@@ -115,6 +115,8 @@ Abrir <http://localhost:8077>.
 | `auditoria@novvus.demo` | `Demo2026!` | Auditorías |
 | `automatizacion@novvus.demo` | `Demo2026!` | Automatización |
 
+Estas credenciales son exclusivas del entorno de demostración local. No las reutilices en un despliegue real: crea cuentas nuevas y rota todos los secretos antes de exponer la plataforma.
+
 Organización de demostración: `01a1a51b-372e-74f3-b194-1b03e034628e`.
 
 ---

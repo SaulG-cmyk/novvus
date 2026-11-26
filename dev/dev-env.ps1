@@ -1,7 +1,19 @@
-# Dev environment for Novvus module development
-$env:NOVVUS_DATABASE_URL = "postgres://novvus:c60d9af8f4bcc458b9bbf45d0ef206f4@localhost:5432/novvus"
-$env:NOVVUS_KERNEL_URL = "http://localhost:8000"
-$env:NOVVUS_INTERNAL_HMAC_SECRET = "967699a93e53602c74a49e40fa89f2dc3d41dc1dc37e9e95210576b3f8dcf8b7"
-$env:NOVVUS_MODULE_DB_PASSWORD = "a801f7fe59c7a6bdfd68b29e778a08f7"
-Write-Host "Dev env loaded. NOVVUS_DATABASE_URL=$env:NOVVUS_DATABASE_URL"
-Write-Host "Kernel: $env:NOVVUS_KERNEL_URL"
+# Dev environment for Novvus module development.
+# Los secretos se leen de entrega/_build/docker/.env, que no se versiona.
+# Copia .env.example a .env y sustituye los valores antes de usar este script.
+$repo = Split-Path -Parent $PSScriptRoot
+$envFile = Join-Path $repo 'entrega\_build\docker\.env'
+if (-not (Test-Path $envFile)) {
+  throw "No se encontró $envFile. Cópialo de .env.example y rellénalo antes de continuar."
+}
+
+$vals = @{}
+foreach ($line in Get-Content $envFile) {
+  if ($line -match '^\s*([A-Z0-9_]+)=(.*)$') { $vals[$matches[1]] = $matches[2].Trim('"') }
+}
+
+$env:NOVVUS_DATABASE_URL = "postgres://$($vals['POSTGRES_USER']):$($vals['POSTGRES_PASSWORD'])@localhost:5432/$($vals['POSTGRES_DB'])"
+$env:NOVVUS_KERNEL_URL = 'http://localhost:8000'
+$env:NOVVUS_INTERNAL_HMAC_SECRET = $vals['NOVVUS_INTERNAL_HMAC_SECRET']
+$env:NOVVUS_MODULE_DB_PASSWORD = $vals['NOVVUS_MODULE_DB_PASSWORD']
+Write-Host 'Dev env loaded from local .env (secretos no mostrados).'

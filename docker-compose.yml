@@ -1,0 +1,187 @@
+# Novvus — entorno académico, autocontenido.
+# Se construye solo con código del repo e imágenes públicas (Python, PostgreSQL, nginx).
+# No necesita acceso a ghcr.io/novvus ni al núcleo comercial de la empresa.
+#
+#   docker compose up --build
+#   http://localhost:8081
+#
+# La guía completa está en README-academico.md.
+
+name: novvus-academico
+
+x-module: &module
+  restart: unless-stopped
+  environment: &module-env
+    NOVVUS_DATABASE_URL: postgresql+psycopg://novvus:novvus_demo@postgres:5432/novvus
+    NOVVUS_INTERNAL_HMAC_SECRET: demo_only_cambiar_esta_clave_en_clase_2026
+    NOVVUS_MODULE_PORT: "8100"
+  networks: [backend]
+  healthcheck: &module-health
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2)"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: academico/.env.demo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+  db-init:
+    image: postgres:16-alpine
+    env_file: academico/.env.demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./academico/init-db.sh:/init-db.sh:ro
+      - ./dev/modules:/modules:ro
+      - ./academico/migrations-extra:/extra:ro
+      - ./academico/data-fixes:/fixes:ro
+    entrypoint: ["bash", "/init-db.sh"]
+    restart: "no"
+    networks: [backend]
+
+  seed:
+    build:
+      context: .
+      dockerfile: academico/Dockerfile.seed
+    env_file: academico/.env.demo
+    environment:
+      NOVVUS_DATABASE_URL: postgresql+psycopg://novvus:novvus_demo@postgres:5432/novvus
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: "no"
+    networks: [backend]
+
+  auditorias:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: auditorias
+    image: novvus-modulo-auditorias:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  automatizacion:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: automatizacion
+    image: novvus-modulo-automatizacion:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  facturacion:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: facturacion
+    image: novvus-modulo-facturacion:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  inventario:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: inventario
+    image: novvus-modulo-inventario:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  logistica:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: logistica
+    image: novvus-modulo-logistica:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  reclutamiento:
+    <<: *module
+    build:
+      context: .
+      dockerfile: Dockerfile.modulo
+      args:
+        MODULE: reclutamiento
+    image: novvus-modulo-reclutamiento:local
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  gateway:
+    build:
+      context: .
+      dockerfile: academico/Dockerfile.gateway
+    env_file: academico/.env.demo
+    restart: unless-stopped
+    depends_on:
+      auditorias:
+        condition: service_healthy
+      automatizacion:
+        condition: service_healthy
+      facturacion:
+        condition: service_healthy
+      inventario:
+        condition: service_healthy
+      logistica:
+        condition: service_healthy
+      reclutamiento:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./academico/web:/usr/share/nginx/html:ro
+      - ./academico/web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+    networks: [backend]
+
+volumes:
+  pgdata:
+
+networks:
+  backend:

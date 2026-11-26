@@ -1,0 +1,17 @@
+.git
+.gitignore
+Lictus-Odoo
+dev/venv
+entrega
+documentación-html
+capturas
+diagramas
+*.pdf
+*.png
+*.svg
+*.zip
+*.dump
+*.tar.gz
+__pycache__
+*.pyc
+*.log

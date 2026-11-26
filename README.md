@@ -4,10 +4,19 @@ Plataforma de gestión empresarial que corre en contenedores: ocho módulos de n
 
 Versión del núcleo: **0.3.72** · Noviembre de 2026
 
+## Dos formas de arrancarlo
+
+- **Para la materia de Docker:** empieza por [`README-academico.md`](README-academico.md) y ejecuta
+  `docker compose up --build` en la raíz. Es un entorno autocontenido: construye los seis módulos
+  desde `dev/` y no necesita imágenes privadas ni credenciales.
+- **Para la entrega a la empresa:** sigue [`LEEME.md`](LEEME.md). Usa las imágenes comerciales del
+  núcleo en `ghcr.io/novvus`.
+
 ## Estructura
 
 | Ruta | Qué es |
 |---|---|
+| `docker-compose.yml`, `Dockerfile.modulo`, `academico/` | Entorno académico autocontenido: compose, imagen de módulo, pasarela, semilla y web. |
 | `dev/` | Código fuente en desarrollo: SDK, los seis módulos propios, los módulos base y el entorno de pruebas. |
 | `entrega/` | Paquete de entrega: PDFs, fuentes HTML, capturas, diagramas y evidencia del host. |
 | `documentación-html/` | Sitio de documentación técnica en HTML. |
@@ -25,7 +34,7 @@ Versión del núcleo: **0.3.72** · Noviembre de 2026
 - `entrega/capturas/`, `entrega/diagramas/` — 21 capturas PNG y 8 diagramas SVG.
 - `entrega/evidencia/` — registro del host, captura del terminal y la imagen del módulo CRM con su suma de verificación.
 
-## Puesta en marcha
+## Puesta en marcha (entorno de la empresa)
 
 Los requisitos y el procedimiento completo están en `LEEME.md`. En resumen:
 

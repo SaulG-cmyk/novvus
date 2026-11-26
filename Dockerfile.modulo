@@ -1,0 +1,21 @@
+# Imagen de ejecución de un módulo Novvus, construida desde el código del repo.
+# No depende de ninguna imagen privada: solo Python oficial y el SDK local.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /src
+COPY dev/sdk /src/sdk
+RUN pip install --no-cache-dir /src/sdk
+
+ARG MODULE
+COPY dev/modules/${MODULE} /app/module
+WORKDIR /app/module
+
+EXPOSE 8100
+HEALTHCHECK --interval=10s --timeout=5s --retries=12 --start-period=20s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2)"
+
+# `novvus run` lee novvus.toml del directorio actual y sirve la app FastAPI.
+CMD ["novvus", "run", "--host", "0.0.0.0", "--port", "8100"]

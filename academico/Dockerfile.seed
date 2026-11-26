@@ -1,0 +1,15 @@
+# Contenedor de un solo uso: ejecuta las funciones @module.seed de los seis módulos.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /src
+COPY dev/sdk /src/sdk
+RUN pip install --no-cache-dir /src/sdk
+
+COPY dev/modules /modules
+COPY academico/seed.sh /usr/local/bin/seed.sh
+RUN chmod +x /usr/local/bin/seed.sh
+
+CMD ["bash", "/usr/local/bin/seed.sh"]

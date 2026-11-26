@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novvus · entorno académico</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #000; background: #f7f7f7; }
+    header { padding: 40px 24px 28px; border-bottom: 1px solid #000; background: #fff; }
+    h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -0.02em; }
+    header p { margin: 0; max-width: 760px; color: #444; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { border: 1px solid #000; background: #fff; padding: 18px; }
+    .card h2 { margin: 0 0 4px; font-size: 18px; }
+    .card small { color: #555; }
+    button { display: block; width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid #000;
+             background: #fff; color: #000; text-align: left; cursor: pointer; font: inherit; }
+    button:hover { background: #000; color: #fff; }
+    h3 { margin: 36px 0 10px; font-size: 16px; }
+    pre { margin: 0; padding: 16px; border: 1px solid #000; background: #fff; overflow: auto; min-height: 80px; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+    footer { margin-top: 36px; border-top: 1px solid #000; padding-top: 14px; color: #555; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Novvus · entorno académico</h1>
+    <p>Seis módulos de negocio construidos desde el código del repositorio. La pasarela firma cada
+       petición con HMAC y la envía al módulo correspondiente; PostgreSQL guarda los datos por esquema.</p>
+  </header>
+  <main>
+    <div id="modulos" class="grid">Cargando módulos…</div>
+    <h3>Respuesta de la API</h3>
+    <pre id="salida"><code>Selecciona un recurso para ver los primeros registros.</code></pre>
+    <footer>Docker Compose: PostgreSQL + inicialización + semilla + 6 módulos + pasarela + nginx.</footer>
+  </main>
+  <script>
+    const salida = document.getElementById('salida');
+    const contenedor = document.getElementById('modulos');
+
+    async function ver(modulo, recurso) {
+      salida.textContent = 'Cargando ' + modulo + '/' + recurso + '…';
+      try {
+        const response = await fetch(`/api/${modulo}/${recurso}?limit=5&with_total=true`);
+        const data = await response.json();
+        salida.textContent = JSON.stringify({ http: response.status, modulo, recurso, data }, null, 2);
+      } catch (error) {
+        salida.textContent = 'Error: ' + error;
+      }
+    }
+
+    fetch('/modulos')
+      .then(response => response.json())
+      .then(data => {
+        contenedor.innerHTML = '';
+        Object.entries(data).forEach(([modulo, info]) => {
+          const card = document.createElement('section');
+          card.className = 'card';
+          const title = document.createElement('h2');
+          title.textContent = modulo;
+          card.appendChild(title);
+          const note = document.createElement('small');
+          note.textContent = info.recursos.length + ' recursos · ' + info.url;
+          card.appendChild(note);
+          info.recursos.forEach(recurso => {
+            const button = document.createElement('button');
+            button.textContent = 'GET ' + recurso;
+            button.onclick = () => ver(modulo, recurso);
+            card.appendChild(button);
+          });
+          contenedor.appendChild(card);
+        });
+      })
+      .catch(error => { contenedor.textContent = 'No se pudo cargar /modulos: ' + error; });
+  </script>
+</body>
+</html>

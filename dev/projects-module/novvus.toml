@@ -1,0 +1,101 @@
+[module]
+id = "projects"
+name = "Proyectos"
+version = "0.2.3"
+description = "Gestión de proyectos: portafolio, fases, procesos con etapas, actividades y subtareas, hitos, entregables, dependencias, riesgos, aprobaciones y plantillas. Se vincula con oportunidades del CRM."
+
+[manifest]
+api_version = "novvus.dev/v1"
+kind = "module"
+
+[publisher]
+id = "novvus"
+name = "Novvus"
+
+[distribution]
+visibility = "standard"
+image = "ghcr.io/novvus/projects"
+platforms = ["linux/amd64", "linux/arm64"]
+
+[compatibility]
+core = ">=0.2.0,<0.4.0"
+sdk = ">=0.2.0,<0.3.0"
+platform_api = 1
+
+[entitlement]
+required = false
+
+[presentation]
+display_name = "Proyectos"
+summary = "Planifica y supervisa proyectos: fases, procesos, actividades, hitos, riesgos y avance real."
+category = "Operaciones"
+icon = "folder-kanban"
+accent = "bg-violet-500/15 text-violet-600 dark:text-violet-300"
+publisher = "Novvus"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1"]
+# Cross-module API access (through the gateway, never the tables).
+service_permissions = ["crm.contacts.read"]
+
+[[permissions]]
+key = "projects.projects.read"
+description = "Ver proyectos"
+
+[[permissions]]
+key = "projects.projects.write"
+description = "Crear y editar proyectos"
+
+[[permissions]]
+key = "projects.tasks.read"
+description = "Ver tareas"
+
+[[permissions]]
+key = "projects.tasks.write"
+description = "Crear y editar tareas"
+
+[[permissions]]
+key = "projects.projects.delete"
+description = "Archivar y eliminar proyectos"
+
+[[permissions]]
+key = "projects.templates.read"
+description = "Ver plantillas de proyecto"
+
+[[permissions]]
+key = "projects.templates.write"
+description = "Crear y editar plantillas de proyecto"
+
+[[permissions]]
+key = "projects.approvals.decide"
+description = "Aprobar o rechazar entregables, hitos y etapas"
+
+[events]
+emits = ["projects.project.created", "projects.project.completed", "projects.task.completed"]
+listens = ["crm.opportunity.won"]
+
+[runtime]
+port = 8120
+healthcheck = "/health"
+
+# Sin [ui]: la shell navega por las vistas genéricas declaradas en los modelos (docs/VIEWS.md §8e),
+# como cualquier módulo de la plataforma.
+
+# Per-organization configuration (docs/MODULE_CONTRACT.md §8).
+[[config]]
+key = "projects.create_on_won"
+type = "boolean"
+label = "Crear proyecto al ganar una oportunidad"
+description = "Si está activo, cada oportunidad ganada en el CRM crea automáticamente un proyecto vinculado. Si no, el CRM ofrece la acción «Crear proyecto»."
+default = false
+permission = "projects.projects.write"
+
+[[config]]
+key = "projects.default_currency"
+type = "select"
+label = "Moneda predeterminada"
+description = "Moneda usada para los presupuestos de proyectos nuevos."
+options = ["MXN", "USD", "EUR"]
+default = "MXN"
+permission = "projects.projects.write"

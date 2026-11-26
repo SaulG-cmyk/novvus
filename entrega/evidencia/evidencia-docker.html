@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Evidencia de imágenes y contenedores · Novvus</title>
+<style>
+@font-face { font-family: "Barlow"; src: url("../documentacion/assets/fonts/Barlow-Regular.ttf"); font-weight: 400; }
+@font-face { font-family: "Barlow"; src: url("../documentacion/assets/fonts/Barlow-Medium.ttf"); font-weight: 500; }
+@font-face { font-family: "Barlow"; src: url("../documentacion/assets/fonts/Barlow-SemiBold.ttf"); font-weight: 600; }
+@font-face { font-family: "Barlow"; src: url("../documentacion/assets/fonts/Barlow-Bold.ttf"); font-weight: 700; }
+@font-face { font-family: "Barlow"; src: url("../documentacion/assets/fonts/Barlow-Black.ttf"); font-weight: 900; }
+
+@page { size: A4; margin: 15mm 15mm 12mm; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: "Barlow", sans-serif; color: #1a1a1a; font-size: 10.6px; line-height: 1.45; }
+.mono { font-family: "Cascadia Mono", Consolas, monospace; }
+
+header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 7px; }
+header img { height: 32px; }
+header .lbl { font-size: 8px; letter-spacing: .16em; text-transform: uppercase; color: #5f5f5f; }
+
+h1 { font-size: 26px; font-weight: 900; letter-spacing: -.01em; margin: 13px 0 3px; line-height: 1.05; }
+.lead { color: #444; margin: 0 0 11px; font-size: 10px; max-width: 118ch; }
+
+.meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #c9c9c9; margin-bottom: 14px; }
+.meta div { padding: 5px 8px; border-right: 1px solid #dcdcdc; }
+.meta div:last-child { border-right: 0; }
+.meta dt { font-size: 7px; letter-spacing: .14em; text-transform: uppercase; color: #6a6a6a; margin: 0 0 1px; }
+.meta dd { margin: 0; font-size: 10px; font-weight: 600; }
+
+h2 { font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; font-weight: 700; margin: 15px 0 5px; padding-bottom: 3px; border-bottom: 1px solid #000; }
+h2 span { color: #8a8a8a; font-weight: 500; letter-spacing: 0; margin-left: 6px; text-transform: none; font-size: 9.4px; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 7px; letter-spacing: .12em; text-transform: uppercase; color: #6a6a6a; font-weight: 600; padding: 3px 6px; border-bottom: 1px solid #999; }
+td { padding: 3.4px 6px; border-bottom: 1px solid #e6e6e6; vertical-align: middle; }
+td.ref { font-weight: 600; white-space: nowrap; }
+.mono.dg { font-size: 7.5px; color: #3f3f3f; }
+.num { text-align: right; white-space: nowrap; }
+.ok { font-weight: 600; white-space: nowrap; }
+.dot { display: inline-block; width: 5px; height: 5px; background: #000; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+
+pre { background: #f6f6f6; border: 1px solid #dcdcdc; border-left: 3px solid #000; padding: 7px 10px; font-size: 8px; line-height: 1.55; margin: 5px 0 0; white-space: pre-wrap; }
+pre .c { color: #6d6d6d; }
+
+.note { border: 1px solid #000; padding: 7px 10px; margin-top: 10px; font-size: 9.3px; line-height: 1.5; }
+.note b { display: block; font-size: 7px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 2px; }
+
+figure { margin: 6px 0 0; }
+figure img { width: 100%; border: 1px solid #d0d0d0; display: block; }
+figcaption { font-size: 8.2px; color: #666; margin-top: 4px; }
+
+.foot { margin-top: 12px; padding-top: 5px; border-top: 1px solid #d0d0d0; display: flex; justify-content: space-between; font-size: 7.6px; color: #6f6f6f; letter-spacing: .04em; }
+
+.page { page-break-after: always; }
+.page:last-of-type { page-break-after: auto; }
+</style>
+</head>
+<body>
+
+<!-- PÁGINA 1 -->
+<div class="page">
+  <header>
+    <img src="../documentacion/assets/novvus-black.svg" alt="Novvus">
+    <div class="lbl">Evidencia de despliegue · imágenes en el host</div>
+  </header>
+
+  <h1>Imágenes y contenedores en ejecución</h1>
+  <p class="lead">Registro del ambiente que produce las capturas y las pruebas de esta entrega. Los identificadores <span class="mono">sha256</span> son la huella de cada imagen: permiten comprobar que la versión evaluada es exactamente la que describe el reporte técnico.</p>
+
+  <div class="meta">
+    <div><dt>Fecha</dt><dd>25 de noviembre de 2026</dd></div>
+    <div><dt>Host</dt><dd>Ubuntu 26.04 · WSL2</dd></div>
+    <div><dt>Docker Engine</dt><dd>29.1.3</dd></div>
+    <div><dt>Compose</dt><dd>2.40.3</dd></div>
+  </div>
+
+  <h2>1. Imágenes <span>siete en uso; cinco del núcleo, distribuidas como imágenes comerciales</span></h2>
+  <table>
+    <thead><tr><th style="width:38%">Imagen</th><th>Digest · ID local</th><th class="num">Tamaño</th><th class="num">Creada</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="ref">ghcr.io/novvus/core:0.3.72</td>
+        <td><span class="mono dg">sha256:a4dbe0862e060fcd876a24aa1685a69a3eb4c63c4e31a7617fd68cf4752b2ba5</span></td>
+        <td class="num">172 MB</td><td class="num">12 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">ghcr.io/novvus/web:0.3.72</td>
+        <td><span class="mono dg">sha256:f5e2a82886e17964f07c9e3ae4b0a3fa7c8b33e8a7210fd0cd28a22c4c0051bd</span></td>
+        <td class="num">1.32 GB</td><td class="num">12 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">ghcr.io/novvus/bootstrap:0.3.72</td>
+        <td><span class="mono dg">sha256:47dfc05703a38f0b5ab699c3e7bfcc7e01fb1b78bd0379e28d723e4436a8b25e</span></td>
+        <td class="num">290 MB</td><td class="num">12 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">ghcr.io/novvus/crm</td>
+        <td><span class="mono dg">sha256:30ef4a9f9138007b84f82c06c99140abb1fbc399b693cfbd918462fdec1cc8a4</span></td>
+        <td class="num">298 MB</td><td class="num">2 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">ghcr.io/novvus/projects</td>
+        <td><span class="mono dg">sha256:93855d895ba84d8f90be24e8e5f2c62aa49ce128b75d7aab23137cb1f4d8a8fc</span></td>
+        <td class="num">299 MB</td><td class="num">9 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">postgres:16-alpine</td>
+        <td><span class="mono dg">sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139</span></td>
+        <td class="num">420 MB</td><td class="num">5 nov</td>
+      </tr>
+      <tr>
+        <td class="ref">novvus-crm:0.2.20</td>
+        <td><span class="mono dg">sha256:cdf1c4ce14060e856d75a9283d5c1230cc8c6a451b7d71afb92d83e8055c7111</span></td>
+        <td class="num">288 MB</td><td class="num">4 nov</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.4px;color:#666;margin:4px 0 0">Los módulos <span class="mono">crm</span> y <span class="mono">projects</span> se ejecutan anclados por digest, no por etiqueta: el compose fija el <span class="mono">sha256</span> para que un <span class="mono">pull</span> posterior no cambie el binario. La última fila es la imagen base de los módulos: se publicó en el registro personal (<span class="mono">ghcr.io/saulg-cmyk/crm:0.2.20</span>, pública) y en el host se etiqueta como <span class="mono">novvus-crm:0.2.20</span>; los seis contenedores de desarrollo la ejecutan con el código de cada módulo montado en <span class="mono">/app/module</span> (sección 6).</p>
+
+  <h2>2. Contenedores <span>once en ejecución: cinco de plataforma y seis módulos propios, todos con healthcheck en verde</span></h2>
+  <table>
+    <thead><tr><th style="width:31%">Contenedor</th><th style="width:31%">Imagen</th><th>Salud</th><th class="num">Puerto publicado</th></tr></thead>
+    <tbody>
+      <tr><td class="ref">novvus-prod-web-1</td><td class="mono" style="font-size:8.2px">ghcr.io/novvus/web:0.3.72</td><td class="ok"><span class="dot"></span>healthy</td><td class="num mono" style="font-size:8.2px">8077 → 3000</td></tr>
+      <tr><td class="ref">novvus-prod-kernel-1</td><td class="mono" style="font-size:8.2px">ghcr.io/novvus/core:0.3.72</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-prod-postgres-1</td><td class="mono" style="font-size:8.2px">postgres:16-alpine</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-prod-crm-1</td><td class="mono" style="font-size:8.2px">novvus/crm@30ef4a9</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-prod-projects-1</td><td class="mono" style="font-size:8.2px">novvus/projects@93855d8</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-reclutamiento</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-logistica</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-auditorias</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-automatizacion</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-facturacion</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+      <tr><td class="ref">novvus-dev-inventario</td><td class="mono" style="font-size:8.2px">novvus-crm:0.2.20</td><td class="ok"><span class="dot"></span>healthy</td><td class="num">interno</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.4px;color:#666;margin:4px 0 0">Solo la capa web publica un puerto al equipo del usuario. Kernel, base y módulos viven en la red interna del compose y no son alcanzables desde el navegador.</p>
+
+  <div class="note"><b>Alcance de la evidencia</b>Las imágenes del núcleo son comerciales y se consumen desde <span class="mono">ghcr.io/novvus</span>: no se redistribuyen en el paquete. Lo que se entrega como evidencia es su huella <span class="mono">sha256</span> y el estado del host donde corren, junto con el código fuente del SDK y de los módulos, y la imagen propia del módulo CRM (sección 6). Cualquier persona con acceso al registro puede reproducir la misma huella con <span class="mono">docker pull</span>.</div>
+
+  <div class="foot"><span>NOVVUS · EVIDENCIA DE DESPLIEGUE · 25 DE NOVIEMBRE DE 2026</span><span>1 / 2</span></div>
+</div>
+
+<!-- PÁGINA 2 -->
+<div class="page">
+  <header>
+    <img src="../documentacion/assets/novvus-black.svg" alt="Novvus">
+    <div class="lbl">Evidencia de despliegue · captura y verificación</div>
+  </header>
+
+  <h2 style="margin-top:10px">3. Captura del host <span>salida real de los dos comandos, el 25 de noviembre a las 19:14</span></h2>
+  <figure>
+    <img src="terminal-docker.png" alt="Terminal con la salida de docker ps y docker images --digests">
+    <figcaption><b>Figura 1.</b> Terminal en WSL: contenedores en ejecución y digests de las imágenes. Las versiones 0.3.70 que aún aparecen en la lista son caché local, no están en uso.</figcaption>
+  </figure>
+
+  <h2>4. Cómo verificar</h2>
+  <pre><span class="c"># imágenes con su digest · estado y salud · huella exacta del núcleo</span>
+docker images --digests
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+docker image inspect ghcr.io/novvus/core:0.3.72 --format '{{json .RepoDigests}}'
+<span class="c"># regenerar el registro de texto</span>
+bash evidencia/collect.sh</pre>
+
+  <h2>5. Consumo en disco <span>doce imágenes en el host, siete en uso</span></h2>
+  <table>
+    <thead><tr><th style="width:30%">Recurso</th><th class="num">Total</th><th class="num">En uso</th><th class="num">Tamaño</th><th class="num">Recuperable</th></tr></thead>
+    <tbody>
+      <tr><td class="ref">Imágenes</td><td class="num">12</td><td class="num">7</td><td class="num">4.38 GB</td><td class="num">2.64 GB</td></tr>
+      <tr><td class="ref">Contenedores</td><td class="num">12</td><td class="num">11</td><td class="num">713 kB</td><td class="num">4 kB</td></tr>
+      <tr><td class="ref">Volúmenes</td><td class="num">3</td><td class="num">3</td><td class="num">74.8 MB</td><td class="num">0</td></tr>
+      <tr><td class="ref">Caché de construcción</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.4px;color:#666;margin:4px 0 0">Las cinco imágenes que no están en uso son versiones anteriores conservadas en la caché local. Se pueden liberar con <span class="mono">docker image prune -a</span>; el respaldo de la base vive en el volumen <span class="mono">pgdata</span>, no en las imágenes.</p>
+
+  <h2>6. Imagen del módulo CRM <span>la base de los seis módulos, también como archivo</span></h2>
+  <table>
+    <thead><tr><th style="width:30%">Referencia</th><th>Digest</th><th class="num">Tamaño</th></tr></thead>
+    <tbody>
+      <tr><td class="ref">ghcr.io/saulg-cmyk/crm:0.2.20</td><td><span class="mono dg">sha256:cdf1c4ce14060e856d75a9283d5c1230cc8c6a451b7d71afb92d83e8055c7111</span></td><td class="num">288 MB</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:8.4px;color:#666;margin:4px 0 0">Es la única imagen del ambiente que se redistribuye: es propia, no comercial. Se incluye comprimida en <span class="mono">evidencia/crm-0.2.20.tar.gz</span> (67.4 MB, 11 capas) con su suma de verificación al lado; el paquete público del registro permite comprobar que el archivo coincide con la huella.</p>
+  <pre>sha256sum -c evidencia/crm-0.2.20.tar.gz.sha256
+docker load -i evidencia/crm-0.2.20.tar.gz</pre>
+
+  <div class="foot"><span>NOVVUS · EVIDENCIA DE DESPLIEGUE · 25 DE NOVIEMBRE DE 2026</span><span>2 / 2</span></div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,2 @@
+FROM ghcr.io/novvus/crm:latest
+COPY dev/sdk/src/novvus_sdk /usr/local/lib/python3.12/site-packages/novvus_sdk

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instalación — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav active" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Empezar / Instalación</div>
+    <article>
+      <h1>Instalación</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">Tres caminos claramente separados: (A) una demo en tu laptop con datos de
+      ejemplo, (B) producción en un servidor Linux con el CLI <code>novvus</code>, y (C) el modo
+      desarrollador para modificar el código. Elige uno con la tabla de abajo y sigue solo esa
+      sección; al final hay una lista de verificación común.</p>
+
+      <h2>Resumen para decidir</h2>
+      <table>
+        <tr><th>Camino</th><th>Úsalo cuando</th><th>Necesitas</th><th>Comando principal</th><th>Entras en</th></tr>
+        <tr>
+          <td><strong>A · Demo local</strong></td>
+          <td>Quieres ver la plataforma completa funcionando en tu computadora, con datos de ejemplo.</td>
+          <td>Docker Desktop + Python 3.8+</td>
+          <td><code>python install.py</code></td>
+          <td><code>http://localhost:3000</code> con <code>demo@novvus.dev</code></td>
+        </tr>
+        <tr>
+          <td><strong>B · Producción</strong></td>
+          <td>Vas a instalar en un servidor Linux para usuarios reales, con actualizaciones seguras.</td>
+          <td>Servidor Linux x86_64/arm64 con Docker y root</td>
+          <td><code>sudo novvus install</code></td>
+          <td><code>http://&lt;servidor&gt;:8077</code>, creas tu cuenta (first-run)</td>
+        </tr>
+        <tr>
+          <td><strong>C · Desarrollador</strong></td>
+          <td>Vas a modificar kernel, SDK, módulos o frontend con recarga rápida.</td>
+          <td>Docker, Rust, Python 3.12+, Node 22</td>
+          <td><code>make up</code> + procesos locales</td>
+          <td><code>http://localhost:3000</code></td>
+        </tr>
+        <tr>
+          <td><strong>D · Manual</strong></td>
+          <td>Producción sin el CLI (casos especiales: automatización propia, auditoría).</td>
+          <td>Lo mismo que B</td>
+          <td><code>docker compose -f docker-compose.prod.yml up -d --wait</code></td>
+          <td><code>http://&lt;servidor&gt;:8077</code></td>
+        </tr>
+      </table>
+      <div class="note">
+        <b>Qué levanta cualquiera de los caminos.</b> Seis servicios: <strong>postgres</strong>
+        (PostgreSQL 16), <strong>kernel</strong> (gateway Rust), <strong>bootstrap</strong>
+        (aprovisionamiento de una sola pasada: registra e instala los módulos y termina en
+        <code>Exited (0)</code>, lo cual es correcto), los módulos <strong>crm</strong> y
+        <strong>projects</strong>, y <strong>web</strong> (Next.js). El módulo <code>salesmx</code>
+        existe en el repositorio pero no forma parte de ningún <code>docker-compose</code> ni del
+        bootstrap; se despliega a mano en el camino C.
+      </div>
+
+      <h2>A · Demo local en tu laptop (<code>install.py</code>)</h2>
+      <p>Funciona en Windows, macOS y Linux. El único requisito real es Docker; el instalador
+      está escrito en Python estándar (3.8 o superior) sin dependencias externas.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Instala Docker Desktop</strong> (o Docker Engine con Compose v2 en Linux) y ábrelo.
+          Si no lo tienes, el propio instalador te lo sugiere: en Windows
+          <code>winget install Docker.DockerDesktop</code>, en macOS <code>brew install --cask docker</code>,
+          en Linux <code>curl -fsSL https://get.docker.com | sh</code>. Si Docker está instalado pero
+          no responde, el instalador intenta abrir Docker Desktop y espera hasta unos 4 minutos.
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Clona el repositorio y ejecuta el instalador.</strong>
+<pre><code>git clone https://github.com/artmichel-dev/Novvus-Core &amp;&amp; cd Novvus-Core
+python install.py            <span class="c"># instala + enciende + siembra demo + abre navegador</span></code></pre>
+          En Windows también puedes hacer doble clic en <code>install.bat</code> (busca
+          <code>py -3</code> y luego <code>python</code>; si no hay Python sugiere
+          <code>winget install Python.Python.3.12</code>). En Linux/macOS, <code>./install.sh</code>
+          equivale a <code>python3 install.py</code>. Con <code>python install.py --no-browser</code> no
+          abre el navegador (útil en un servidor de pruebas).
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Espera.</strong> El instalador comprueba que los puertos <code>3000</code> y
+          <code>8000</code> estén libres (solo avisa), construye las imágenes con
+          <code>docker-compose.full.yml</code> (la primera vez tarda 10-20 minutos porque compila
+          Rust y Node desde cero), levanta todo con <code>--wait</code>, espera al
+          <code>/health</code> del kernel y a la web, y abre el navegador.
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Entra.</strong> En <code>http://localhost:3000</code> con las credenciales de demo.
+          El kernel queda accesible en <code>http://localhost:8000</code> (por ejemplo
+          <code>http://localhost:8000/health</code>).
+<pre><code>Usuario:    demo@novvus.dev
+Contraseña: demo-password-123</code></pre>
+          La organización «Novvus Demo» ya tiene los módulos CRM y Proyectos habilitados, los
+          roles «Ventas» y «Gerente de ventas», y datos sembrados (empresas, contactos, leads y
+          un pipeline con oportunidades).
+        </div></div>
+      </div>
+      <h3>Subcomandos del instalador</h3>
+      <table>
+        <tr><th>Comando</th><th>Qué hace</th></tr>
+        <tr><td><code>python install.py</code></td><td>Instala y enciende todo (idempotente: puedes repetirlo).</td></tr>
+        <tr><td><code>python install.py start</code></td><td>Enciende sin reconstruir imágenes.</td></tr>
+        <tr><td><code>python install.py stop</code></td><td>Apaga conservando los datos.</td></tr>
+        <tr><td><code>python install.py status</code></td><td>Muestra los servicios y el healthcheck del kernel.</td></tr>
+        <tr><td><code>python install.py logs</code></td><td>Logs en vivo de todos los contenedores.</td></tr>
+        <tr><td><code>python install.py update</code></td><td><code>git pull --ff-only</code> + reconstruir + reiniciar. Conserva los volúmenes (datos).</td></tr>
+        <tr><td><code>python install.py reset</code></td><td>Borra contenedores, imágenes locales <strong>y datos</strong>. Pide escribir <code>BORRAR</code>.</td></tr>
+      </table>
+      <div class="tip">
+        <b>Si algo no responde.</b> «Docker no está instalado» → instálalo y vuelve a ejecutar.
+        «El puerto 3000/8000 está en uso» → cierra lo que lo ocupe (otro Novvus, un
+        <code>npm run dev</code>). Construcción lenta → es normal la primera vez; la segunda usa
+        caché. Para ver qué falla: <code>python install.py logs</code>.
+      </div>
+      <details class="fold"><summary>Ver más: qué hay dentro de <code>docker-compose.full.yml</code></summary>
+        <p>Proyecto Docker <code>novvus</code>. Postgres sin puerto en el host (usuario/base
+        <code>novvus</code>), kernel en <code>8000:8000</code>, bootstrap con <code>NOVVUS_DEMO=1</code> y
+        <code>SEED=1</code> (crea el usuario demo, la organización, despliega los módulos, crea roles y
+        siembra datos; guarda los tokens de servicio en el volumen <code>novvus_tokens</code>), módulos
+        crm (interno 8110) y projects (interno 8120), web en <code>3000:3000</code>. Volúmenes:
+        <code>novvus_full_pgdata</code>, <code>novvus_tokens</code>, <code>novvus_minio</code>. Existe un
+        perfil opcional <code>s3</code> con MinIO en el puerto 9000 para probar el backend de
+        adjuntos S3. Variables que el bootstrap admite para personalizar la demo:
+        <code>NOVVUS_ADMIN_EMAIL</code>, <code>NOVVUS_ADMIN_PASSWORD</code>, <code>NOVVUS_ORG_NAME</code>,
+        <code>NOVVUS_ORG_SLUG</code>, <code>SEED</code>.</p>
+      </details>
+
+      <h2>B · Producción en un servidor Linux (CLI <code>novvus</code>)</h2>
+      <p>Esta es la ruta soportada para usuarios reales. El servidor <strong>no necesita el
+      repositorio</strong>, ni Rust, ni Python, ni Node: el CLI trae la plantilla de despliegue
+      embebida y descarga imágenes ya construidas desde <code>ghcr.io/novvus/*</code>.</p>
+      <h3>Requisitos del servidor</h3>
+      <table>
+        <tr><th>Recurso</th><th>Mínimo útil</th><th>Recomendado</th></tr>
+        <tr><td>Sistema operativo</td><td>Linux x86_64 o arm64 (Ubuntu Server 22.04 LTS)</td><td>Ubuntu Server 24.04 LTS</td></tr>
+        <tr><td>CPU / RAM</td><td>2 vCPU / 4 GB</td><td>4 vCPU / 8 GB</td></tr>
+        <tr><td>Disco</td><td>30 GB SSD</td><td>50+ GB SSD (los respaldos de <code>novvus update</code> se guardan en el servidor)</td></tr>
+        <tr><td>Software</td><td>Docker Engine + Compose v2, <code>curl</code>, acceso root (<code>sudo</code>)</td><td>Igual; <code>jq</code> es opcional</td></tr>
+        <tr><td>Red</td><td>IP pública, puerto 22 solo desde tu IP</td><td>IP fija + dominio + puertos 80/443 para el proxy</td></tr>
+      </table>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Prepara el sistema e instala Docker</strong> (una vez, como en cualquier VPS Ubuntu):
+<pre><code>ssh ubuntu@IP_DEL_SERVIDOR
+sudo apt update &amp;&amp; sudo apt upgrade -y
+sudo apt install -y ca-certificates curl gnupg
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release &amp;&amp; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list &gt; /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+docker compose version      <span class="c"># debe decir v2.x</span></code></pre>
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Instala el CLI administrativo.</strong> Descarga el binario estático de tu
+          arquitectura, verifica su SHA-256 contra el manifiesto publicado y lo deja en
+          <code>/usr/local/bin/novvus</code>:
+<pre><code>curl -fsSL https://install.novvus.dev/install.sh | bash
+novvus version               <span class="c"># Novvus CLI: 0.1.6 / Novvus Core: not installed</span></code></pre>
+          Para fijar una versión concreta: <code>curl -fsSL https://install.novvus.dev/install.sh | bash -s -- 0.1.6</code>.
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Instala Novvus Core.</strong> Sin preguntas: valida Linux + Docker + Compose v2 + root,
+          genera todos los secretos con entropía del sistema, escribe
+          <code>/opt/novvus/docker-compose.yml</code> y <code>/opt/novvus/.env</code> (permisos 600),
+          descarga las imágenes <code>ghcr.io/novvus/{core,web,bootstrap,crm,projects}</code> de la
+          versión exacta del CLI, levanta los 6 servicios y espera sus healthchecks reales (hasta
+          300 s). Al terminar deja <code>/opt/novvus/novvus.json</code> (versión, fecha, arquitectura;
+          sin secretos).
+<pre><code>sudo novvus install</code></pre>
+          El puerto web es <strong>8077</strong>. Si está ocupado el instalador se detiene y te lo dice;
+          nunca elige otro por su cuenta. Para cambiarlo:
+          <code>NOVVUS_WEB_PORT=8088 sudo novvus install</code>. Si detecta una instalación previa en
+          <code>/opt/novvus</code>, se detiene sin tocar nada.
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Comprueba el estado.</strong>
+<pre><code>novvus status                <span class="c"># versión + tabla postgres/kernel/bootstrap/crm/projects/web + URL</span>
+cd /opt/novvus &amp;&amp; docker compose ps   <span class="c"># (opcional) la misma información vista desde Docker</span></code></pre>
+          <code>novvus status</code> devuelve exit code 0 solo si todo está sano; <code>bootstrap</code>
+          aparece como <code>completed</code>. El kernel no tiene puerto en el host: solo es
+          alcanzable a través de la web.
+        </div></div>
+        <div class="step"><span class="num">5</span><div>
+          <strong>First-run en el navegador.</strong> Abre <code>http://IP_DEL_SERVIDOR:8077</code>
+          (temporalmente, solo desde tu IP; ver paso 6). No existe ningún usuario todavía:
+          <ol>
+            <li>Pestaña <strong>Crear cuenta</strong>: nombre, correo y contraseña. Será la cuenta administradora.</li>
+            <li><strong>Crear organización</strong>: nombre e identificador para URL (minúsculas, números y guiones,
+                por ejemplo <code>mi-empresa</code>). Recibes el rol <strong>Owner</strong>.</li>
+            <li>Entra a <strong>Aplicaciones</strong> (<code>/apps</code>) y pulsa <strong>Instalar</strong> y luego
+                <strong>Habilitar</strong> en <strong>CRM</strong>; después en <strong>Proyectos</strong> (depende de CRM:
+                la tienda te mostrará el plan de dependencias y un botón «Habilitar todo»).</li>
+            <li>Vuelve a <strong>Inicio</strong>: tus apps ya aparecen en el launcher.</li>
+          </ol>
+        </div></div>
+        <div class="step"><span class="num">6</span><div>
+          <strong>Publica con dominio y HTTPS (reverse proxy).</strong> Solo la web escucha en el
+          host; Postgres y el kernel viven en la red interna de Docker y el navegador llega al
+          kernel por el proxy interno de la propia web. Para TLS, pon Caddy delante del 8077 (o
+          nginx/Traefik, si lo prefieres):
+<pre><code>sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update &amp;&amp; sudo apt install -y caddy</code></pre>
+          Edita <code>/etc/caddy/Caddyfile</code> (Caddy obtiene el certificado solo cuando el DNS ya apunta al servidor):
+<pre><code>novvus.tu-dominio.com {
+  reverse_proxy 127.0.0.1:8077
+}</code></pre>
+<pre><code>sudo systemctl reload caddy</code></pre>
+          Con el proxy funcionando, <strong>cierra el 8077 en el firewall</strong>: hacia internet solo
+          deben quedar abiertos <code>80</code> y <code>443</code> (y <code>22</code> desde tu IP).
+        </div></div>
+      </div>
+      <div class="warn">
+        <b>Reglas de oro en producción.</b> Nunca expongas <code>8077</code> sin proxy HTTPS. Nunca
+        abras <code>5432</code> ni <code>8000</code>: en la instalación con CLI ni siquiera existen en el
+        host. No edites <code>/opt/novvus/.env</code> a mano salvo que sepas lo que haces: los
+        secretos los genera y preserva el CLI, y <code>novvus update</code> lo migra línea a línea.
+        Los respaldos y la actualización se explican en
+        <a href="actualizacion.html">Actualización y releases</a> y
+        <a href="mantenimiento.html">Mantenimiento</a>.
+      </div>
+      <h3>Qué queda en el servidor</h3>
+      <table>
+        <tr><th>Ruta</th><th>Contenido</th></tr>
+        <tr><td><code>/usr/local/bin/novvus</code></td><td>El CLI administrativo (se reemplaza solo al actualizar).</td></tr>
+        <tr><td><code>/opt/novvus/docker-compose.yml</code></td><td>Plantilla de despliegue de la versión instalada.</td></tr>
+        <tr><td><code>/opt/novvus/.env</code></td><td>Secretos y <code>NOVVUS_VERSION</code>, <code>NOVVUS_WEB_PORT</code>, <code>NOVVUS_LOG_LEVEL</code>. Permisos 600.</td></tr>
+        <tr><td><code>/opt/novvus/novvus.json</code></td><td>Versión instalada, fecha y arquitectura. Base de <code>novvus update</code>.</td></tr>
+        <tr><td><code>/opt/novvus/backups/</code>, <code>/opt/novvus/logs/</code></td><td>Respaldos y logs que crea cada <code>novvus update</code>.</td></tr>
+        <tr><td>Volúmenes <code>pgdata</code>, <code>files</code>, <code>tokens</code></td><td>Base de datos (respaldar), adjuntos (respaldar), tokens de servicio (no borrar).</td></tr>
+      </table>
+
+      <h3>Guías breves por proveedor</h3>
+      <p>Los nombres de los botones cambian, pero el servidor por dentro es el mismo: Ubuntu +
+      SSH + Docker + los pasos 1-6 de arriba. Lo único que varía es cómo abres puertos: en todos
+      los casos <strong>22</strong> solo desde tu IP, <strong>80/443</strong> públicos, y <strong>nunca 8077</strong>
+      público sin el proxy (si quieres probar antes del DNS, ábrelo solo desde tu IP y ciérralo después).</p>
+      <details class="fold"><summary>VPS genérico (DigitalOcean, Linode, Vultr…)</summary>
+        <ol>
+          <li>Crea un droplet/instancia con Ubuntu 24.04 LTS, 2-4 vCPU, 4-8 GB RAM, 50 GB de disco.</li>
+          <li>Agrega tu llave SSH pública; evita contraseñas para SSH.</li>
+          <li>Firewall del proveedor: 22 desde tu IP; 80 y 443 públicos.</li>
+          <li>Apunta un registro <code>A</code> del dominio a la IP y sigue los pasos 1-6.</li>
+        </ol>
+      </details>
+      <details class="fold"><summary>Oracle Cloud Infrastructure (OCI)</summary>
+        <ol>
+          <li>Crea una VCN con subnet pública, internet gateway y route table hacia internet.</li>
+          <li>Crea una instancia Compute con Ubuntu. Las Ampere A1 (arm64) funcionan: el CLI y las imágenes se publican también para <code>linux-arm64</code>.</li>
+          <li>Entra normalmente como <code>ubuntu</code>. Reserva IP pública si el ambiente será estable.</li>
+          <li>En Security List o NSG: 22 desde tu IP; 80/443 públicos.</li>
+        </ol>
+        <div class="tip">OCI tiene dos capas de firewall: las reglas de red de la VCN y el firewall del
+        sistema operativo. Si <code>curl localhost:8077</code> funciona dentro del servidor pero desde tu
+        laptop no, revisa primero Security List/NSG y después <code>sudo ufw status</code>.</div>
+      </details>
+      <details class="fold"><summary>Hostinger VPS</summary>
+        <ol>
+          <li>Contrata un VPS KVM con Ubuntu 24.04 y agrega tu llave SSH desde hPanel.</li>
+          <li>Activa los snapshots del proveedor antes de instalar, si el plan lo permite.</li>
+          <li>Firewall del panel: 22 restringido a tu IP; 80/443 públicos. Apunta el DNS con un registro <code>A</code>.</li>
+          <li>Si te entregan acceso como <code>root</code>, crea un usuario operativo para el día a día:
+<pre><code>adduser deploy
+usermod -aG sudo deploy
+rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
+su - deploy</code></pre></li>
+        </ol>
+      </details>
+      <details class="fold"><summary>AWS (EC2)</summary>
+        <ol>
+          <li>Instancia EC2 con Ubuntu Server 24.04 LTS; <code>t3.medium</code> (x86_64) o <code>t4g.medium</code> (arm64) como punto de partida; EBS gp3 de 50 GB.</li>
+          <li>Key pair SSH. Security Group: 22 desde tu IP; 80/443 desde internet.</li>
+          <li>Elastic IP si debe conservar la IP; registro en Route 53 hacia esa IP.</li>
+          <li>Conéctate como <code>ubuntu</code> y sigue los pasos 1-6. Para una etapa posterior: respaldos a S3, logs a CloudWatch.</li>
+        </ol>
+      </details>
+      <details class="fold"><summary>Azure (Virtual Machine)</summary>
+        <ol>
+          <li>VM Ubuntu Server 24.04 LTS; tamaño <code>B2s</code> para pruebas o <code>D2s_v5</code> para un ambiente estable; disco SSD de 50 GB o más.</li>
+          <li>Autenticación con llave SSH. NSG inbound: 22 desde tu IP; 80/443 públicos.</li>
+          <li>Public IP estática si usarás dominio. Conéctate con el usuario creado (<code>azureuser</code> por convención) y sigue los pasos 1-6.</li>
+        </ol>
+      </details>
+
+      <h2>C · Modo desarrollador</h2>
+      <p>Para trabajar sobre el código con procesos locales y recarga rápida. Requiere más
+      herramientas en tu equipo: <strong>Docker</strong>, <strong>Rust stable</strong> (<code>cargo</code>),
+      <strong>Python 3.12+</strong> y <strong>Node.js 22</strong>. Aquí no hay bootstrap automático: tú
+      registras el módulo con el CLI del SDK y obtienes su token de servicio.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Infraestructura.</strong> El <code>docker-compose.yml</code> de la raíz levanta solo Postgres 16
+          (puerto <code>5432</code>, volumen <code>novvus_pgdata</code>).
+<pre><code>cp .env.example .env         <span class="c"># secretos de desarrollo; ajusta si hace falta</span>
+make up                      <span class="c"># docker compose up -d --wait</span></code></pre>
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Kernel</strong> (puerto 8000; aplica sus migraciones al arrancar):
+<pre><code>cd kernel &amp;&amp; cargo run -p novvus-gateway</code></pre>
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>SDK</strong> (una vez, en un entorno virtual de Python 3.12+). Esto instala el comando
+          <code>novvus</code> del SDK:
+<pre><code>pip install -e sdk</code></pre>
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Registra y arranca los módulos.</strong> Necesitas un JWT de un usuario con
+          <code>core.modules.manage</code> (crea tu cuenta y organización en la web o con la API; ver
+          <a href="api.html">La API</a>). <code>novvus deploy</code> hace register → install → enable e
+          imprime el token de servicio <strong>una sola vez</strong>:
+<pre><code>cd modules/crm
+novvus deploy --kernel http://127.0.0.1:8000 --token &lt;JWT&gt;
+<span class="c"># Token de servicio del módulo (guárdalo, se muestra UNA sola vez): NOVVUS_SERVICE_TOKEN=nvk_...</span>
+NOVVUS_SERVICE_TOKEN=nvk_... novvus run --port 8110
+
+cd ../projects               <span class="c"># igual, en otra terminal</span>
+novvus deploy --kernel http://127.0.0.1:8000 --token &lt;JWT&gt;
+NOVVUS_SERVICE_TOKEN=nvk_... novvus run --port 8120</code></pre>
+          Guarda cada token en un archivo <code>.env</code> dentro de la carpeta del módulo
+          (<code>modules/crm/.env</code>) para no teclearlo cada vez. <code>salesmx</code> se despliega igual
+          (elige un puerto libre); solo aporta extensiones al CRM, no tiene pantallas propias.
+        </div></div>
+        <div class="step"><span class="num">5</span><div>
+          <strong>Frontend</strong> (puerto 3000):
+<pre><code>cd apps/web &amp;&amp; npm install &amp;&amp; npm run dev</code></pre>
+          Después habilita CRM y Proyectos para tu organización desde <code>/apps</code>.
+        </div></div>
+      </div>
+      <h3>Atajos en Windows</h3>
+      <p>En el equipo se usan dos scripts locales, <code>start.bat</code> y <code>off.bat</code>, que están
+      fuera del control de versiones (no viajan en el repositorio; si no los tienes, sigue el
+      flujo manual de arriba):</p>
+      <ul>
+        <li><code>start.bat</code>: espera a Docker, levanta Postgres, exige el binario
+            <code>kernel\target\debug\novvus-gateway.exe</code> (si falta: <code>cd kernel &amp;&amp; cargo build -p novvus-gateway</code>),
+            abre el kernel en una ventana «NOVVUS-KERNEL», y si existe <code>modules\crm\.env</code> lanza
+            el CRM en 8110, Proyectos en 8120 y <code>npm run dev</code> en ventanas propias. Si falta el
+            <code>.env</code> del módulo avisa que primero hay que hacer <code>novvus deploy</code>.</li>
+        <li><code>off.bat</code>: cierra las ventanas NOVVUS-*, mata lo que escuche en 8000/8110/8120/3000
+            y detiene los contenedores.</li>
+      </ul>
+      <h3>Targets del <code>Makefile</code></h3>
+      <table>
+        <tr><th>Target</th><th>Qué hace</th></tr>
+        <tr><td><code>make up</code> / <code>down</code> / <code>ps</code> / <code>logs</code></td><td>Postgres de desarrollo: levantar, bajar, estado, logs.</td></tr>
+        <tr><td><code>make full-up</code> / <code>full-down</code></td><td>Plataforma completa en Docker con <code>docker-compose.full.yml</code> (construye imágenes); bajar conservando volúmenes.</td></tr>
+        <tr><td><code>make demo</code></td><td><code>full-up</code> + imprime las credenciales de demo. Equivale a <code>install.py</code> sin las comprobaciones.</td></tr>
+        <tr><td><code>make kernel-test</code></td><td><code>cargo test --workspace</code> (requiere Postgres arriba).</td></tr>
+        <tr><td><code>make sdk-test</code> / <code>crm-test</code> / <code>projects-test</code> / <code>salesmx-test</code></td><td>Suites de Python de cada paquete.</td></tr>
+        <tr><td><code>make web-test</code></td><td>Typecheck + lint + <code>npm run build</code> del frontend.</td></tr>
+        <tr><td><code>make test</code></td><td>Todas las suites anteriores.</td></tr>
+        <tr><td><code>make fmt</code> / <code>lint</code></td><td><code>cargo fmt</code>; <code>cargo clippy -D warnings</code> + <code>ruff</code> + <code>mypy</code> sobre sdk, crm, projects y salesmx.</td></tr>
+      </table>
+      <div class="tip">
+        <b>Puertos en desarrollo.</b> 3000 web · 8000 kernel (<code>/health</code>, <code>/metrics</code>,
+        <code>/api/core/*</code>, <code>/api/&lt;modulo&gt;/*</code>) · 8110 crm · 8120 projects · 5432 Postgres.
+        En producción solo existe 8077 (web) en el host.
+      </div>
+
+      <h2>D · Despliegue manual sin el CLI</h2>
+      <details class="fold"><summary>Ver más: equivalente manual de <code>novvus install</code> con <code>docker-compose.prod.yml</code></summary>
+        <p>Es exactamente lo que el CLI automatiza. Úsalo solo si tienes una razón concreta (el
+        CLI no soporta tu plataforma, integras con tu propia automatización). Perderás
+        <code>novvus update</code> con respaldo y rollback automáticos.</p>
+<pre><code>sudo mkdir -p /opt/novvus &amp;&amp; cd /opt/novvus
+<span class="c"># copia aquí docker-compose.prod.yml y .env.prod.example desde el repositorio</span>
+cp .env.prod.example .env
+<span class="c"># llena TODAS las variables: NOVVUS_VERSION, POSTGRES_*, NOVVUS_JWT_ACCESS_SECRET,</span>
+<span class="c"># NOVVUS_JWT_REFRESH_SECRET, NOVVUS_INTERNAL_HMAC_SECRET, NOVVUS_MODULE_DB_PASSWORD,</span>
+<span class="c"># NOVVUS_BOOTSTRAP_TOKEN, NOVVUS_WEB_PORT=8077, NOVVUS_LOG_LEVEL=info</span>
+openssl rand -hex 32         <span class="c"># un valor distinto por cada secreto</span>
+docker compose -f docker-compose.prod.yml up -d --wait
+docker compose -f docker-compose.prod.yml ps   <span class="c"># todo healthy; bootstrap Exited (0)</span></code></pre>
+        <p>Orden de arranque automático: postgres → kernel → bootstrap → crm, projects → web en
+        <code>${NOVVUS_WEB_PORT:-8077}</code>. El compose se niega a arrancar si falta alguna variable.
+        Respaldo mínimo de la base:</p>
+<pre><code>docker compose -f docker-compose.prod.yml exec postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" &gt; backup.sql</code></pre>
+        <p>Si más adelante instalas el CLI, <code>novvus status</code> y <code>novvus version</code> reconocen
+        esta instalación leyendo la versión del <code>.env</code>; <code>novvus install</code> se negará a
+        sobrescribirla.</p>
+      </details>
+
+      <h2>Lista de verificación final</h2>
+      <ul>
+        <li><strong>A:</strong> <code>python install.py status</code> muestra los servicios <code>running</code>/<code>healthy</code> y puedes entrar con el usuario demo.</li>
+        <li><strong>B/D:</strong> <code>novvus status</code> (o <code>docker compose -f docker-compose.prod.yml ps</code>) reporta todo sano y <code>bootstrap</code> terminado en 0.</li>
+        <li><strong>B/D:</strong> creaste tu cuenta y organización, y CRM y Proyectos aparecen habilitados en <code>/apps</code>.</li>
+        <li><strong>B/D:</strong> el dominio resuelve a la IP, el proxy sirve HTTPS y hacia internet solo están abiertos 80 y 443 (22 desde tu IP).</li>
+        <li><strong>B/D:</strong> sabes dónde están <code>/opt/novvus/.env</code> y los volúmenes, y tienes un plan de respaldo (<a href="mantenimiento.html">Mantenimiento</a>).</li>
+        <li><strong>C:</strong> kernel en 8000, módulos en 8110/8120, web en 3000, y guardaste los tokens de servicio en los <code>.env</code> de cada módulo.</li>
+        <li>El equipo sabe cómo ver logs: <code>python install.py logs</code> (A) o <code>docker compose logs -f</code> en <code>/opt/novvus</code> (B/D).</li>
+      </ul>
+
+      <h2>Referencias externas</h2>
+      <ul>
+        <li><a href="https://docs.docker.com/engine/install/ubuntu/">Docker Engine en Ubuntu</a></li>
+        <li><a href="https://caddyserver.com/docs/">Documentación de Caddy</a></li>
+        <li><a href="https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securityrules.htm">OCI Security Rules</a></li>
+        <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules-reference.html">AWS EC2 Security Group Rules</a></li>
+        <li><a href="https://learn.microsoft.com/en-us/azure/virtual-machines/linux/quick-create-portal">Azure Linux VM Quickstart</a></li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="conceptos.html"><span class="dir">← Anterior</span>Conceptos en 10 minutos</a>
+        <a class="next" href="guia-usuario.html"><span class="dir">Siguiente →</span>Guía de usuario</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reporte técnico · Novvus</title>
+<link rel="stylesheet" href="assets/doc.css">
+</head>
+<body>
+
+<!-- ============================================================ PORTADA -->
+<section class="cover">
+  <div class="cover-band">
+    <img src="assets/novvus-white.svg" alt="Novvus">
+    <span class="suite">Business Suite</span>
+  </div>
+
+  <div class="cover-body">
+    <div class="cover-kicker">Reporte técnico</div>
+    <h1>Arquitectura, construcción y operación</h1>
+    <p class="lede">Especificaciones de la plataforma Novvus: capas, módulos, modelo de datos, integración por eventos, seguridad y el proceso seguido para construir y documentar el sistema.</p>
+
+    <div class="rule"></div>
+
+    <dl class="cover-meta">
+      <div><dt>Producto</dt><dd>Novvus Core 0.3.72</dd></div>
+      <div><dt>Versión</dt><dd>1.0</dd></div>
+      <div><dt>Fecha</dt><dd>18 de noviembre de 2026</dd></div>
+      <div><dt>Audiencia</dt><dd>Equipo técnico</dd></div>
+      <div><dt>Módulos</dt><dd>8 aplicaciones</dd></div>
+      <div><dt>Base de datos</dt><dd>PostgreSQL 16</dd></div>
+    </dl>
+  </div>
+
+  <img class="cover-mark" src="assets/novvus-black.svg" alt="">
+
+  <div class="cover-foot">
+    <span>Novvus · Documentación técnica</span>
+    <span>Uso interno</span>
+  </div>
+</section>
+
+<!-- ============================================================== ÍNDICE -->
+<section>
+  <div class="chapter-head">
+    <span class="chapter-num">CONTENIDO</span>
+    <div>
+      <h1 class="chapter-title">Índice</h1>
+      <p class="chapter-sub">Trece capítulos con diagramas, tablas de referencia y evidencia de funcionamiento.</p>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-group">
+      <h3>Resumen ejecutivo</h3>
+      <ol><li><span class="n">—</span>Síntesis del proyecto y resultados</li></ol>
+    </div>
+    <div class="toc-group">
+      <h3>1. Objetivo y alcance</h3>
+      <ol>
+        <li><span class="n">1.1</span>Problema y propuesta</li>
+        <li><span class="n">1.2</span>Alcance entregado</li>
+        <li><span class="n">1.3</span>Fuera de alcance</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>2. Arquitectura</h3>
+      <ol>
+        <li><span class="n">2.1</span>Vista por capas</li>
+        <li><span class="n">2.2</span>Decisiones de diseño</li>
+        <li><span class="n">2.3</span>Flujo de una petición</li>
+        <li><span class="n">2.4</span>Límites de responsabilidad</li>
+        <li><span class="n">2.5</span>Riesgos y mitigaciones</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>3. Tecnologías y herramientas</h3>
+      <ol>
+        <li><span class="n">3.1</span>Plataforma</li>
+        <li><span class="n">3.2</span>Módulos</li>
+        <li><span class="n">3.3</span>Herramientas de documentación</li>
+        <li><span class="n">3.4</span>Reproducibilidad</li>
+        <li><span class="n">3.5</span>Alternativas evaluadas</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>4. Catálogo de módulos</h3>
+      <ol>
+        <li><span class="n">4.1</span>Inventario funcional</li>
+        <li><span class="n">4.2</span>Puertos y contenedores</li>
+        <li><span class="n">4.3</span>Permisos y dependencias</li>
+        <li><span class="n">4.4</span>Alta de un módulo</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>5. Modelo de datos</h3>
+      <ol>
+        <li><span class="n">5.1</span>Entidades principales</li>
+        <li><span class="n">5.2</span>Esquemas por módulo</li>
+        <li><span class="n">5.3</span>Convenciones</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>6. Integración por eventos</h3>
+      <ol>
+        <li><span class="n">6.1</span>Catálogo de eventos</li>
+        <li><span class="n">6.2</span>Idempotencia</li>
+        <li><span class="n">6.3</span>Orquestación</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>7. Seguridad</h3>
+      <ol>
+        <li><span class="n">7.1</span>Autenticación</li>
+        <li><span class="n">7.2</span>Autorización</li>
+        <li><span class="n">7.3</span>Aislamiento multiempresa</li>
+        <li><span class="n">7.4</span>Comunicación entre servicios</li>
+        <li><span class="n">7.5</span>Auditoría</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>8. Flujo funcional</h3>
+      <ol>
+        <li><span class="n">8.1</span>Recorrido principal</li>
+        <li><span class="n">8.2</span>Evidencia visual</li>
+        <li><span class="n">8.3</span>Qué demuestra la evidencia</li>
+        <li><span class="n">8.4</span>Reproducir el recorrido</li>
+        <li><span class="n">8.5</span>Roles en el recorrido</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>9. Despliegue y operación</h3>
+      <ol>
+        <li><span class="n">9.1</span>Topología</li>
+        <li><span class="n">9.2</span>Volúmenes y respaldos</li>
+        <li><span class="n">9.3</span>Salud y registros</li>
+        <li><span class="n">9.4</span>Comandos de operación</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>10. Proceso de construcción</h3>
+      <ol>
+        <li><span class="n">10.1</span>Fases</li>
+        <li><span class="n">10.2</span>Correcciones aplicadas</li>
+        <li><span class="n">10.3</span>Datos de demostración</li>
+        <li><span class="n">10.4</span>Lecciones del proceso</li>
+        <li><span class="n">10.5</span>Automatización de la entrega</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>11. Pruebas y verificación</h3>
+      <ol>
+        <li><span class="n">11.1</span>Verificaciones técnicas</li>
+        <li><span class="n">11.2</span>Volumen de datos</li>
+        <li><span class="n">11.3</span>Alcance de las pruebas</li>
+        <li><span class="n">11.4</span>Matriz de aceptación</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>12. Limitaciones y futuro</h3>
+      <ol><li><span class="n">12.1</span>Limitaciones conocidas</li><li><span class="n">12.2</span>Siguientes pasos</li><li><span class="n">12.3</span>Criterios para producción</li></ol>
+    </div>
+    <div class="toc-group">
+      <h3>13. Anexos</h3>
+      <ol>
+        <li><span class="n">13.1</span>Estructura del paquete</li>
+        <li><span class="n">13.2</span>Credenciales y direcciones</li>
+        <li><span class="n">13.3</span>Referencias</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== RESUMEN -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">00</span>
+    <div>
+      <h1 class="chapter-title">Resumen ejecutivo</h1>
+      <p class="chapter-sub">Qué se construyó, cómo funciona y qué se verificó.</p>
+    </div>
+  </div>
+
+  <p class="lead">Novvus es una suite empresarial modular desplegada sobre contenedores. El sistema entregado comprende la plataforma (capa web, kernel de servicios y base de datos) y ocho módulos de negocio que cubren el ciclo completo de una empresa: prospección comercial, ejecución de proyectos, operación logística, control de calidad, facturación y cobranza, inventario, talento humano y automatización de procesos.</p>
+
+  <div class="grid-3" style="margin:14px 0 16px">
+    <div class="card"><span class="tag">Módulos</span><h4 style="font-size:18pt;margin:2px 0 0">8</h4><p>CRM, Proyectos, Reclutamiento, Logística, Auditorías, Facturación, Inventario y Automatización.</p></div>
+    <div class="card"><span class="tag">Tablas</span><h4 style="font-size:18pt;margin:2px 0 0">116</h4><p>38 en el esquema <code>core</code> y 78 distribuidas en los ocho esquemas <code>mod_*</code>.</p></div>
+    <div class="card"><span class="tag">Eventos</span><h4 style="font-size:18pt;margin:2px 0 0">16</h4><p>Eventos de negocio publicados y consumidos entre módulos, sin acoplamiento de tablas.</p></div>
+  </div>
+
+  <h2>Hallazgos principales</h2>
+  <ul>
+    <li><strong>Arquitectura desacoplada.</strong> El kernel actúa como único punto de entrada: autentica, autoriza, enruta y firma las llamadas a los módulos. Ningún módulo queda expuesto directamente al navegador.</li>
+    <li><strong>Módulos como unidades autónomas.</strong> Cada módulo declara sus modelos, vistas, permisos y eventos con el SDK de Novvus; el SDK genera la API REST y aplica el aislamiento por organización.</li>
+    <li><strong>Integración por eventos, no por base de datos.</strong> Un módulo nunca escribe en las tablas de otro: publica un hecho y los demás reaccionan mediante su API pública.</li>
+    <li><strong>Operación verificada.</strong> Los ocho módulos responden a su verificación de salud, las nueve vistas principales cargan con datos de demostración y las integraciones producen registros reales entre módulos.</li>
+  </ul>
+
+  <h2>Entregables</h2>
+  <table class="compact">
+    <thead><tr><th style="width:34%">Entregable</th><th>Contenido</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Sistema en ejecución</strong></td><td>Plataforma y ocho módulos en contenedores, accesibles en <code>http://localhost:8077</code>.</td></tr>
+      <tr><td><strong>Manual de usuario (PDF)</strong></td><td>19 capturas y 27 figuras; recorrido por módulos y flujos guiados.</td></tr>
+      <tr><td><strong>Reporte técnico (PDF)</strong></td><td>Este documento: arquitectura, modelo de datos, seguridad, despliegue y pruebas.</td></tr>
+      <tr><td><strong>Código fuente</strong></td><td>SDK, módulos personalizados, migraciones y configuración de despliegue.</td></tr>
+      <tr><td><strong>Diagramas vectoriales</strong></td><td>Ocho diagramas SVG generados con Mermaid 11.</td></tr>
+      <tr><td><strong>Respaldos de base de datos</strong></td><td>Volcados de PostgreSQL listos para restaurar el ambiente.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info"><span class="ico">i</span><div><b>Qué demuestra este documento</b> Que la suite no es una maqueta: los ocho módulos operan sobre una base real, se comunican por eventos y producen registros verificables. Las secciones siguientes explican cómo está construida y qué se comprobó.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 1 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">01</span>
+    <div>
+      <h1 class="chapter-title">Objetivo y alcance</h1>
+      <p class="chapter-sub">El problema que resuelve la plataforma y los límites del entregable.</p>
+    </div>
+  </div>
+
+  <h2 id="r1-1">1.1 Problema y propuesta</h2>
+  <p>Una empresa mediana típica opera con una herramienta para vender, otra para ejecutar proyectos, una hoja de cálculo para el inventario y correos para todo lo demás. El costo no es la licencia: es el dato duplicado y la reconciliación manual. Cuando una venta se cierra, alguien tiene que crear el proyecto a mano, avisar a logística y emitir la factura; si olvida un paso, el error aparece tres semanas después.</p>
+  <p>La propuesta de Novvus es una <strong>suite modular con un núcleo común</strong>: una sola sesión, un solo modelo de permisos y un mecanismo de eventos que propaga los hechos de negocio. Cada área conserva su interfaz especializada, pero el dato deja de capturarse dos veces.</p>
+
+  <h2 id="r1-2">1.2 Alcance entregado</h2>
+  <table>
+    <thead><tr><th style="width:24%">Componente</th><th>Descripción</th><th style="width:18%">Estado</th></tr></thead>
+    <tbody>
+      <tr><td>Plataforma</td><td>Kernel 0.3.72, capa web 0.3.72 y PostgreSQL 16 en contenedores.</td><td>Operativo</td></tr>
+      <tr><td>CRM</td><td>Empresas, contactos, leads, oportunidades, actividades, productos, cotizaciones y reportes.</td><td>Operativo</td></tr>
+      <tr><td>Proyectos</td><td>Portafolio, fases, procesos, tareas, hitos, entregables, riesgos y plantillas.</td><td>Operativo</td></tr>
+      <tr><td>Reclutamiento</td><td>Puestos, candidatos, postulaciones, entrevistas y ofertas.</td><td>Operativo</td></tr>
+      <tr><td>Logística</td><td>Almacenes, transportistas, vehículos, envíos y órdenes de entrega.</td><td>Operativo</td></tr>
+      <tr><td>Auditorías</td><td>Auditorías, listas de verificación, hallazgos e informes.</td><td>Operativo</td></tr>
+      <tr><td>Facturación</td><td>Facturas, líneas, pagos y control de saldos.</td><td>Operativo</td></tr>
+      <tr><td>Inventario</td><td>Productos, existencias por almacén y movimientos.</td><td>Operativo</td></tr>
+      <tr><td>Automatización</td><td>Procesos, pasos, ejecuciones, registros y notificaciones.</td><td>Operativo</td></tr>
+      <tr><td>Documentación</td><td>Manual de usuario y reporte técnico en PDF, con diagramas y capturas.</td><td>Entregado</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r1-3">1.3 Fuera de alcance</h2>
+  <ul>
+    <li><strong>Contabilidad fiscal.</strong> Facturación emite y cobra documentos, pero no calcula impuestos declarables ni genera contabilidad electrónica.</li>
+    <li><strong>Nómina.</strong> Reclutamiento cubre la selección; el ciclo de pago de personal no forma parte del alcance.</li>
+    <li><strong>Aplicación móvil nativa.</strong> La interfaz es web y responsive, no hay binarios móviles.</li>
+    <li><strong>Personalización por cliente.</strong> Se entrega la configuración del ambiente de demostración; los ajustes específicos de cada empresa se realizan sobre esa base.</li>
+  </ul>
+</section>
+
+<!-- =========================================================== CAPÍTULO 2 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">02</span>
+    <div>
+      <h1 class="chapter-title">Arquitectura</h1>
+      <p class="chapter-sub">Cuatro capas, un solo punto de entrada y módulos intercambiables.</p>
+    </div>
+  </div>
+
+  <h2 id="r2-1">2.1 Vista por capas</h2>
+  <p>La plataforma se organiza en cuatro capas con responsabilidades estrictas. La capa web nunca habla con la base de datos; los módulos nunca son accesibles desde el navegador; y el kernel es el único componente que conoce a todos los módulos.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/arquitectura.svg" alt="Arquitectura por capas de Novvus">
+    <figcaption><b>Figura 1.</b> Arquitectura: cliente, capa web, kernel y módulos sobre una base PostgreSQL compartida.</figcaption>
+  </figure>
+
+  <p>La figura resume la regla de confianza: el navegador solo conoce la capa web, la capa web solo conoce el kernel y los módulos solo existen para el kernel. Cada flecha es un límite que ninguna otra capa puede saltarse, de modo que un módulo comprometido no alcanza al usuario y el usuario no alcanza la base de datos.</p>
+
+  <table>
+    <thead><tr><th style="width:20%">Capa</th><th style="width:26%">Tecnología</th><th>Responsabilidad</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Cliente</strong></td><td>Navegador moderno</td><td>Renderiza la interfaz, mantiene la sesión y consume la API pública.</td></tr>
+      <tr><td><strong>Web</strong></td><td>Next.js sobre Node.js 22</td><td>Interfaz de usuario, enrutamiento de vistas y proxy de la API hacia el kernel.</td></tr>
+      <tr><td><strong>Kernel</strong></td><td>Rust (servicio <code>novvus_gateway</code>)</td><td>Autenticación JWT, RBAC, registro de módulos, proxy firmado, bus de eventos, archivos y auditoría.</td></tr>
+      <tr><td><strong>Módulos</strong></td><td>Python 3.12 · FastAPI · SQLAlchemy 2</td><td>Reglas de negocio, API REST generada por el SDK y reacción a eventos.</td></tr>
+      <tr><td><strong>Datos</strong></td><td>PostgreSQL 16</td><td>Esquema <code>core</code> compartido y un esquema por módulo con políticas RLS.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r2-2">2.2 Decisiones de diseño</h2>
+
+  <h3>Un kernel que centraliza lo transversal</h3>
+  <p>Autenticación, permisos, auditoría y enrutamiento son problemas que no deberían resolverse ocho veces. El kernel los concentra y expone a los módulos una interfaz uniforme: cada módulo se registra con su manifiesto, su dirección interna y sus permisos, y el kernel decide si una petición puede pasar.</p>
+
+  <h3>Módulos declarativos</h3>
+  <p>Un módulo no escribe controladores REST a mano. Declara modelos con SQLAlchemy, vistas con un diccionario de presentación y reglas de negocio como acciones; el SDK genera la API, valida los permisos y aplica las políticas de aislamiento. Esto reduce el código repetido y garantiza que todos los módulos se comporten igual.</p>
+
+  <h3>Integración por eventos</h3>
+  <p>Cuando el CRM acepta una cotización, publica <code>crm.quote.accepted</code> con los identificadores necesarios. Logística, Facturación y Automatización reaccionan cada uno por su cuenta. El CRM no sabe —ni necesita saber— quién está escuchando.</p>
+
+  <h3>Aislamiento por organización</h3>
+  <p>Todas las tablas de negocio llevan <code>org_id</code> y una política de seguridad a nivel de fila. El SDK fija el identificador de la organización en la sesión de base de datos antes de cada consulta, de modo que un error de programación no puede filtrar datos entre empresas.</p>
+
+  <h2 id="r2-3">2.3 Flujo de una petición</h2>
+  <ol class="steps">
+    <li>El navegador solicita una vista a la capa web en el puerto publicado.</li>
+    <li>La capa web envía la llamada a <code>/api/&lt;módulo&gt;/...</code> con el token de acceso del usuario.</li>
+    <li>El kernel valida la firma y la vigencia del token, comprueba el permiso sobre el recurso y resuelve a qué módulo corresponde la ruta.</li>
+    <li>El kernel reenvía la petición al contenedor del módulo por la red interna, firmada con HMAC y con el contexto de organización.</li>
+    <li>El módulo ejecuta la consulta dentro de su esquema, con RLS activo, y devuelve JSON.</li>
+    <li>El kernel registra la operación en la bitácora de auditoría y devuelve la respuesta a la capa web.</li>
+  </ol>
+  <div class="callout info"><span class="ico">i</span><div><b>Consecuencia práctica</b> Para agregar un módulo no hay que tocar la capa web ni el kernel: basta con publicar su contenedor, registrar su manifiesto y otorgar permisos. El menú y las vistas se construyen a partir del manifiesto.</div></div>
+
+  <h2 id="r2-4">2.4 Límites de responsabilidad</h2>
+  <p>La arquitectura funciona porque cada capa tiene un límite explícito. Esta tabla resume qué se queda en el kernel y qué pertenece al dominio de cada módulo.</p>
+  <table class="compact">
+    <thead><tr><th style="width:44%">El kernel resuelve</th><th>Cada módulo resuelve</th></tr></thead>
+    <tbody>
+      <tr><td>Autenticación, sesión y renovación del token.</td><td>Reglas de negocio del dominio y sus validaciones.</td></tr>
+      <tr><td>Permisos por rol, recurso y operación.</td><td>Etiquetas, vistas y formularios de sus registros.</td></tr>
+      <tr><td>Enrutamiento y firma HMAC de las llamadas.</td><td>Migraciones y evolución de su propio esquema.</td></tr>
+      <tr><td>Distribución de eventos y bitácora de auditoría.</td><td>Suscripción a eventos y reacción a los mismos.</td></tr>
+      <tr><td>Archivos adjuntos, cuotas y respaldo lógico.</td><td>Índices y consultas sobre sus tablas.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r2-5">2.5 Riesgos y mitigaciones</h2>
+  <p>La arquitectura reparte responsabilidades, y con ellas los riesgos. Estos son los que se identificaron durante la construcción y la forma en que quedaron cubiertos:</p>
+  <table class="compact">
+    <thead><tr><th style="width:30%">Riesgo</th><th style="width:26%">Impacto</th><th>Mitigación aplicada</th></tr></thead>
+    <tbody>
+      <tr><td>Un módulo mal configurado expone datos de otra organización.</td><td>Fuga entre empresas.</td><td>RLS activo en todas las tablas y <code>app.org_id</code> fijado por transacción desde el SDK.</td></tr>
+      <tr><td>El mismo evento se procesa dos veces.</td><td>Duplicados en facturas, envíos o proyectos.</td><td>Tabla <code>_processed_events</code> y claves de negocio deterministas.</td></tr>
+      <tr><td>Un módulo deja de responder.</td><td>Vistas incompletas en la interfaz.</td><td>Chequeo <code>/health</code>, bitácora del kernel y mensaje explícito en lugar de error 500.</td></tr>
+      <tr><td>Cambios de esquema sin respaldo.</td><td>Pérdida de datos de demostración.</td><td>Migraciones versionadas por módulo y respaldo <code>pg_dump</code> antes de aplicar.</td></tr>
+      <tr><td>Dependencia de imágenes comerciales del núcleo.</td><td>Sin acceso al código del kernel y la capa web.</td><td>SDK y módulos entregados como fuente; el núcleo se consume como contenedor versionado.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn"><span class="ico">!</span><div><b>Riesgo residual</b> La plataforma no sustituye un plan de continuidad: los respaldos viven en el mismo equipo que la base. Para producción hay que copiarlos fuera del anfitrión y probar la restauración.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 3 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">03</span>
+    <div>
+      <h1 class="chapter-title">Tecnologías y herramientas</h1>
+      <p class="chapter-sub">Qué se usó en cada capa y con qué se produjo la documentación.</p>
+    </div>
+  </div>
+
+  <h2 id="r3-1">3.1 Plataforma</h2>
+  <table>
+    <thead><tr><th style="width:22%">Componente</th><th style="width:30%">Tecnología y versión</th><th>Uso en el proyecto</th></tr></thead>
+    <tbody>
+      <tr><td>Sistema anfitrión</td><td>Windows 11 · WSL2 con Ubuntu</td><td>Ejecuta Docker y aloja los volúmenes de datos.</td></tr>
+      <tr><td>Contenedores</td><td>Docker Engine</td><td>Orquesta los once servicios y sus redes internas.</td></tr>
+      <tr><td>Kernel</td><td><code>ghcr.io/novvus/core:0.3.72</code> (Rust)</td><td>Autenticación, RBAC, proxy, eventos y archivos.</td></tr>
+      <tr><td>Capa web</td><td><code>ghcr.io/novvus/web:0.3.72</code> (Next.js · Node 22.23)</td><td>Interfaz de usuario y proxy de API.</td></tr>
+      <tr><td>Base de datos</td><td>PostgreSQL 16 (imagen <code>postgres:16-alpine</code>)</td><td>Persistencia con RLS por organización.</td></tr>
+      <tr><td>Runtime de módulos</td><td>Debian 12 · Python 3.12.14</td><td>Ejecuta cada módulo con <code>uvicorn</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r3-2">3.2 Módulos</h2>
+  <table>
+    <thead><tr><th style="width:26%">Librería</th><th style="width:18%">Versión</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td>novvus-sdk</td><td>0.1.0</td><td>Modelos, vistas, permisos, eventos, migraciones y cliente del kernel.</td></tr>
+      <tr><td>FastAPI</td><td>0.141.1</td><td>Aplicación HTTP y documentación automática de la API.</td></tr>
+      <tr><td>SQLAlchemy</td><td>2.0.52</td><td>Mapeo objeto-relacional con tipado moderno (<code>Mapped</code>).</td></tr>
+      <tr><td>Pydantic</td><td>incluida en el runtime</td><td>Validación de cuerpos y respuestas.</td></tr>
+      <tr><td>uvicorn</td><td>incluida en el runtime</td><td>Servidor ASGI de cada contenedor de módulo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r3-3">3.3 Herramientas de documentación</h2>
+  <p>La documentación se generó con herramientas disponibles en el equipo, sin dependencias de pago ni servicios externos.</p>
+  <table>
+    <thead><tr><th style="width:24%">Herramienta</th><th style="width:16%">Versión</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td>Mermaid</td><td>11 (CDN)</td><td>Definición de los ocho diagramas en texto y render a SVG.</td></tr>
+      <tr><td>Microsoft Edge</td><td>headless</td><td>Render de Mermaid (<code>--dump-dom</code>) y conversión de HTML a PDF (<code>--print-to-pdf</code>).</td></tr>
+      <tr><td>Python</td><td>3.12</td><td>Automatización del render de diagramas y de la generación de PDF.</td></tr>
+      <tr><td>Extensión de navegador</td><td>—</td><td>Capturas de la aplicación autenticada, en tema oscuro y a resolución real.</td></tr>
+      <tr><td>HTML + CSS de impresión</td><td>—</td><td>Maquetación de los dos documentos con reglas <code>@page</code> A4.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Ventaja del enfoque</b> Los diagramas se mantienen como texto versionable; el PDF se produce con el mismo motor que usa el navegador, de modo que lo que se ve en pantalla es exactamente lo que se imprime.</div></div>
+
+  <h2 id="r3-4">3.4 Reproducibilidad</h2>
+  <p>El ambiente se puede reconstruir sin pasos manuales ocultos. Las versiones están fijadas, la topología vive en un archivo y los datos de demostración se cargan con una semilla idempotente.</p>
+  <table class="compact">
+    <thead><tr><th style="width:30%">Artefacto</th><th>Cómo se reproduce</th></tr></thead>
+    <tbody>
+      <tr><td>Diagramas</td><td><code>render_diagrams.py</code> con Mermaid 11 renderizado en Edge headless.</td></tr>
+      <tr><td>Documentos PDF</td><td>HTML y CSS de impresión convertidos con <code>--print-to-pdf</code>.</td></tr>
+      <tr><td>Capturas</td><td>Sesión autenticada sobre <code>http://localhost:8077</code>, tema oscuro y 1526 × 730 px.</td></tr>
+      <tr><td>Base de datos demo</td><td><code>docker compose</code>, migraciones por módulo y semilla SQL sobre el respaldo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r3-5">3.5 Alternativas evaluadas</h2>
+  <p>No todas las decisiones fueron obvias. Esta tabla recoge las opciones que se compararon y el motivo por el que se descartaron:</p>
+  <table class="compact">
+    <thead><tr><th style="width:30%">Alternativa</th><th>Motivo del descarte</th></tr></thead>
+    <tbody>
+      <tr><td>Documentos en procesador de texto</td><td>Las capturas y los diagramas se desalinean al editar; el HTML permite versionar texto, figuras y estilo en un solo lugar.</td></tr>
+      <tr><td>Diagramas dibujados a mano</td><td>Se desactualizan con facilidad. Mermaid mantiene cada diagrama como texto y se regenera con un comando.</td></tr>
+      <tr><td>Capturas en tema claro</td><td>El tema oscuro es el de la operación diaria y muestra con fidelidad el contraste real de la interfaz.</td></tr>
+      <tr><td>Base de datos vacía con datos ficticios mínimos</td><td>Las listas y los indicadores quedaban semivacíos; la semilla carga volúmenes suficientes para evaluar la interfaz.</td></tr>
+      <tr><td>Replicar el alcance completo de un ERP</td><td>Fuera del objetivo: se priorizó un recorrido comercial completo y verificable frente a una cobertura superficial.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Límites de esta elección</h3>
+  <p>Documentar con HTML y scripts tiene un costo que conviene conocer antes de adoptarlo:</p>
+  <ul>
+    <li><strong>No hay edición visual.</strong> Cambiar una figura exige tocar el HTML y regenerar; no se arrastra una imagen dentro de un procesador de texto.</li>
+    <li><strong>Todo se imprime desde el navegador.</strong> El resultado depende de la versión de Chromium; una actualización puede mover un salto de página.</li>
+    <li><strong>Las capturas hay que mantenerlas.</strong> Si la interfaz cambia, la figura queda obsoleta hasta que se vuelve a capturar.</li>
+    <li><strong>Sin interactividad.</strong> El PDF es estático: el índice no navega ni las tablas se ordenan; para eso está la versión HTML.</li>
+  </ul>
+</section>
+
+<!-- =========================================================== CAPÍTULO 4 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">04</span>
+    <div>
+      <h1 class="chapter-title">Catálogo de módulos</h1>
+      <p class="chapter-sub">Qué declara cada módulo, en qué puerto escucha y de qué depende.</p>
+    </div>
+  </div>
+
+  <h2 id="r4-1">4.1 Inventario funcional</h2>
+  <table class="compact">
+    <thead><tr><th style="width:16%">Módulo</th><th style="width:12%">Versión</th><th style="width:14%">Categoría</th><th class="num" style="width:9%">Tablas</th><th>Recursos principales</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CRM</strong></td><td>0.2.4</td><td>Ventas</td><td class="num">20</td><td>empresas, contactos, leads, oportunidades, etapas, cotizaciones, productos, actividades</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td>0.2.6</td><td>Operaciones</td><td class="num">27</td><td>proyectos, fases, procesos, tareas, hitos, entregables, riesgos, plantillas</td></tr>
+      <tr><td><strong>Reclutamiento</strong></td><td>0.1.0</td><td>Recursos Humanos</td><td class="num">6</td><td>puestos, candidatos, postulaciones, entrevistas, ofertas</td></tr>
+      <tr><td><strong>Logística</strong></td><td>0.1.0</td><td>Operaciones</td><td class="num">6</td><td>almacenes, transportistas, vehículos, envíos, órdenes de entrega</td></tr>
+      <tr><td><strong>Auditorías</strong></td><td>0.1.0</td><td>Calidad</td><td class="num">5</td><td>auditorías, listas de verificación, hallazgos, informes</td></tr>
+      <tr><td><strong>Facturación</strong></td><td>0.1.0</td><td>Finanzas</td><td class="num">4</td><td>facturas, líneas de factura, pagos</td></tr>
+      <tr><td><strong>Inventario</strong></td><td>0.1.0</td><td>Operaciones</td><td class="num">4</td><td>productos, existencias, movimientos</td></tr>
+      <tr><td><strong>Automatización</strong></td><td>0.1.0</td><td>Operaciones</td><td class="num">6</td><td>procesos, pasos, ejecuciones, registros, notificaciones</td></tr>
+    </tbody>
+  </table>
+  <p class="table-note">Cada esquema incluye además la tabla técnica <code>_processed_events</code>, que registra los eventos ya procesados para garantizar idempotencia.</p>
+
+  <h2 id="r4-2">4.2 Puertos y contenedores</h2>
+  <p>Los módulos escuchan en puertos consecutivos dentro de la red interna. Solo la capa web publica un puerto en el equipo anfitrión.</p>
+  <table class="compact">
+    <thead><tr><th style="width:26%">Contenedor</th><th style="width:16%">Puerto</th><th style="width:22%">Publicado</th><th>Notas</th></tr></thead>
+    <tbody>
+      <tr><td><code>novvus-prod-web-1</code></td><td>3000</td><td>8077 en el anfitrión</td><td>Único punto de acceso del usuario.</td></tr>
+      <tr><td><code>novvus-prod-kernel-1</code></td><td>8000</td><td>No</td><td>Red interna; recibe las llamadas de la capa web.</td></tr>
+      <tr><td><code>novvus-prod-postgres-1</code></td><td>5432</td><td>No</td><td>Volumen persistente <code>pgdata</code>.</td></tr>
+      <tr><td><code>novvus-prod-crm-1</code></td><td>8110</td><td>No</td><td>Módulo base incluido en el núcleo.</td></tr>
+      <tr><td><code>novvus-prod-projects-1</code></td><td>8120</td><td>No</td><td>Módulo base incluido en el núcleo.</td></tr>
+      <tr><td>Módulos añadidos</td><td>8140 – 8190</td><td>No</td><td>Reclutamiento, Logística, Auditorías, Automatización, Facturación e Inventario.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r4-3">4.3 Permisos y dependencias</h2>
+  <p>Cada manifiesto declara los módulos de los que depende y los permisos de servicio que necesita para consultarlos. La dependencia es lógica, no de base de datos: el módulo llama a la API pública del otro.</p>
+  <table class="compact">
+    <thead><tr><th style="width:16%">Módulo</th><th style="width:22%">Depende de</th><th>Permisos de servicio</th></tr></thead>
+    <tbody>
+      <tr><td>CRM</td><td>—</td><td><code>projects.projects.*</code> (integración opcional)</td></tr>
+      <tr><td>Proyectos</td><td>crm ≥ 0.1</td><td><code>crm.contacts.read</code></td></tr>
+      <tr><td>Reclutamiento</td><td>crm, projects</td><td><code>crm.contacts.*</code>, <code>projects.projects.*</code></td></tr>
+      <tr><td>Logística</td><td>crm ≥ 0.1</td><td><code>crm.companies.read</code>, <code>crm.activities.*</code></td></tr>
+      <tr><td>Auditorías</td><td>crm ≥ 0.1</td><td><code>crm.activities.*</code></td></tr>
+      <tr><td>Facturación</td><td>crm ≥ 0.1</td><td><code>crm.companies.read</code>, <code>crm.contacts.read</code>, <code>crm.quotes.read</code></td></tr>
+      <tr><td>Inventario</td><td>crm, logistica</td><td><code>crm.products.read</code>, <code>logistica.warehouses.read</code></td></tr>
+      <tr><td>Automatización</td><td>crm ≥ 0.1</td><td><code>crm.activities.read</code>, <code>crm.opportunities.read</code>, <code>projects.projects.read</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r4-4">4.4 Alta de un módulo</h2>
+  <p>Incorporar un módulo nuevo no requiere recompilar la plataforma. El procedimiento es el mismo que se siguió con los seis módulos añadidos:</p>
+  <ol class="steps">
+    <li><strong>Publique la imagen.</strong> El módulo se distribuye como contenedor con su manifiesto y sus variables de entorno.</li>
+    <li><strong>Registre el manifiesto.</strong> El kernel recibe nombre, versión, recursos, vistas y eventos publicados.</li>
+    <li><strong>Otorgue permisos de servicio.</strong> Solo los recursos declarados quedan accesibles para ese módulo.</li>
+    <li><strong>Verifique.</strong> El chequeo de salud responde, las migraciones se aplican y el menú aparece para los roles autorizados.</li>
+  </ol>
+  <div class="callout info"><span class="ico">i</span><div><b>Sin acoplamiento</b> El módulo nuevo no modifica el código del kernel ni de los demás módulos. Si se retira, sus tablas permanecen y el resto del sistema sigue operando.</div></div>
+
+  <h3>Retirar un módulo</h3>
+  <p>El camino inverso exige el mismo orden, para no dejar eventos huérfanos ni permisos abiertos:</p>
+  <ol class="steps">
+    <li><strong>Desactive sus procesos.</strong> En Automatización, los procesos que escuchan sus eventos se marcan como inactivos.</li>
+    <li><strong>Retire del manifiesto.</strong> El módulo deja de aparecer en el menú y el kernel responde <code>404</code> a sus rutas.</li>
+    <li><strong>Revise los consumidores.</strong> Los módulos que leían sus recursos pierden el permiso y muestran el dato como no disponible.</li>
+    <li><strong>Conserve las tablas.</strong> El esquema <code>mod_&lt;módulo&gt;</code> no se borra: los datos quedan para consulta y para una eventual reinstalación.</li>
+  </ol>
+  <div class="callout warn"><span class="ico">!</span><div><b>El borrado no es parte del retiro</b> Eliminar el esquema es una decisión aparte, con respaldo previo y autorización explícita. Retirar el módulo de la operación nunca debe destruir su historia.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 5 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">05</span>
+    <div>
+      <h1 class="chapter-title">Modelo de datos</h1>
+      <p class="chapter-sub">Un esquema compartido, ocho esquemas de módulo y reglas comunes.</p>
+    </div>
+  </div>
+
+  <h2 id="r5-1">5.1 Entidades principales</h2>
+  <p>El modelo sigue el recorrido del negocio: la empresa origina oportunidades, la oportunidad se cotiza, la cotización se convierte en factura y en proyecto, y el proyecto se ejecuta con tareas. En paralelo, el inventario y los envíos sostienen la operación.</p>
+
+  <div class="figrow mid">
+    <figure class="diagram">
+      <img src="../diagramas/modelo-datos.svg" alt="Modelo de datos principal">
+      <figcaption><b>Figura 2.</b> Entidades principales y cardinalidades del modelo comercial y de ejecución.</figcaption>
+    </figure>
+    <div class="side">
+      <h4>Lectura del diagrama</h4>
+      <ul>
+        <li><strong>Company es la raíz:</strong> contactos y oportunidades cuelgan de la empresa; una empresa puede tener muchas de cada una.</li>
+        <li><strong>Opportunity se divide:</strong> una oportunidad genera una o varias cotizaciones y, al ganarse, un proyecto.</li>
+        <li><strong>Quote cierra en Invoice:</strong> la factura conserva sus líneas y recibe uno o varios pagos.</li>
+        <li><strong>Project ejecuta:</strong> el proyecto contiene tareas y consume productos del inventario.</li>
+        <li><strong>Product se referencia:</strong> las líneas de factura y los movimientos apuntan al producto, sin duplicarlo.</li>
+      </ul>
+      <p class="small">Las cardinalidades se leen en las terminaciones: línea simple = uno, tres líneas = muchos.</p>
+    </div>
+  </div>
+
+  <table class="compact">
+    <thead><tr><th style="width:20%">Entidad</th><th>Propósito</th><th style="width:26%">Relaciones clave</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Company</strong></td><td>Empresa cliente o prospecto, con datos fiscales y comerciales.</td><td>Contactos, oportunidades, cotizaciones, facturas.</td></tr>
+      <tr><td><strong>Contact</strong></td><td>Persona vinculada a una o varias empresas.</td><td>Empresas, oportunidades, actividades.</td></tr>
+      <tr><td><strong>Opportunity</strong></td><td>Venta potencial con importe, probabilidad y etapa.</td><td>Cotizaciones, proyecto, actividades.</td></tr>
+      <tr><td><strong>Quote</strong></td><td>Oferta formal con líneas, impuestos y vigencia.</td><td>Oportunidad, factura, envío, proyecto.</td></tr>
+      <tr><td><strong>Project</strong></td><td>Ejecución del trabajo vendido.</td><td>Oportunidad, tareas, hitos, riesgos.</td></tr>
+      <tr><td><strong>Invoice</strong></td><td>Documento de cobro con saldo y estado.</td><td>Cotización, líneas, pagos.</td></tr>
+      <tr><td><strong>Product</strong></td><td>Artículo o servicio con SKU y precio.</td><td>Existencias, movimientos, líneas.</td></tr>
+      <tr><td><strong>Process</strong></td><td>Automatización con disparador y pasos.</td><td>Pasos, ejecuciones, registros.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r5-2">5.2 Esquemas por módulo</h2>
+  <table class="compact">
+    <thead><tr><th style="width:24%">Esquema</th><th class="num" style="width:12%">Tablas</th><th>Contenido</th></tr></thead>
+    <tbody>
+      <tr><td><code>core</code></td><td class="num">38</td><td>organizaciones, usuarios, membresías, roles, permisos, módulos, eventos, auditoría, archivos, tareas programadas.</td></tr>
+      <tr><td><code>mod_crm</code></td><td class="num">20</td><td>company, contact, lead, opportunity, stage, pipeline, quote, activity, product, tag.</td></tr>
+      <tr><td><code>mod_projects</code></td><td class="num">27</td><td>project, phase, process, task, milestone, deliverable, risk, template, work_front.</td></tr>
+      <tr><td><code>mod_reclutamiento</code></td><td class="num">6</td><td>job_position, candidate, application, interview, offer.</td></tr>
+      <tr><td><code>mod_logistica</code></td><td class="num">6</td><td>warehouse, carrier, vehicle, shipment, delivery_order.</td></tr>
+      <tr><td><code>mod_auditorias</code></td><td class="num">5</td><td>audit, audit_checklist, audit_finding, audit_report.</td></tr>
+      <tr><td><code>mod_facturacion</code></td><td class="num">4</td><td>invoice, invoice_line, payment.</td></tr>
+      <tr><td><code>mod_inventario</code></td><td class="num">4</td><td>product, stock_item, stock_movement.</td></tr>
+      <tr><td><code>mod_automatizacion</code></td><td class="num">6</td><td>process, process_step, process_execution, process_log, notification.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r5-3">5.3 Convenciones</h2>
+  <ul>
+    <li><strong>Identificadores UUIDv7.</strong> Ordenables por tiempo, lo que mejora la localidad en índices sin exponer secuencias.</li>
+    <li><strong>Columnas comunes.</strong> Toda tabla lleva <code>id</code>, <code>org_id</code>, <code>created_at</code>, <code>updated_at</code> y <code>deleted_at</code>.</li>
+    <li><strong>Borrado lógico.</strong> Los registros no se eliminan físicamente: se marca <code>deleted_at</code> y las vistas filtran por nulo.</li>
+    <li><strong>Campos desnormalizados de presentación.</strong> Algunas listas guardan el nombre legible del registro relacionado (<code>customer_name</code>, <code>product_name</code>, <code>invoice_number</code>, <code>process_name</code>) para evitar consultas adicionales por fila.</li>
+    <li><strong>Importes.</strong> Tipo <code>numeric(14,2)</code> con moneda ISO de tres letras; nunca coma flotante.</li>
+  </ul>
+</section>
+
+<!-- =========================================================== CAPÍTULO 6 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">06</span>
+    <div>
+      <h1 class="chapter-title">Integración por eventos</h1>
+      <p class="chapter-sub">El mecanismo que hace que los módulos se comporten como un solo sistema.</p>
+    </div>
+  </div>
+
+  <h2 id="r6-1">6.1 Catálogo de eventos</h2>
+  <p>Un evento tiene un nombre con espacio de nombres (<code>módulo.hecho</code>) y un cuerpo JSON con los identificadores y datos mínimos para reaccionar. El kernel los distribuye a los módulos suscritos.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/conexiones.svg" alt="Eventos entre módulos">
+    <figcaption><b>Figura 3.</b> Grafo de integración: origen, evento y módulo que reacciona.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead><tr><th style="width:30%">Evento</th><th style="width:16%">Emisor</th><th>Consumidores y efecto</th></tr></thead>
+    <tbody>
+      <tr><td><code>crm.quote.accepted</code></td><td>CRM</td><td>Logística crea el envío; Facturación emite la factura; Inventario prepara la salida; Automatización registra el proceso.</td></tr>
+      <tr><td><code>crm.opportunity.won</code></td><td>CRM</td><td>Proyectos crea el proyecto; Automatización notifica al responsable.</td></tr>
+      <tr><td><code>crm.lead.created</code></td><td>CRM</td><td>Automatización programa el primer contacto.</td></tr>
+      <tr><td><code>crm.opportunity.stage_changed</code></td><td>CRM</td><td>Automatización evalúa reglas de seguimiento.</td></tr>
+      <tr><td><code>crm.quote.sent</code> / <code>.rejected</code></td><td>CRM</td><td>Seguimiento comercial y cierre del ciclo de la cotización.</td></tr>
+      <tr><td><code>projects.project.created</code></td><td>Proyectos</td><td>Automatización avisa al equipo de entrega.</td></tr>
+      <tr><td><code>reclutamiento.candidate.hired</code></td><td>Reclutamiento</td><td>Crea el contacto en CRM y el proyecto de integración.</td></tr>
+      <tr><td><code>logistica.shipment.delivered</code></td><td>Logística</td><td>CRM registra la actividad de entrega; Inventario descuenta existencias.</td></tr>
+      <tr><td><code>auditorias.finding.created</code></td><td>Auditorías</td><td>Automatización notifica al responsable del plan de acción.</td></tr>
+      <tr><td><code>automatizacion.process.completed</code></td><td>Automatización</td><td>Cierre de la ejecución y actualización de métricas.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r6-2">6.2 Idempotencia</h2>
+  <p>Un evento puede entregarse más de una vez: por reintentos del bus, por una reconexión o por una ejecución manual repetida. Para que eso no duplique registros, cada módulo mantiene la tabla <code>_processed_events</code> con la clave del evento procesado y aplica dos defensas:</p>
+  <ul>
+    <li><strong>Marca de procesamiento.</strong> Antes de actuar, el módulo intenta insertar la clave del evento; si ya existe, lo ignora.</li>
+    <li><strong>Clave de negocio estable.</strong> Cuando el evento no trae identificador único, se deriva uno determinista. Por ejemplo, el envío generado por una cotización usa los últimos ocho caracteres hexadecimales del UUID de la cotización: <code>ENV-COT-8C7E</code>.</li>
+  </ul>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Verificación</b> La cotización <code>COT-…8C7E</code> produjo un único envío aunque se publicó el evento más de una vez; el segundo intento quedó registrado como omitido.</div></div>
+
+  <h2 id="r6-3">6.3 Orquestación</h2>
+  <p>El módulo de Automatización convierte eventos en procesos con pasos tipados. Cada ejecución deja una bitácora con nivel y mensaje, lo que permite reconstruir qué hizo el sistema y por qué.</p>
+
+  <div class="figrow narrow">
+    <figure class="diagram">
+      <img src="../diagramas/automatizacion.svg" alt="Anatomía de una automatización">
+      <figcaption><b>Figura 4.</b> De evento a ejecución: proceso, pasos, resultado y registro.</figcaption>
+    </figure>
+    <div class="side">
+      <h4>Pasos disponibles</h4>
+      <ul>
+        <li><strong><code>query</code>:</strong> consulta registros que cumplen una condición.</li>
+        <li><strong><code>get_record</code>:</strong> obtiene un registro concreto por identificador.</li>
+        <li><strong><code>send_email</code>:</strong> envía una plantilla con los datos del evento.</li>
+        <li><strong><code>notify</code>:</strong> crea un aviso en la bandeja del responsable.</li>
+      </ul>
+      <h4>Qué garantiza</h4>
+      <ul>
+        <li>Los pasos se ejecutan en el orden de su posición y la corrida se detiene en el primero que falla.</li>
+        <li>El resultado de cada paso se guarda en la ejecución, no solo el estado final.</li>
+        <li>Una notificación repetida se marca como leída una sola vez; no se acumulan duplicados.</li>
+      </ul>
+      <p class="small">La ejecución de la figura 4 ocurre en milisegundos: el usuario solo percibe que el envío, la factura y el proyecto aparecieron juntos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 7 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">07</span>
+    <div>
+      <h1 class="chapter-title">Seguridad</h1>
+      <p class="chapter-sub">Quién entra, qué puede ver y cómo se aísla la información.</p>
+    </div>
+  </div>
+
+  <h2 id="r7-1">7.1 Autenticación</h2>
+  <p>El acceso se resuelve con dos tokens: un <strong>token de acceso</strong> de vida corta que viaja en la cabecera <code>Authorization</code> y un <strong>token de refresco</strong> de vida larga que permite renovarlo sin volver a pedir la contraseña. Ambos están firmados por el kernel y contienen el identificador de usuario y de organización.</p>
+  <ul>
+    <li>Las contraseñas se almacenan con función de derivación lenta y sal por usuario; nunca en claro ni con hash reversible.</li>
+    <li>La renovación valida que el usuario siga activo y pertenezca a la organización indicada.</li>
+    <li>El cierre de sesión invalida el token de refresco del dispositivo.</li>
+  </ul>
+
+  <h2 id="r7-2">7.2 Autorización</h2>
+  <p>El control de acceso se basa en roles. Cada rol agrupa permisos con la forma <code>módulo.recurso.operación</code>; el kernel los evalúa antes de enrutar la petición y el SDK vuelve a verificarlos dentro del módulo. La doble comprobación evita que un módulo mal configurado se convierta en un punto ciego.</p>
+
+  <h2 id="r7-3">7.3 Aislamiento multiempresa</h2>
+  <p>Todas las tablas de negocio tienen <code>org_id</code> y una política de seguridad a nivel de fila del tipo:</p>
+  <p class="mono" style="display:block;padding:8px 10px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:8.6pt">USING (org_id = current_setting('app.org_id')::uuid)</p>
+  <p>El SDK establece <code>app.org_id</code> en cada transacción a partir del token, de modo que la base de datos —y no solo la aplicación— impide leer o escribir filas de otra organización.</p>
+
+  <h2 id="r7-4">7.4 Comunicación entre servicios</h2>
+  <ul>
+    <li><strong>Tokens de servicio.</strong> Cada módulo recibe un token propio (<code>nvk_…</code>) que lo identifica ante el kernel cuando necesita consultar a otro módulo.</li>
+    <li><strong>Firma HMAC.</strong> El kernel firma las peticiones que reenvía; el módulo verifica la firma antes de ejecutar la operación.</li>
+    <li><strong>Red interna.</strong> Los módulos no publican puertos en el anfitrión; solo la capa web es alcanzable desde el equipo del usuario.</li>
+    <li><strong>Permisos de servicio.</strong> Un módulo solo puede llamar a los recursos que declara en su manifiesto.</li>
+  </ul>
+
+  <h2 id="r7-5">7.5 Auditoría</h2>
+  <p>El kernel registra cada operación relevante en <code>core.audit_log</code> con usuario, organización, recurso, acción, fecha y resultado. Esa bitácora es independiente de los registros de negocio y no se puede modificar desde la interfaz.</p>
+</section>
+
+<!-- =========================================================== CAPÍTULO 8 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">08</span>
+    <div>
+      <h1 class="chapter-title">Flujo funcional</h1>
+      <p class="chapter-sub">El recorrido principal, con evidencia tomada del sistema en operación.</p>
+    </div>
+  </div>
+
+  <h2 id="r8-1">8.1 Recorrido principal</h2>
+  <p>El flujo comercial es la mejor demostración de que la arquitectura funciona: una sola acción del usuario —aceptar una cotización— produce registros consistentes en cuatro módulos.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/flujo-comercial.svg" alt="Flujo comercial completo">
+    <figcaption><b>Figura 5.</b> Flujo comercial: lead, oportunidad, cotización, proyecto, envío, factura y pago.</figcaption>
+  </figure>
+
+  <ol class="steps">
+    <li><strong>CRM.</strong> Se registra la empresa y el contacto, se crea la oportunidad y se avanza por el pipeline.</li>
+    <li><strong>CRM.</strong> Se emite la cotización con líneas e impuestos; al aceptarla se publica <code>crm.quote.accepted</code>.</li>
+    <li><strong>Proyectos.</strong> El listener crea el proyecto vinculado a la oportunidad y deja el plan listo para asignar responsables.</li>
+    <li><strong>Logística.</strong> Se crea el envío con referencia determinista y estado inicial en borrador.</li>
+    <li><strong>Facturación.</strong> Se emite la factura con el importe de la cotización y su vencimiento.</li>
+    <li><strong>Inventario.</strong> Al entregarse el envío se registra el movimiento de salida y se actualiza la existencia.</li>
+    <li><strong>Automatización.</strong> Cada paso deja una ejecución con su bitácora y, si algo falla, una notificación al responsable.</li>
+  </ol>
+
+  <h2 id="r8-2">8.2 Evidencia visual</h2>
+  <p>Las siguientes capturas se tomaron del ambiente de demostración con sesión de administrador.</p>
+
+  <figure class="shot">
+    <img src="../capturas/04-crm-oportunidades.png" alt="Oportunidades del CRM">
+    <figcaption><b>Figura 6.</b> Oportunidades en el CRM: el origen del flujo, con importe, probabilidad y etapa.</figcaption>
+  </figure>
+
+  <figure class="shot">
+    <img src="../capturas/12-facturacion.png" alt="Facturas emitidas">
+    <figcaption><b>Figura 7.</b> Facturación: documento emitido, estado y saldo pendiente.</figcaption>
+  </figure>
+
+  <figure class="shot">
+    <img src="../capturas/19-automatizacion-ejecuciones.png" alt="Ejecuciones de automatización">
+    <figcaption><b>Figura 8.</b> Ejecuciones: la trazabilidad del flujo, con el proceso y sus marcas de inicio y fin.</figcaption>
+  </figure>
+
+  <figure class="shot">
+    <img src="../capturas/02-home.png" alt="Panel general">
+    <figcaption><b>Figura 9.</b> Panel general: el resultado consolidado de todos los módulos en una sola pantalla.</figcaption>
+  </figure>
+
+  <h3>Qué mirar en las capturas</h3>
+  <ul>
+    <li><strong>Coherencia de importes y fechas:</strong> cada factura vence después de su emisión y el total coincide con lo que muestra el panel general.</li>
+    <li><strong>Nombres legibles:</strong> cliente, producto y proceso aparecen con su nombre; no queda ningún identificador UUID en las listas.</li>
+    <li><strong>Estados consistentes:</strong> lo que la lista marca como pagado o completado coincide con lo que resume el indicador.</li>
+    <li><strong>Volumen suficiente:</strong> hay filas para paginar y desplazar, de modo que la captura muestra una operación real y no un ejemplo de dos registros.</li>
+  </ul>
+
+  <h2 id="r8-3">8.3 Qué demuestra la evidencia</h2>  <p>Las capturas no son maquetas: provienen del ambiente de demostración con datos cargados. Cada una verifica un tramo distinto del recorrido.</p>
+  <table class="compact">
+    <thead><tr><th style="width:16%">Figura</th><th style="width:24%">Módulo</th><th>Qué se comprueba</th></tr></thead>
+    <tbody>
+      <tr><td>6</td><td>CRM</td><td>El pipeline tiene oportunidades con importe, probabilidad y etapa, y los nombres se leen sin identificadores.</td></tr>
+      <tr><td>7</td><td>Facturación</td><td>Las facturas muestran cliente, folio, estado y saldo; el documento nació de una cotización aceptada.</td></tr>
+      <tr><td>8</td><td>Automatización</td><td>Las ejecuciones registran proceso, estado y marcas de tiempo, incluidas las corridas de prueba manuales.</td></tr>
+      <tr><td>9</td><td>Panel general</td><td>Los indicadores de todos los módulos conviven en una sola vista y se actualizan con la misma base.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Del clic al registro</b> Aceptar una cotización y ver aparecer el envío, la factura y el proyecto demuestra el mecanismo completo: evento, listener, idempotencia y auditoría, sin intervención manual entre módulos.</div></div>
+
+  <h2 id="r8-4">8.4 Reproducir el recorrido</h2>
+  <p>Con el ambiente levantado y la semilla cargada, cualquier persona puede repetir el flujo en pocos minutos:</p>
+  <ol class="steps">
+    <li>Entre con la cuenta <code>ventas@novvus.demo</code> y abra <strong>CRM → Oportunidades</strong>.</li>
+    <li>Localice una oportunidad con cotización emitida y abra el documento.</li>
+    <li>Cambie el estado de la cotización a <strong>Aceptada</strong> y confirme.</li>
+    <li>Revise <strong>Proyectos</strong>, <strong>Logística</strong> y <strong>Facturación</strong>: los tres registros aparecen sin que nadie los haya creado.</li>
+    <li>En <strong>Automatización → Ejecuciones</strong>, abra la corrida y lea su bitácora paso a paso.</li>
+    <li>Repita la aceptación: el evento se marca como ya procesado y no se duplica nada.</li>
+  </ol>
+  <div class="callout info"><span class="ico">i</span><div><b>Qué observar</b> El envío conserva la referencia derivada de la cotización (<code>ENV-COT-…</code>), la factura hereda importe y vencimiento, y el proyecto queda vinculado a la misma oportunidad. Esa coherencia es la que se quería demostrar.</div></div>
+
+  <h2 id="r8-5" class="page-break">8.5 Roles en el recorrido</h2>
+  <p>Aunque el flujo lo dispara una sola persona, cada tramo pertenece a un rol distinto. La tabla indica quién recibe el trabajo después de la aceptación y en qué pantalla puede comprobarlo:</p>
+  <table class="compact">
+    <thead><tr><th style="width:15%">Rol</th><th style="width:26%">Recibe</th><th style="width:25%">Dónde se verifica</th><th>Qué hace a continuación</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Ventas</strong></td><td>La oportunidad y la cotización aceptada.</td><td>CRM → Oportunidades</td><td>Comunica la aceptación y confirma el importe con el cliente.</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td>El proyecto creado por el evento.</td><td>Proyectos → Portafolio</td><td>Asigna responsables, fechas y entregables del plan.</td></tr>
+      <tr><td><strong>Logística</strong></td><td>El envío en borrador, con la referencia derivada.</td><td>Logística → Envíos</td><td>Confirma almacén, transportista y fecha de salida.</td></tr>
+      <tr><td><strong>Finanzas</strong></td><td>La factura emitida y su vencimiento.</td><td>Facturación → Facturas</td><td>Da seguimiento al cobro y registra el pago.</td></tr>
+    </tbody>
+  </table>
+
+  <p>Ningún rol vuelve a capturar lo que ya viajó en el evento: ventas cierra, proyectos planifica, logística despacha y finanzas cobra, cada uno sobre el registro que el sistema dejó en su bandeja. Los permisos acompañan esa división: cada cuenta ve el módulo que le corresponde y el registro compartido aparece en modo lectura cuando no es suyo.</p>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Regla de traspaso</b> Quien recibe el registro confirma los datos de su tramo —fechas, almacén, vencimiento— y no repite la captura anterior. Si un dato de origen está mal, se corrige en el módulo dueño del dato y el cambio queda auditado en la bitácora del registro.</div></div>
+
+  <p>Esa bitácora es la que cierra el círculo: guarda el evento original, el momento en que se procesó y el identificador de cada registro creado. Ante una discrepancia —un importe distinto, una fecha que no cuadra— el rastro lleva a la aceptación que la originó y a la persona que la firmó.</p>
+</section>
+
+<!-- =========================================================== CAPÍTULO 9 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">09</span>
+    <div>
+      <h1 class="chapter-title">Despliegue y operación</h1>
+      <p class="chapter-sub">Cómo se levanta el sistema, dónde viven los datos y cómo se vigila.</p>
+    </div>
+  </div>
+
+  <h2 id="r9-1">9.1 Topología</h2>
+  <p>Todo el sistema corre en contenedores sobre WSL2. La capa web publica el puerto 8077; el resto de los servicios viven en una red interna y no son alcanzables desde fuera.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/despliegue.svg" alt="Diagrama de despliegue">
+    <figcaption><b>Figura 10.</b> Topología de despliegue sobre WSL2 con Docker Engine.</figcaption>
+  </figure>
+
+  <h3>Tres capas, un solo borde</h3>
+  <ul>
+    <li><strong>Equipo del usuario:</strong> solo necesita un navegador; no se instala nada ni se abren puertos adicionales.</li>
+    <li><strong>WSL2 con Docker Engine:</strong> aloja la capa web, el kernel, los ocho módulos y PostgreSQL en una red interna privada.</li>
+    <li><strong>Red interna:</strong> los módulos se hablan entre sí por nombre de servicio, nunca por dirección pública.</li>
+    <li><strong>Persistencia:</strong> el volumen <code>pgdata</code> sobrevive a la recreación de contenedores; el resto del sistema es desechable.</li>
+  </ul>
+
+  <table class="compact">
+    <thead><tr><th style="width:26%">Servicio</th><th style="width:34%">Imagen</th><th>Reinicio</th></tr></thead>
+    <tbody>
+      <tr><td>web</td><td><code>ghcr.io/novvus/web:0.3.72</code></td><td><code>unless-stopped</code></td></tr>
+      <tr><td>kernel</td><td><code>ghcr.io/novvus/core:0.3.72</code></td><td><code>unless-stopped</code></td></tr>
+      <tr><td>postgres</td><td><code>postgres:16-alpine</code></td><td><code>unless-stopped</code></td></tr>
+      <tr><td>crm, projects</td><td>Imágenes de módulo del núcleo</td><td><code>unless-stopped</code></td></tr>
+      <tr><td>6 módulos añadidos</td><td>Runtime de módulo con el código montado desde <code>dev/modules</code></td><td><code>unless-stopped</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r9-2">9.2 Volúmenes y respaldos</h2>
+  <p>Los datos persisten en volúmenes de Docker: <code>pgdata</code> para la base, <code>files</code> para adjuntos y <code>entitlement</code> para licencias. Los respaldos se generan con <code>pg_dump</code> en formato personalizado y se incluyen en el paquete de entrega.</p>
+  <ul>
+    <li><strong>Frecuencia recomendada:</strong> diaria para la base de datos y semanal para los adjuntos.</li>
+    <li><strong>Restauración:</strong> <code>pg_restore</code> sobre una base vacía, con el mismo nombre de organización.</li>
+    <li><strong>Verificación:</strong> tras restaurar, comprobar el conteo de registros por módulo y el acceso con la cuenta administradora.</li>
+  </ul>
+
+  <p>El volcado incluido en el paquete se generó desde el ambiente de demostración con <code>pg_dump -Fc</code>: un solo archivo, comprimido y restaurable por secciones. Antes de dar por bueno un respaldo conviene comprobar tres cosas:</p>
+
+  <ol class="steps">
+    <li><strong>Que abre.</strong> <code>pg_restore --list</code> enumera los esquemas <code>core</code> y <code>mod_*</code> con sus tablas; si falla, el archivo está truncado.</li>
+    <li><strong>Que restaura.</strong> La carga sobre una base vacía termina sin errores y el conteo por módulo coincide con el de la sección 11.2.</li>
+    <li><strong>Que sirve.</strong> Con la base restaurada, el acceso con la cuenta administradora muestra los mismos totales que el panel original.</li>
+  </ol>
+
+  <div class="callout warn"><span class="ico">!</span><div><b>Antes de migrar</b> Genere un respaldo nuevo, cópielo fuera del equipo y pruebe la migración sobre la copia, no sobre la base en uso. Un volcado que nunca se restauró no es todavía un respaldo.</div></div>
+
+  <h2 id="r9-3" class="page-break">9.3 Salud y registros</h2>
+  <p>Cada contenedor expone <code>/health</code>. Los ocho módulos responden <code>200</code> y el kernel registra en su bitácora los errores de enrutamiento (<code>503 Service Unavailable</code>) cuando un módulo no está disponible, lo que permite distinguir un fallo de red de un error de negocio.</p>
+  <table class="compact">
+    <thead><tr><th style="width:32%">Verificación</th><th style="width:24%">Comando</th><th>Resultado esperado</th></tr></thead>
+    <tbody>
+      <tr><td>Contenedores activos</td><td><code>docker ps</code></td><td>Once servicios en estado <em>healthy</em>.</td></tr>
+      <tr><td>Salud de módulo</td><td><code>curl /health</code></td><td>HTTP 200 en menos de un segundo.</td></tr>
+      <tr><td>Resumen de módulo</td><td><code>GET /api/{m}/reports/dashboard</code></td><td>JSON con indicadores, sin error 500.</td></tr>
+      <tr><td>Interfaz</td><td>Abrir <code>:8077</code></td><td>Pantalla de acceso y panel de inicio.</td></tr>
+      <tr><td>Registros del kernel</td><td><code>docker logs --tail 100 novvus-prod-kernel-1</code></td><td>Las últimas cien líneas, sin errores de enrutamiento.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r9-4">9.4 Comandos de operación</h2>
+  <p>Las tres operaciones habituales se resuelven desde una terminal de WSL, dentro del directorio <code>/opt/novvus</code>:</p>
+  <table class="compact">
+    <thead><tr><th style="width:26%">Tarea</th><th>Comando</th></tr></thead>
+    <tbody>
+      <tr><td>Estado de los servicios</td><td><code>docker ps --format "table {{.Names}}\t{{.Status}}"</code></td></tr>
+      <tr><td>Levantar o actualizar</td><td><code>docker compose up -d</code></td></tr>
+      <tr><td>Respaldo de la base</td><td><code>docker exec novvus-prod-postgres-1 pg_dump -U novvus -Fc novvus &gt; novvus_$(date +%F).dump</code></td></tr>
+    </tbody>
+  </table>
+  <p class="table-note">El respaldo se escribe en el directorio actual del contenedor anfitrión; muévalo fuera del equipo antes de aplicar una migración.</p>
+
+  <p>Con esas tres rutinas —observar, actualizar y respaldar— el ambiente se mantiene sano sin herramientas adicionales. El capítulo siguiente recorre el proceso con el que se construyó y documentó lo que aquí se opera.</p>
+</section>
+
+<!-- ========================================================== CAPÍTULO 10 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">10</span>
+    <div>
+      <h1 class="chapter-title">Proceso de construcción</h1>
+      <p class="chapter-sub">Cómo se llegó del núcleo instalado a la suite documentada.</p>
+    </div>
+  </div>
+
+  <h2 id="r10-1">10.1 Fases</h2>
+  <table>
+    <thead><tr><th style="width:14%">Fase</th><th style="width:26%">Objetivo</th><th>Trabajo realizado</th></tr></thead>
+    <tbody>
+      <tr><td><strong>0</strong></td><td>Plataforma operativa</td><td>Instalación del kernel, la capa web y PostgreSQL; alta de la organización, usuarios y roles; verificación de acceso.</td></tr>
+      <tr><td><strong>A</strong></td><td>Núcleo comercial</td><td>Puesta a punto del CRM: pipeline, etapas, cotizaciones, actividades y reportes.</td></tr>
+      <tr><td><strong>B</strong></td><td>Proyectos</td><td>Portafolio, fases, tareas e hitos; integración con oportunidades ganadas.</td></tr>
+      <tr><td><strong>C</strong></td><td>Módulos de operación</td><td>Reclutamiento, Logística, Auditorías, Facturación e Inventario con sus manifiestos y migraciones.</td></tr>
+      <tr><td><strong>D</strong></td><td>Integración</td><td>Eventos entre módulos, tokens de servicio, listeners idempotentes y automatizaciones.</td></tr>
+      <tr><td><strong>E</strong></td><td>Datos de demostración</td><td>Carga de 13 facturas, 13 productos, 26 movimientos, procesos y notificaciones con nombres legibles.</td></tr>
+      <tr><td><strong>F</strong></td><td>Documentación</td><td>Diagramas, capturas, manual de usuario y reporte técnico en PDF.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r10-2">10.2 Correcciones aplicadas</h2>
+  <p>Durante la puesta a punto se corrigieron defectos que afectaban la legibilidad del producto o la consistencia de los datos:</p>
+  <ul>
+    <li><strong>Categoría de Facturación.</strong> El manifiesto la clasificaba como «Ventas»; se corrigió a «Finanzas» en el manifiesto y en la base de datos.</li>
+    <li><strong>Iconos del menú.</strong> La capa web no renderiza iconos personalizados por módulo; se homologaron los acentos de color y los nombres accesibles.</li>
+    <li><strong>Listas con identificadores.</strong> Las vistas mostraban UUID en lugar de nombres. Se añadieron columnas desnormalizadas (<code>customer_name</code>, <code>product_name</code>, <code>invoice_number</code>, <code>process_name</code>) con su migración y su relleno retroactivo.</li>
+    <li><strong>Tablero de ejecuciones.</strong> La tarjeta del kanban usaba el identificador del proceso; ahora muestra el nombre.</li>
+    <li><strong>Reinicio de contenedores.</strong> Los módulos añadidos se recrearon con política <code>unless-stopped</code> para sobrevivir al reinicio de Docker.</li>
+    <li><strong>Datos de demostración incompletos.</strong> Se ampliaron facturas, productos y movimientos para que las listas y los indicadores tuvieran contenido realista.</li>
+  </ul>
+
+  <h2 id="r10-3">10.3 Datos de demostración</h2>
+  <p>Los datos se cargaron con scripts SQL idempotentes que pueden ejecutarse repetidamente sin duplicar registros. Las migraciones viven junto al código de cada módulo, de modo que un ambiente nuevo se reconstruye con el mismo resultado.</p>
+  <table class="compact">
+    <thead><tr><th style="width:40%">Migración</th><th>Efecto</th></tr></thead>
+    <tbody>
+      <tr><td><code>facturacion/0002_readable_lists.sql</code></td><td>Añade cliente, folio de factura y folio de pago; rellena los valores existentes.</td></tr>
+      <tr><td><code>inventario/0002_readable_lists.sql</code></td><td>Añade el nombre del producto a existencias y movimientos.</td></tr>
+      <tr><td><code>automatizacion/0002_process_name.sql</code></td><td>Añade el nombre del proceso a pasos y ejecuciones.</td></tr>
+      <tr><td><code>facturacion/seed_demo_2026_11.sql</code></td><td>13 facturas, 13 productos, existencias y 26 movimientos de ejemplo.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r10-4">10.4 Lecciones del proceso</h2>
+  <p>La puesta a punto dejó aprendizajes que conviene registrar, porque explican varias decisiones del entregable:</p>
+  <ul>
+    <li><strong>La documentación se escribe con el sistema en marcha.</strong> Cada captura se tomó del ambiente real; si una vista no tenía datos, primero se corrigieron los datos y después se documentó.</li>
+    <li><strong>La legibilidad es parte del modelo.</strong> Guardar solo el identificador obliga a la interfaz a resolver nombres; las columnas desnormalizadas simplifican la lista a cambio de mantenerlas en las migraciones.</li>
+    <li><strong>Las migraciones necesitan orden.</strong> Cada módulo evoluciona su esquema por separado; aplicar una migración fuera de secuencia deja columnas sin rellenar.</li>
+    <li><strong>La idempotencia se prueba repitiendo el evento.</strong> No basta con leer el código: se publicó el mismo evento dos veces y se verificó que el segundo intento quedara omitido.</li>
+    <li><strong>Los defectos de interfaz aparecen usándola.</strong> El tablero de ejecuciones y los iconos del menú solo se detectaron al recorrer el flujo completo con datos cargados.</li>
+  </ul>
+
+  <h2 id="r10-5">10.5 Automatización de la propia entrega</h2>
+  <p>Los artefactos de documentación también se generan con scripts, para que una corrección se propague sin rehacer el trabajo a mano:</p>
+  <table class="compact">
+    <thead><tr><th style="width:34%">Script</th><th>Qué produce</th></tr></thead>
+    <tbody>
+      <tr><td><code>render_diagrams.py</code></td><td>Los ocho SVG a partir de definiciones Mermaid, con ajuste de tamaño y limpieza del marcado.</td></tr>
+      <tr><td><code>pdf_pages.py</code></td><td>Una imagen por página del PDF, para revisar cortes, figuras y espacios en blanco.</td></tr>
+      <tr><td><code>seed_demo_2026_11.sql</code></td><td>Los datos de demostración, ejecutables tantas veces como haga falta.</td></tr>
+      <tr><td>Impresión de Chromium</td><td>Ambos PDF con el CSS de A4, sin encabezados ni pies automáticos.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Documentación reproducible</b> Una corrección de texto, una captura nueva o un diagrama distinto se regenera en minutos; no hay que rehacer el documento desde cero ni reenviar archivos sueltos.</div></div>
+</section>
+
+<!-- ========================================================== CAPÍTULO 11 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">11</span>
+    <div>
+      <h1 class="chapter-title">Pruebas y verificación</h1>
+      <p class="chapter-sub">Qué se comprobó y con qué resultado.</p>
+    </div>
+  </div>
+
+  <h2 id="r11-1">11.1 Verificaciones técnicas</h2>
+  <table>
+    <thead><tr><th style="width:34%">Prueba</th><th style="width:26%">Método</th><th>Resultado</th></tr></thead>
+    <tbody>
+      <tr><td>Arranque de la plataforma</td><td><code>docker ps</code></td><td>Once contenedores activos y saludables.</td></tr>
+      <tr><td>Acceso de usuario</td><td>Inicio de sesión en la interfaz</td><td>Sesión creada; panel de inicio con datos.</td></tr>
+      <tr><td>Salud de módulos</td><td><code>GET /health</code></td><td>HTTP 200 en los ocho módulos.</td></tr>
+      <tr><td>Resumen por módulo</td><td><code>GET /api/{m}/reports/dashboard</code></td><td>JSON válido; indicadores coherentes con la base.</td></tr>
+      <tr><td>Listas y detalle</td><td>Navegación por las nueve vistas principales</td><td>Render con datos legibles y paginación.</td></tr>
+      <tr><td>Evento de cotización</td><td>Aceptar una cotización</td><td>Envío y factura creados una sola vez.</td></tr>
+      <tr><td>Idempotencia</td><td>Repetir el evento</td><td>Segundo intento omitido sin duplicar registros.</td></tr>
+      <tr><td>Aislamiento</td><td>Consulta con otra organización</td><td>Sin filas visibles fuera de la organización activa.</td></tr>
+      <tr><td>Exportación</td><td>Botón Exportar en una vista</td><td>Archivo descargado con las columnas visibles.</td></tr>
+      <tr><td>Documento PDF</td><td>Impresión desde el navegador</td><td>A4, sin cortes de tabla ni de figura.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r11-2">11.2 Volumen de datos</h2>
+  <table class="compact">
+    <thead><tr><th>Entidad</th><th class="num">Registros</th><th>Entidad</th><th class="num">Registros</th></tr></thead>
+    <tbody>
+      <tr><td>Empresas</td><td class="num">116</td><td>Proyectos</td><td class="num">11</td></tr>
+      <tr><td>Contactos</td><td class="num">44</td><td>Candidatos</td><td class="num">5</td></tr>
+      <tr><td>Leads</td><td class="num">6</td><td>Envíos</td><td class="num">4</td></tr>
+      <tr><td>Oportunidades</td><td class="num">71</td><td>Auditorías / hallazgos</td><td class="num">2 / 3</td></tr>
+      <tr><td>Actividades</td><td class="num">20</td><td>Facturas / pagos</td><td class="num">13 / 8</td></tr>
+      <tr><td>Cotizaciones</td><td class="num">5</td><td>Productos / movimientos</td><td class="num">13 / 26</td></tr>
+      <tr><td>Usuarios</td><td class="num">8</td><td>Procesos de automatización</td><td class="num">9</td></tr>
+    </tbody>
+  </table>
+  <p class="table-note">Conteos obtenidos de la base <code>novvus</code> al cierre de la documentación, excluyendo registros con borrado lógico.</p>
+
+  <h2 id="r11-3">11.3 Alcance de las pruebas</h2>
+  <p>Lo que sigue no se probó y conviene decirlo con la misma claridad que los resultados anteriores:</p>
+  <ul>
+    <li><strong>Carga concurrente.</strong> No se ejecutaron pruebas de estrés con decenas de usuarios simultáneos; los tiempos observados corresponden a un solo usuario.</li>
+    <li><strong>Otros navegadores.</strong> Las capturas y la navegación se validaron en navegadores basados en Chromium; Firefox y Safari quedan pendientes.</li>
+    <li><strong>Restauración en otro equipo.</strong> El respaldo <code>.dump</code> se generó y se verificó su contenido, pero la restauración completa sobre un anfitrión limpio no forma parte de esta entrega.</li>
+    <li><strong>Envío real de correo.</strong> Las automatizaciones registran el envío en su bitácora; no hay proveedor SMTP configurado, de modo que no sale correo a Internet.</li>
+    <li><strong>Dispositivos móviles.</strong> La interfaz se diseñó para escritorio; no se evaluó en tablet ni teléfono.</li>
+    <li><strong>Cumplimiento fiscal.</strong> La facturación es operativa, no fiscal: no hay timbrado ni validación ante autoridad.</li>
+  </ul>
+  <div class="callout warn"><span class="ico">!</span><div><b>Antes de producción</b> Repita la batería de la tabla 11.1 en el servidor definitivo, con TLS y con el volumen de datos previsto, y añada una prueba de restauración. Los resultados de este reporte describen el ambiente de demostración.</div></div>
+
+  <h2 id="r11-4">11.4 Matriz de aceptación</h2>
+  <p>Cada módulo se acepta con una prueba corta que recorre su registro principal y comprueba la integración con el resto:</p>
+  <table class="compact">
+    <thead><tr><th style="width:20%">Módulo</th><th style="width:40%">Prueba</th><th>Criterio de aceptación</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CRM</strong></td><td>Crear empresa y contacto, abrir una oportunidad y aceptar su cotización.</td><td>Nombres legibles en la lista y evento <code>crm.quote.accepted</code> publicado.</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td>Abrir el proyecto creado por el evento anterior.</td><td>Proyecto vinculado a la oportunidad, con tareas y responsable disponible.</td></tr>
+      <tr><td><strong>Logística</strong></td><td>Confirmar el envío asociado a la misma cotización.</td><td>Referencia <code>ENV-COT-…</code> y estado actualizado sin duplicados.</td></tr>
+      <tr><td><strong>Facturación</strong></td><td>Revisar la factura emitida y registrar un pago parcial.</td><td>Importe y vencimiento iguales a la cotización; saldo recalculado.</td></tr>
+      <tr><td><strong>Inventario</strong></td><td>Consultar el movimiento de salida del envío.</td><td>Existencia descontada y referencia del envío en el movimiento.</td></tr>
+      <tr><td><strong>Reclutamiento</strong></td><td>Publicar una vacante y mover un candidato de etapa.</td><td>Etapa y estado reflejados en la lista; contacto disponible en CRM.</td></tr>
+      <tr><td><strong>Auditorías</strong></td><td>Registrar un hallazgo con responsable y severidad.</td><td>Hallazgo visible en la lista y notificación al responsable.</td></tr>
+      <tr><td><strong>Automatización</strong></td><td>Repetir la aceptación de la cotización.</td><td>Segunda ejecución marcada como omitida, sin registros nuevos.</td></tr>
+    </tbody>
+  </table>
+  <p class="table-note">Las ocho pruebas se ejecutaron en secuencia sobre el ambiente de demostración; cualquier fallo detenía la corrida y se corregía antes de continuar.</p>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Cierre de la verificación</b> Con la matriz completa, el recorrido comercial queda probado de extremo a extremo: ocho módulos, un solo evento y ningún registro creado a mano entre ellos.</div></div>
+</section>
+
+<!-- ========================================================== CAPÍTULO 12 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">12</span>
+    <div>
+      <h1 class="chapter-title">Limitaciones y trabajo futuro</h1>
+      <p class="chapter-sub">Lo que conviene saber antes de llevar el sistema a producción.</p>
+    </div>
+  </div>
+
+  <h2 id="r12-1">12.1 Limitaciones conocidas</h2>
+  <ul>
+    <li><strong>Tableros en módulos añadidos.</strong> Las vistas kanban de Logística, Auditorías, Reclutamiento y Facturación no muestran tarjetas en esta versión; la vista de lista sí funciona y es la recomendada.</li>
+    <li><strong>Iconos por módulo.</strong> La capa web actual no renderiza iconos personalizados; se usan acentos de color y nombres accesibles.</li>
+    <li><strong>Código del núcleo.</strong> El kernel y la capa web se distribuyen como imágenes comerciales; el código fuente entregado corresponde al SDK y a los módulos personalizados.</li>
+    <li><strong>Facturación fiscal.</strong> No incluye timbrado, cancelación ante la autoridad fiscal ni contabilidad electrónica.</li>
+    <li><strong>Autenticación externa.</strong> No está configurado el inicio de sesión con proveedor de identidad (SSO).</li>
+  </ul>
+
+  <h2 id="r12-2">12.2 Siguientes pasos</h2>
+  <ol class="steps">
+    <li>Publicar el ambiente en un servidor con TLS, respaldos automáticos y monitoreo de salud.</li>
+    <li>Habilitar SSO y políticas de contraseña para la organización.</li>
+    <li>Completar las vistas kanban de los módulos añadidos y homologar los iconos cuando la capa web lo permita.</li>
+    <li>Integrar un proveedor de correo transaccional para las notificaciones de automatización.</li>
+    <li>Añadir tableros analíticos por rol con exportación programada.</li>
+    <li>Ampliar la batería de pruebas automatizadas de eventos e idempotencia.</li>
+  </ol>
+
+  <h2 id="r12-3">12.3 Criterios para pasar a producción</h2>
+  <p>El sistema está listo para demostración y operación interna. Para llevarlo a producción con datos reales deberían cumplirse estos criterios:</p>
+  <ul>
+    <li><strong>Infraestructura:</strong> servidor con TLS, respaldos automáticos fuera del anfitrión y monitoreo de salud con alertas.</li>
+    <li><strong>Identidad:</strong> una cuenta por persona, roles revisados y, si aplica, SSO con el directorio corporativo.</li>
+    <li><strong>Datos:</strong> migración desde el sistema anterior con conciliación de empresas, contactos y saldos.</li>
+    <li><strong>Pruebas:</strong> repetición de la batería del capítulo 11 sobre el volumen real y una restauración completa verificada.</li>
+    <li><strong>Operación:</strong> responsable de cada módulo, procedimiento de alta y baja de usuarios, y calendario de respaldos.</li>
+    <li><strong>Documentación:</strong> manual adaptado a los roles de la organización y capacitación registrada.</li>
+  </ul>
+  <div class="callout tip"><span class="ico">✓</span><div><b>Recomendación de despliegue</b> Empiece con dos módulos y un equipo reducido, mida una semana y amplíe por olas. Un despliegue total el primer día multiplica los problemas sin mejorar el aprendizaje.</div></div>
+</section>
+
+<!-- ========================================================== CAPÍTULO 13 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">13</span>
+    <div>
+      <h1 class="chapter-title">Anexos</h1>
+      <p class="chapter-sub">Referencia rápida del paquete entregado.</p>
+    </div>
+  </div>
+
+  <h2 id="r13-1">13.1 Estructura del paquete</h2>
+  <table class="compact">
+    <thead><tr><th style="width:36%">Ruta</th><th>Contenido</th></tr></thead>
+    <tbody>
+      <tr><td><code>Manual-Usuario-Novvus.pdf</code></td><td>Manual de usuario con capturas y diagramas.</td></tr>
+      <tr><td><code>Reporte-Tecnico-Novvus.pdf</code></td><td>Este documento.</td></tr>
+      <tr><td><code>LEEME.md</code></td><td>Instrucciones de instalación, credenciales y verificación.</td></tr>
+      <tr><td><code>codigo/sdk/</code></td><td>SDK de módulos (modelos, vistas, eventos, migraciones).</td></tr>
+      <tr><td><code>codigo/modulos/</code></td><td>Seis módulos personalizados con sus migraciones y manifiestos.</td></tr>
+      <tr><td><code>codigo/crm-module/</code>, <code>codigo/projects-module/</code></td><td>Módulos base en su versión de desarrollo.</td></tr>
+      <tr><td><code>docker/</code></td><td>Composición de servicios, configuración y respaldos <code>.dump</code>.</td></tr>
+      <tr><td><code>documentacion/</code></td><td>Fuentes HTML y hoja de estilo de ambos documentos.</td></tr>
+      <tr><td><code>capturas/</code></td><td>19 capturas PNG en resolución 1526 × 730.</td></tr>
+      <tr><td><code>diagramas/</code></td><td>8 diagramas SVG: arquitectura, flujo, casos de uso, conexiones, datos, despliegue, automatización y estados.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r13-2">13.2 Credenciales y direcciones</h2>
+  <table class="compact">
+    <thead><tr><th style="width:28%">Elemento</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>Interfaz</td><td><code>http://localhost:8077</code></td></tr>
+      <tr><td>Administrador</td><td><code>saulgutierrez143@gmail.com</code></td></tr>
+      <tr><td>Cuentas de equipo</td><td><code>ventas@</code>, <code>proyectos@</code>, <code>logistica@</code>, <code>rrhh@</code>, <code>auditoria@</code>, <code>automatizacion@novvus.demo</code></td></tr>
+      <tr><td>Contraseña de demostración</td><td><code>Demo2026!</code></td></tr>
+      <tr><td>Base de datos</td><td><code>novvus</code> en PostgreSQL 16, usuario <code>novvus</code></td></tr>
+      <tr><td>Organización</td><td><code>01a1a51b-372e-74f3-b194-1b03e034628e</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="r13-3">13.3 Referencias</h2>
+  <ul>
+    <li>SDK de Novvus: contrato de módulos, modelos, vistas, permisos y eventos (<code>codigo/sdk/README.md</code>).</li>
+    <li>Manifiestos de módulo (<code>novvus.toml</code>): versión, categoría, permisos y eventos.</li>
+    <li>Migraciones SQL por módulo: estructura y datos de demostración.</li>
+    <li>Documentación en línea de Mermaid 11 y de las herramientas de impresión de Chromium.</li>
+  </ul>
+
+  <hr class="soft">
+  <p class="small center">Novvus · Reporte técnico · Versión 1.0 · Noviembre de 2026</p>
+</section>
+
+</body>
+</html>

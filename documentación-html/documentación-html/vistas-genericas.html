@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vistas genéricas y metadatos — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav active" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Construir módulos / Vistas genéricas y metadatos</div>
+    <article>
+      <h1>Vistas genéricas y metadatos</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Cómo un módulo obtiene lista, formulario, kanban, calendario, filtros visuales y
+      exportación <b>sin escribir una línea de React</b>: declaras <code>__novvus_views__</code> en el modelo,
+      el SDK construye un documento de metadatos, el kernel lo valida y lo sirve filtrado por permisos, y la
+      shell lo convierte en pantallas bajo <code>/m/{módulo}/{modelo}</code>.</p>
+
+      <h2>Por qué existe este pipeline</h2>
+      <p>En el tutorial anterior tu módulo ya tenía API REST automática. Lo que faltaba era la interfaz. En
+      otras plataformas eso significa escribir vistas XML o componentes por cada modelo. En NOVVUS CORE la
+      interfaz nace del propio modelo Python: el SDK sabe qué columnas tienes, de qué tipo son, cuáles son
+      obligatorias y qué permisos las protegen. Con esa información —el <b>meta</b>— la shell puede renderizar
+      una tabla, un formulario y un kanban correctos para cualquier módulo, incluso uno de terceros que la
+      shell nunca ha visto.</p>
+      <div class="note"><b>Regla de oro.</b> El genérico es el <i>default</i>, nunca una jaula. Si un modelo
+      necesita una pantalla a medida, registras un <i>override</i> o creas una página bajo
+      <code>/{módulo}/…</code> dentro del mismo chrome. Nada te obliga a usar el genérico, pero siempre lo tienes.</div>
+
+      <h2>El pipeline de metadatos, paso a paso</h2>
+<pre class="diagram">Módulo (Python)              Kernel (Rust)                         Shell (Next.js)
+     │                            │                                     │
+     │ __novvus_views__           │                                     │
+     │ build_module_meta()        │                                     │
+     │ ── handshake {module_id, base_url, meta} ──►                     │
+     │                            │ valida (serde estricto, ≤512 KiB)   │
+     │                            │ persiste core.modules.meta          │
+     │                            │                                     │
+     │                            │ ◄── GET /api/core/meta ─────────────┤ useMetaIndex()
+     │                            │ filtra por permiso read + módulos   │
+     │                            │ habilitados; fusiona ext/custom     │
+     │                            │ ── {modules:[…]} + ETag ───────────►│
+     │                            │                                     │ /m/crm/contacts
+     │ ◄── GET /api/crm/contacts?filter=…&amp;order_by=…&amp;cursor=… ──────────┤ GenericListView</pre>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Declaración.</b> Cada clase registrada con
+        <code>@module.model</code> puede llevar el atributo opcional <code>__novvus_views__</code>. Al registrar,
+        <code>validate_views()</code> (<code>sdk/src/novvus_sdk/meta.py:183</code>) revisa la declaración y falla
+        con <code>ValueError</code> si algo no cuadra: el módulo no arranca "a medias".</div></div>
+        <div class="step"><span class="num">2</span><div><b>Construcción.</b> En <code>startup()</code> el SDK llama
+        <code>build_module_meta(self.id, version, self.models)</code> (<code>app.py:275</code>) y obtiene un JSON con
+        <code>meta_version</code>, <code>module</code>, <code>module_version</code> y la lista <code>models</code>.</div></div>
+        <div class="step"><span class="num">3</span><div><b>Handshake.</b> <code>KernelClient.handshake()</code>
+        (<code>kernel.py:44</code>) envía <code>{module_id, base_url, meta}</code> a
+        <code>POST /api/core/modules/handshake</code> con el token de servicio. El meta viaja <i>empujado</i>: el
+        kernel no lo consulta después. <code>GET /_novvus/meta</code> del runtime existe solo para depurar.</div></div>
+        <div class="step"><span class="num">4</span><div><b>Validación en el kernel.</b>
+        <code>kernel/crates/novvus-registry/src/meta.rs</code> deserializa con <code>deny_unknown_fields</code>
+        (una clave desconocida rechaza el handshake), exige <code>meta_version = 1</code>, tamaño serializado
+        ≤ <code>512 × 1024</code> bytes, <code>module</code> igual al módulo que hace handshake, nombres de modelo
+        y campo con <code>^[a-z][a-z0-9_]{0,63}$</code>, permisos con prefijo <code>{módulo}.</code> (del módulo,
+        no del modelo: <code>stages</code> del CRM vive bajo <code>crm.pipelines.read</code>) y tipos del catálogo
+        cerrado. Si pasa, se guarda en la columna JSONB <code>core.modules.meta</code>. Un handshake sin
+        <code>meta</code> conserva el documento anterior.</div></div>
+        <div class="step"><span class="num">5</span><div><b>Exposición.</b> <code>GET /api/core/meta</code> y
+        <code>GET /api/core/meta/{módulo}</code> (<code>novvus-gateway/src/routes/meta.rs</code>) devuelven solo
+        modelos de módulos <b>habilitados en la org activa</b> sobre los que el usuario tiene el permiso
+        <code>read</code>; <code>capabilities.create/update/delete</code> se recortan según <code>write</code>.
+        Aquí se fusionan además los campos de extensiones y los campos personalizados de la org. Respuesta con
+        <code>ETag</code> y <code>Cache-Control: private, max-age=60</code>; con <code>If-None-Match</code> devuelve 304.</div></div>
+        <div class="step"><span class="num">6</span><div><b>Render.</b> <code>apps/web/src/lib/meta/use-meta.ts</code>
+        cachea el índice con TanStack Query (<code>staleTime: 60_000</code>, alineado al max-age) y las rutas
+        <code>/m/{módulo}/{modelo}</code> y <code>/m/{módulo}/{modelo}/{id}</code> montan los componentes genéricos
+        dentro del <code>ModuleShell</code> del módulo dueño.</div></div>
+      </div>
+
+      <h2>Referencia de <code>__novvus_views__</code></h2>
+      <p>Las únicas claves aceptadas son las de <code>VIEW_KEYS</code> (<code>meta.py:33</code>). Cualquier otra
+      provoca <code>ValueError: … unknown keys</code> al registrar el modelo.</p>
+      <table>
+        <tr><th>Clave</th><th>Tipo</th><th>Qué hace</th><th>Validación</th></tr>
+        <tr><td><code>label</code></td><td>str</td><td>Nombre del modelo en la UI (es-MX fuente, pasa por <code>t()</code>). Default: el <i>resource</i> capitalizado.</td><td>—</td></tr>
+        <tr><td><code>labels</code></td><td>dict campo → str</td><td>Etiqueta de cada campo. Sin etiqueta: nombre de columna con <code>_</code> → espacio y capitalizado.</td><td>Cada campo debe existir.</td></tr>
+        <tr><td><code>display</code></td><td>str</td><td>Campo representativo (título del form, texto en relaciones y tarjetas). Default: <code>name</code> si existe, si no <code>id</code>.</td><td>Debe existir.</td></tr>
+        <tr><td><code>fields</code></td><td>dict campo → flags</td><td>Sobrescribe por campo <code>searchable</code>, <code>sortable</code>, <code>filterable</code>, <code>groupable</code> (solo esas cuatro, <code>FLAG_OVERRIDES</code>).</td><td>Campo existente; otras claves se ignoran.</td></tr>
+        <tr><td><code>list.columns</code></td><td>list[str]</td><td>Columnas de la tabla, en orden. Default: las primeras 6 columnas no readonly.</td><td>Deben existir.</td></tr>
+        <tr><td><code>list.default_order</code></td><td>str</td><td>Orden inicial, con <code>-</code> para descendente. Default <code>-created_at</code>.</td><td>Columna existente.</td></tr>
+        <tr><td><code>form.layout</code></td><td>list[list[str]]</td><td>Filas del formulario; cada fila es una lista de campos que se reparten en columnas. Default: un campo por fila.</td><td>Deben existir.</td></tr>
+        <tr><td><code>kanban.group_by</code></td><td>str</td><td>Campo que define las columnas del tablero. Solo si declaras <code>kanban</code> aparece la vista.</td><td>Obligatorio y <code>groupable</code>.</td></tr>
+        <tr><td><code>kanban.card</code></td><td>list[str]</td><td>Campos de la tarjeta; el primero es el título. Default: <code>[display]</code>.</td><td>Deben existir.</td></tr>
+        <tr><td><code>calendar.date_field</code></td><td>str</td><td>Campo fecha que ubica el registro en el mes.</td><td>Obligatorio; tipo <code>date</code> o <code>datetime</code>.</td></tr>
+        <tr><td><code>calendar.title</code></td><td>str</td><td>Campo mostrado en la celda. Default: <code>display</code>.</td><td>Debe existir.</td></tr>
+        <tr><td><code>track</code></td><td>list[str]</td><td>Campos cuyo cambio en PATCH publica un mensaje <code>system</code> en el chatter (ver <a href="colaboracion.html">colaboración</a>).</td><td>Deben existir.</td></tr>
+        <tr><td><code>chatter</code></td><td>bool</td><td>Monta el hilo de conversación en el formulario (<code>capabilities.chatter</code>).</td><td>—</td></tr>
+        <tr><td><code>attachments</code></td><td>bool</td><td>Monta el panel de adjuntos (<code>capabilities.attachments</code>).</td><td>—</td></tr>
+      </table>
+
+      <h3>Qué deriva el SDK de cada columna</h3>
+      <p><code>field_specs()</code> (<code>meta.py:110</code>) recorre <code>model.__table__.columns</code> y produce un
+      spec por campo. Conviene saber las reglas para no pelearte con los defaults:</p>
+      <table>
+        <tr><th>Propiedad</th><th>Regla</th></tr>
+        <tr><td>Columnas ocultas</td><td><code>org_id</code>, <code>deleted_at</code>, <code>ext</code> y <code>custom</code> nunca salen en el meta (<code>HIDDEN_COLUMNS</code>). Las dos últimas llegan a la shell fusionadas por el kernel como <code>ext.{extensor}.{campo}</code> y <code>custom.{campo}</code>.</td></tr>
+        <tr><td>Solo lectura</td><td><code>id</code>, <code>created_at</code>, <code>updated_at</code>.</td></tr>
+        <tr><td><code>type</code></td><td>Mapeo desde SQLAlchemy (<code>_meta_type</code>): FK → <code>relation</code>; <code>Enum</code> → <code>string</code> + <code>choices</code>; <code>Text</code> → <code>text</code>; <code>String</code> → <code>string</code>; <code>Boolean</code>, <code>DateTime</code>, <code>Date</code>, <code>Integer</code>, <code>Numeric</code> → <code>decimal</code>, UUID → <code>uuid</code>, <code>JSON</code> → <code>json</code>.</td></tr>
+        <tr><td><code>relation</code></td><td><code>"{módulo}.{resource}"</code> del modelo destino, respetando su <code>__resource__</code> (una FK a <code>company.id</code> se resuelve como <code>crm.companies</code>).</td></tr>
+        <tr><td><code>choices</code></td><td>Para Enum: <code>[{value, label}]</code> con <code>label = value</code>. Traduce los labels con el catálogo i18n del módulo si quieres texto distinto.</td></tr>
+        <tr><td><code>required</code></td><td>No nullable, sin <code>default</code>, sin <code>server_default</code> y no readonly.</td></tr>
+        <tr><td><code>searchable</code></td><td>Si el modelo declara <code>__novvus_api__["search"]</code>, exactamente esa lista. Si no: columnas <code>string</code>/<code>text</code> que no sean Enum ni de sistema.</td></tr>
+        <tr><td><code>sortable</code> / <code>filterable</code></td><td>Todo salvo <code>json</code>.</td></tr>
+        <tr><td><code>groupable</code></td><td>Tipos <code>string</code>, <code>boolean</code>, <code>date</code>, <code>relation</code>, excepto <code>id</code>.</td></tr>
+        <tr><td>Modelos sin superficie</td><td>Un modelo con <code>list</code> en <code>__novvus_api__["disabled"]</code> no entra al meta (tablas de unión como <code>contact_tags</code>).</td></tr>
+      </table>
+
+      <h3><code>__novvus_api__</code>: el hermano mayor</h3>
+      <p>Configura la auto-API y, por tanto, lo que el meta puede prometer:</p>
+<pre><code><span class="k">class</span> Stage(NovvusModel):
+    __resource__ = <span class="s">"stages"</span>
+    __novvus_api__ = {
+        <span class="s">"permissions"</span>: {<span class="s">"read"</span>: <span class="s">"crm.pipelines.read"</span>, <span class="s">"write"</span>: <span class="s">"crm.pipelines.manage"</span>},
+        <span class="s">"disabled"</span>: [],                 <span class="c"># list | create | get | update | delete</span>
+        <span class="s">"search"</span>: [<span class="s">"name"</span>],             <span class="c"># columnas que responde ?q=</span>
+        <span class="s">"export_max_rows"</span>: <span class="n">20000</span>,       <span class="c"># default EXPORT_MAX_ROWS = 100 000</span>
+    }</code></pre>
+      <p>Los permisos por defecto son <code>{módulo}.{resource}.read</code> y <code>.write</code>. El meta publica
+      exactamente los que resulten, y el kernel filtra el modelo entero cuando el usuario no tiene el de lectura.</p>
+
+      <h2>Ejemplo completo: el CRM</h2>
+      <p>Tomado de <code>modules/crm/models.py:54-116</code>. Fíjate en que <code>Company</code> declara kanban por
+      industria y <code>Contact</code> no, así que la shell solo ofrece el conmutador Lista/Kanban en Empresas.</p>
+<pre><code><span class="k">class</span> Company(NovvusModel):
+    __resource__ = <span class="s">"companies"</span>
+
+    name: Mapped[str] = mapped_column(String(<span class="n">200</span>))
+    website: Mapped[str] = mapped_column(String(<span class="n">300</span>), default=<span class="s">""</span>)
+    industry: Mapped[str] = mapped_column(String(<span class="n">120</span>), default=<span class="s">""</span>)
+    phone: Mapped[str] = mapped_column(String(<span class="n">40</span>), default=<span class="s">""</span>)
+    address: Mapped[str] = mapped_column(String(<span class="n">400</span>), default=<span class="s">""</span>)
+    notes: Mapped[str] = mapped_column(String(<span class="n">4000</span>), default=<span class="s">""</span>)
+
+    __novvus_views__ = {
+        <span class="s">"label"</span>: <span class="s">"Empresas"</span>,
+        <span class="s">"display"</span>: <span class="s">"name"</span>,
+        <span class="s">"attachments"</span>: <span class="k">True</span>,
+        <span class="s">"chatter"</span>: <span class="k">True</span>,
+        <span class="s">"labels"</span>: {<span class="s">"name"</span>: <span class="s">"Nombre"</span>, <span class="s">"website"</span>: <span class="s">"Sitio web"</span>, <span class="s">"industry"</span>: <span class="s">"Industria"</span>,
+                   <span class="s">"phone"</span>: <span class="s">"Teléfono"</span>, <span class="s">"address"</span>: <span class="s">"Dirección"</span>, <span class="s">"notes"</span>: <span class="s">"Notas"</span>},
+        <span class="s">"list"</span>: {<span class="s">"columns"</span>: [<span class="s">"name"</span>, <span class="s">"industry"</span>, <span class="s">"phone"</span>, <span class="s">"website"</span>], <span class="s">"default_order"</span>: <span class="s">"name"</span>},
+        <span class="s">"form"</span>: {<span class="s">"layout"</span>: [[<span class="s">"name"</span>, <span class="s">"industry"</span>], [<span class="s">"phone"</span>, <span class="s">"website"</span>], [<span class="s">"address"</span>], [<span class="s">"notes"</span>]]},
+        <span class="s">"kanban"</span>: {<span class="s">"group_by"</span>: <span class="s">"industry"</span>, <span class="s">"card"</span>: [<span class="s">"name"</span>, <span class="s">"phone"</span>]},
+    }
+
+
+<span class="k">class</span> Contact(NovvusModel):
+    __resource__ = <span class="s">"contacts"</span>
+
+    name: Mapped[str] = mapped_column(String(<span class="n">200</span>))
+    email: Mapped[str] = mapped_column(String(<span class="n">254</span>), default=<span class="s">""</span>)
+    phone: Mapped[str] = mapped_column(String(<span class="n">40</span>), default=<span class="s">""</span>)
+    job_title: Mapped[str] = mapped_column(String(<span class="n">120</span>), default=<span class="s">""</span>)
+    company_id: Mapped[UUID | <span class="k">None</span>] = mapped_column(
+        PgUUID(as_uuid=<span class="k">True</span>), ForeignKey(<span class="s">"company.id"</span>, ondelete=<span class="s">"SET NULL"</span>), nullable=<span class="k">True</span>
+    )
+
+    __novvus_views__ = {
+        <span class="s">"label"</span>: <span class="s">"Contactos"</span>,
+        <span class="s">"display"</span>: <span class="s">"name"</span>,
+        <span class="s">"attachments"</span>: <span class="k">True</span>,
+        <span class="s">"chatter"</span>: <span class="k">True</span>,
+        <span class="s">"track"</span>: [<span class="s">"job_title"</span>, <span class="s">"company_id"</span>],
+        <span class="s">"labels"</span>: {<span class="s">"name"</span>: <span class="s">"Nombre"</span>, <span class="s">"email"</span>: <span class="s">"Correo"</span>, <span class="s">"phone"</span>: <span class="s">"Teléfono"</span>,
+                   <span class="s">"job_title"</span>: <span class="s">"Puesto"</span>, <span class="s">"company_id"</span>: <span class="s">"Empresa"</span>},
+        <span class="s">"list"</span>: {<span class="s">"columns"</span>: [<span class="s">"name"</span>, <span class="s">"email"</span>, <span class="s">"phone"</span>, <span class="s">"job_title"</span>, <span class="s">"company_id"</span>], <span class="s">"default_order"</span>: <span class="s">"name"</span>},
+        <span class="s">"form"</span>: {<span class="s">"layout"</span>: [[<span class="s">"name"</span>, <span class="s">"email"</span>], [<span class="s">"phone"</span>, <span class="s">"job_title"</span>], [<span class="s">"company_id"</span>]]},
+    }</code></pre>
+      <p>Y así queda un campo dentro del meta que recibe la shell (<code>company_id</code> de <code>contacts</code>):</p>
+<pre><code>{
+  <span class="s">"name"</span>: <span class="s">"company_id"</span>, <span class="s">"type"</span>: <span class="s">"relation"</span>, <span class="s">"label"</span>: <span class="s">"Empresa"</span>,
+  <span class="s">"required"</span>: <span class="k">false</span>, <span class="s">"readonly"</span>: <span class="k">false</span>, <span class="s">"default"</span>: <span class="k">null</span>, <span class="s">"choices"</span>: <span class="k">null</span>,
+  <span class="s">"relation"</span>: <span class="s">"crm.companies"</span>,
+  <span class="s">"searchable"</span>: <span class="k">false</span>, <span class="s">"sortable"</span>: <span class="k">true</span>, <span class="s">"filterable"</span>: <span class="k">true</span>, <span class="s">"groupable"</span>: <span class="k">true</span>
+}</code></pre>
+      <div class="tip"><b>Depurar el meta.</b> Con el módulo corriendo en modo offline (ver
+      <a href="sdk.html">el SDK por dentro</a>) puedes pedir <code>GET /_novvus/meta</code> con cabeceras firmadas y ver
+      el documento exacto que viajará en el handshake. Desde el navegador, <code>GET /api/core/meta/crm</code> muestra
+      lo que ve <i>tu</i> usuario, ya filtrado y fusionado.</div>
+
+      <h2>Los endpoints genéricos de la auto-API</h2>
+      <p>Todos viven bajo <code>/api/{módulo}/{resource}</code>, exigen <code>enforce(read_perm)</code> y corren dentro de
+      la sesión de tenant (RLS). Lista, agrupación y exportación comparten la misma función
+      <code>searched_and_filtered()</code> (<code>autoapi.py:203</code>): es imposible exportar filas que la lista no muestre.</p>
+      <table>
+        <tr><th>Ruta</th><th>Parámetros</th><th>Respuesta</th></tr>
+        <tr><td><code>GET /{resource}</code></td><td><code>limit</code> (1–200, default 50) · <code>cursor</code> · <code>order_by</code> (<code>[-]columna</code>, default <code>-id</code>; solo columnas reales, 422 si no existe) · <code>q</code> (ILIKE sobre los campos <code>searchable</code>) · <code>filter</code> (DSL JSON) · filtros planos <code>columna=valor</code> por compatibilidad (coerción por tipo; 422 si el valor no cabe).</td><td><code>{items, next_cursor}</code>. El cursor es keyset: base64url de <code>{o: {t, v}, id}</code>; nunca hay <code>page</code>/<code>offset</code>.</td></tr>
+        <tr><td><code>GET /{resource}/group?by=</code></td><td><code>by</code> (campo <code>groupable</code> o <code>custom.{nombre}</code> con choices/boolean) · <code>q</code> · <code>filter</code>.</td><td><code>{groups: [{value, label, count}]}</code> ordenado por conteo descendente. Alimenta las columnas del kanban.</td></tr>
+        <tr><td><code>GET /{resource}/export</code></td><td><code>format=csv|xlsx</code> · <code>q</code> · <code>filter</code> · <code>order_by</code>.</td><td>Descarga con <code>Content-Disposition: attachment; filename="{resource}.{format}"</code>. Cabeceras = labels traducidos según <code>x-novvus-locale</code>; columnas de extensiones y custom al final. Si el conteo supera <code>export_max_rows</code> responde 422 pidiendo acotar el filtro. CSV se transmite fila a fila; XLSX usa openpyxl en modo <i>write-only</i>.</td></tr>
+      </table>
+
+      <h3>El DSL de filtros JSON (<code>?filter=</code>)</h3>
+      <p>Sustituye a los <i>domains</i> de Odoo con JSON componible y validado (<code>sdk/src/novvus_sdk/filters.py</code>).
+      Gramática:</p>
+<pre class="diagram">Filter    := Group | Condition
+Group     := {"and": [Filter, …]} | {"or": [Filter, …]}     (1..N hijos, una sola clave)
+Condition := {"field": nombre, "op": operador, "value": json}</pre>
+      <table>
+        <tr><th>Operador</th><th>Tipos admitidos</th><th>Semántica</th></tr>
+        <tr><td><code>eq</code>, <code>ne</code></td><td>todos los filtrables</td><td>igualdad / desigualdad</td></tr>
+        <tr><td><code>in</code></td><td>todos los filtrables</td><td>pertenencia; <code>value</code> es un array no vacío de ≤ 100 elementos</td></tr>
+        <tr><td><code>is_null</code></td><td>todos</td><td><code>value</code> booleano; es la única forma de preguntar por nulos (un <code>null</code> en otro operador → 422)</td></tr>
+        <tr><td><code>gt</code>, <code>gte</code>, <code>lt</code>, <code>lte</code></td><td><code>integer</code>, <code>decimal</code>, <code>date</code>, <code>datetime</code></td><td>comparación</td></tr>
+        <tr><td><code>between</code></td><td>los mismos comparables</td><td><code>value = [min, max]</code>, rango inclusivo</td></tr>
+        <tr><td><code>contains</code></td><td><code>string</code>, <code>text</code></td><td>ILIKE <code>%v%</code> con <code>%</code>, <code>_</code> y <code>\</code> escapados</td></tr>
+        <tr><td><code>ilike</code></td><td><code>string</code>, <code>text</code></td><td>patrón ILIKE literal del cliente</td></tr>
+      </table>
+      <p>Límites y garantías: profundidad máxima 5 (<code>MAX_DEPTH</code>), 50 condiciones (<code>MAX_CONDITIONS</code>),
+      solo campos <code>filterable</code> (las columnas ocultas ni siquiera están en los specs, así que
+      <code>org_id</code>/<code>deleted_at</code> no se pueden nombrar), coerción por tipo del campo, traducción exclusiva a
+      expresiones de columna de SQLAlchemy (jamás <code>text()</code>). Los campos <code>ext.{extensor}.{campo}</code> y
+      <code>custom.{campo}</code> también se aceptan: se traducen a <code>ext -&gt; 'x' -&gt;&gt; 'y'</code> con <i>cast</i> al tipo
+      declarado. Todo rechazo es 422 con la ruta del nodo: <code>{"detail": {"message": "…", "path": "and[1].or[0]"}}</code>.</p>
+<pre><code><span class="c"># Contactos con puesto que contiene "gerente" y sin empresa asignada</span>
+curl -G <span class="s">"http://localhost:8000/api/crm/contacts"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  --data-urlencode <span class="s">'filter={"and":[{"field":"job_title","op":"contains","value":"gerente"},{"field":"company_id","op":"is_null","value":true}]}'</span> \
+  --data-urlencode <span class="s">"order_by=name"</span> --data-urlencode <span class="s">"limit=25"</span>
+
+<span class="c"># Oportunidades de este trimestre por importe, agrupadas por prioridad</span>
+curl -G <span class="s">"http://localhost:8000/api/crm/opportunities/group"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  --data-urlencode <span class="s">"by=priority"</span> \
+  --data-urlencode <span class="s">'filter={"field":"expected_close_date","op":"between","value":["2026-07-01","2026-09-30"]}'</span>
+
+<span class="c"># Exportar a XLSX el mismo filtro (misma consulta, mismo permiso)</span>
+curl -G <span class="s">"http://localhost:8000/api/crm/opportunities/export"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span> -H <span class="s">"x-novvus-locale: en-US"</span> \
+  --data-urlencode <span class="s">"format=xlsx"</span> \
+  --data-urlencode <span class="s">'filter={"field":"priority","op":"in","value":["high","medium"]}'</span> -o oportunidades.xlsx
+
+<span class="c"># Filtro sobre un campo de extensión (salesmx aporta rfc a crm.contacts)</span>
+curl -G <span class="s">"http://localhost:8000/api/crm/contacts"</span> -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  --data-urlencode <span class="s">'filter={"field":"ext.salesmx.rfc","op":"ilike","value":"XAXX%"}'</span></code></pre>
+      <div class="warn"><b>En producción el kernel no está expuesto.</b> Los ejemplos usan <code>:8000</code> del entorno
+      de desarrollo. Con una instalación real llama a <code>http://&lt;servidor&gt;:8077/api/…</code>: la web hace el
+      <i>rewrite</i> same-origin hacia el kernel.</div>
+
+      <h2>Los componentes de la shell</h2>
+      <p>Viven en <code>apps/web/src/components/generic/</code> y solo conocen el meta: ninguno importa nada de un
+      módulo concreto.</p>
+      <table>
+        <tr><th>Componente</th><th>Qué hace con el meta</th></tr>
+        <tr><td><code>GenericListView</code><br><code>list-view.tsx</code></td><td>Tabla con <code>views.list.columns</code> más las columnas <code>ext</code>/<code>custom</code> al final; buscador (<code>q</code>); <code>FilterBuilder</code>; orden al hacer clic en cabeceras <code>sortable</code> (no en ext/custom: <code>order_by</code> solo acepta columnas reales); paginación infinita por cursor de 25; botón Exportar (CSV/XLSX vía <code>fetch</code> con Bearer, porque un <code>&lt;a href&gt;</code> no puede llevar la cabecera); botón Nuevo si <code>capabilities.create</code> → <code>/m/{módulo}/{modelo}/new</code>.</td></tr>
+        <tr><td><code>GenericFormView</code><br><code>form-view.tsx</code></td><td>Filas de <code>views.form.layout</code> como <i>grid</i> de N columnas; secciones de extensores (<code>ext_sections</code>) justo debajo de la fila que contiene su <code>after:{campo}</code>, o al final si el slot no existe; sección "Información adicional" con los campos <code>custom</code>; validación cliente de <code>required</code>; el payload se reconstruye con <code>nestExtValues()</code> (<code>ext.x.y</code> → <code>ext.x.y</code> anidado). Con <code>capabilities.attachments</code>/<code>chatter</code> monta <code>AttachmentPanel</code> y <code>ChatterPanel</code> (solo al editar, no al crear). Eliminar pide confirmación y respeta <code>capabilities.delete</code>.</td></tr>
+        <tr><td><code>GenericKanban</code><br><code>kanban-view.tsx</code></td><td>Columnas de <code>GET /group?by=kanban.group_by</code> (primero los <code>choices</code> declarados, luego los valores encontrados, incluida una columna para nulos); cada columna lista con <code>filter {eq|is_null}</code> y <code>limit 50</code>; arrastrar hace <code>PATCH {group_by: valor}</code>.</td></tr>
+        <tr><td><code>GenericCalendar</code><br><code>calendar-view.tsx</code></td><td>Mes con lunes primero; consulta <code>filter {between}</code> sobre <code>calendar.date_field</code> con <code>limit 200</code>; 3 entradas por día y "+N"; la vista semanal está en BACKLOG.</td></tr>
+        <tr><td><code>FilterBuilder</code><br><code>filter-builder.tsx</code></td><td>Constructor visual: v1 construye un AND plano de condiciones sobre campos <code>filterable</code> no readonly; los operadores ofrecidos por tipo salen de <code>opsForType()</code> (<code>lib/meta/types.ts</code>).</td></tr>
+        <tr><td><code>FieldInput</code><br><code>field-input.tsx</code></td><td>Un input por tipo: <i>switch</i> para boolean, <code>Select</code> si hay <code>choices</code>, <code>RelationPicker</code> para <code>relation</code> (busca con <code>q</code> en el modelo destino y muestra su <code>display</code>), textarea para <code>text</code>, <code>number</code>/<code>date</code>/<code>datetime-local</code> para el resto. Mantiene los valores en la forma que espera la API.</td></tr>
+      </table>
+      <p>Las dos rutas son <code>app/(protected)/m/[moduleId]/[model]/page.tsx</code> (lista con conmutador
+      Lista / Kanban / Calendario según lo que declare el meta) y <code>…/[model]/[id]/page.tsx</code> (formulario;
+      <code>id = "new"</code> crea). El <code>layout.tsx</code> intermedio envuelve todo en
+      <code>&lt;ModuleShell moduleId={params.moduleId}&gt;</code>, así que una vista genérica se ve dentro del chrome del
+      módulo dueño, con su icono, su nav y el <i>app switcher</i>.</p>
+
+      <h2>Sustituir una vista: <code>registerViewOverride</code></h2>
+      <p>El registro vive en <code>apps/web/src/lib/meta/overrides.tsx</code>. La clave es
+      <code>"{módulo}.{modelo}.{vista}"</code> con vista ∈ <code>list | form | kanban | calendar</code>; el componente recibe
+      <code>{moduleId, model, recordId?}</code> (<code>recordId</code> solo para <code>form</code>). Las páginas genéricas llaman
+      <code>renderViewOverride()</code> antes de montar el genérico y, si hay override, usan el tuyo.</p>
+<pre><code><span class="c">// apps/web/src/app/(protected)/crm/overrides.tsx (archivo tuyo, importado por el layout del módulo)</span>
+<span class="s">"use client"</span>;
+<span class="k">import</span> { registerViewOverride, <span class="k">type</span> GenericViewProps } <span class="k">from</span> <span class="s">"@/lib/meta/overrides"</span>;
+<span class="k">import</span> { GenericListView } <span class="k">from</span> <span class="s">"@/components/generic/list-view"</span>;
+
+<span class="k">function</span> <span class="f">OpportunitiesBoard</span>({ moduleId, model }: GenericViewProps) {
+  <span class="c">// Tu pantalla: puedes reutilizar piezas genéricas y añadir lo tuyo.</span>
+  <span class="k">return</span> (
+    &lt;<span class="k">div</span> className=<span class="s">"space-y-4"</span>&gt;
+      &lt;PipelineSummary moduleId={moduleId} /&gt;
+      &lt;GenericListView moduleId={moduleId} model={model} /&gt;
+    &lt;/<span class="k">div</span>&gt;
+  );
+}
+
+registerViewOverride(<span class="s">"crm.opportunities.list"</span>, OpportunitiesBoard);</code></pre>
+      <div class="note"><b>Los módulos no envían JavaScript.</b> Un override es código de la shell (repositorio de
+      la plataforma), no del paquete del módulo: el marketplace transporta solo manifiesto, migraciones y
+      estáticos. En v0.1.6 no hay overrides registrados en el repositorio; el mecanismo existe para cuando lo
+      necesites.</div>
+
+      <h2>Páginas a medida bajo <code>/{módulo}/…</code></h2>
+      <p>Cuando un modelo necesita una experiencia propia completa (el pipeline del CRM, por ejemplo), la
+      opción es una ruta bespoke en la shell. El patrón es el de <code>app/(protected)/crm/layout.tsx</code>:</p>
+<pre><code><span class="s">"use client"</span>;
+<span class="k">import</span> { ModuleShell } <span class="k">from</span> <span class="s">"@/components/module-shell"</span>;
+
+<span class="k">export default function</span> <span class="f">CrmLayout</span>({ children }: { children: React.ReactNode }) {
+  <span class="k">return</span> &lt;ModuleShell moduleId=<span class="s">"crm"</span>&gt;{children}&lt;/ModuleShell&gt;;
+}</code></pre>
+      <p>Desde esas páginas puedes usar el cliente tipado <code>records</code> de <code>lib/meta/api.ts</code>
+      (<code>list/one/create/update/remove/group</code>) y los mismos paneles (<code>AttachmentPanel</code>,
+      <code>ChatterPanel</code>), que se exportan precisamente para vistas custom.</p>
+
+      <h3>La regla de <code>ui.nav</code></h3>
+      <p>Toda <code>path</code> de <code>[ui]</code> debe vivir bajo <code>/{id}</code> (<code>valid_ui_path</code> en
+      <code>kernel/crates/novvus-registry/src/manifest.rs:309</code>, espejo en <code>sdk/src/novvus_sdk/manifest.py:315</code>).
+      Por tanto <b>un item de nav no puede apuntar a <code>/m/…</code></b>: eso sería inyectar navegación en la shell.
+      Cómo se resuelve en la práctica:</p>
+      <table>
+        <tr><th>Situación</th><th>Qué hace la shell</th></tr>
+        <tr><td>El módulo declara <code>[[ui.nav]]</code></td><td>Pinta esos items en la barra superior del <code>ModuleShell</code>. Cuando el usuario está en <code>/m/crm/contacts</code>, el item <code>/crm/contacts</code> se marca activo (la shell quita el prefijo <code>/m</code> al comparar).</td></tr>
+        <tr><td>El módulo no declara nav (o el usuario no tiene permiso para ningún item)</td><td>Deriva un item por modelo visible del meta apuntando a <code>/m/{id}/{modelo}</code> (<code>module-shell.tsx:144-151</code>). El botón "Abrir" del launcher usa <code>resolveOpenRoute()</code>: <code>ui.entry</code> si existe, si no la primera vista genérica.</td></tr>
+        <tr><td>Módulo sin páginas ni modelos (p. ej. <code>salesmx</code>)</td><td>No hay a dónde abrir: el <i>app switcher</i> lo omite y la tienda lo muestra sin botón Abrir.</td></tr>
+      </table>
+
+      <details class="fold"><summary>Ver más: qué NO hace el meta todavía</summary>
+        <p>Permisos por campo (hoy la unidad es el modelo), filtros sobre columnas <code>json</code>, búsqueda libre
+        <code>?q=</code> sobre campos ext/custom, resolución del <code>display</code> de relaciones en la tabla (la lista
+        muestra el UUID; el <i>picker</i> del formulario sí resuelve el nombre), vista semanal del calendario,
+        grupos anidados en el constructor visual y selector de columnas. Todo está en
+        <code>documents/docs/BACKLOG.md</code>. Regla del proyecto: detectado ≠ implementado.</p>
+      </details>
+
+      <nav class="page-nav">
+        <a href="tutorial-modulo.html"><span class="dir">← Anterior</span>Tutorial: tu primer módulo</a>
+        <a class="next" href="colaboracion.html"><span class="dir">Siguiente →</span>Adjuntos, chatter y notificaciones</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

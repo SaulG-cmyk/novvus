@@ -1,0 +1,5 @@
+Proceso,Nombre,Posición,Tipo de acción,Configuración,Activo,Id,Created at,Updated at
+01a1a58f-0cfd-7d90-82f9-a2d84ec20ee4,Obtener contacto,1,get_record,"{""module"":""crm"",""model"":""contacts""}",True,01a1a58f-0e4a-78d8-921b-532a7cae05de,2026-11-04T07:56:18.362156+00:00,2026-11-04T07:56:18.362156+00:00
+01a1a58f-0e1d-793d-8b94-2140c1832cf8,Buscar tareas vencidas,1,query,"{""model"":""tasks"",""filter"":""due_date < today""}",True,01a1a58f-0efc-7081-a855-daf181690402,2026-11-04T07:56:18.554064+00:00,2026-11-04T07:56:18.554064+00:00
+01a1a58f-0cfd-7d90-82f9-a2d84ec20ee4,Enviar email,2,send_email,"{""template"":""won_opportunity""}",True,01a1a58f-0ea6-76b2-a889-424fe23ad243,2026-11-04T07:56:18.462448+00:00,2026-11-04T07:56:18.462448+00:00
+01a1a58f-0e1d-793d-8b94-2140c1832cf8,Enviar recordatorio,2,send_email,"{""template"":""task_reminder""}",True,01a1a58f-0f2f-74d7-bc81-b0bbc12c8180,2026-11-04T07:56:18.604386+00:00,2026-11-04T07:56:18.604386+00:00

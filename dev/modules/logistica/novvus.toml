@@ -1,0 +1,73 @@
+[module]
+id = "logistica"
+name = "Logística"
+version = "0.1.0"
+description = "Gestión de logística y entregas: almacenes, transportistas, vehículos, envíos y órdenes de entrega."
+
+[presentation]
+display_name = "Logística"
+summary = "Planifica envíos, asigna transportistas y vehículos, y sigue cada entrega hasta su destino."
+category = "Operaciones"
+icon = "truck"
+accent = "bg-orange-500/15 text-orange-600 dark:text-orange-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1"]
+service_permissions = ["crm.companies.read", "crm.activities.write", "crm.activities.read"]
+
+[[permissions]]
+key = "logistica.warehouses.read"
+description = "Ver almacenes"
+
+[[permissions]]
+key = "logistica.warehouses.write"
+description = "Crear y editar almacenes"
+
+[[permissions]]
+key = "logistica.carriers.read"
+description = "Ver transportistas"
+
+[[permissions]]
+key = "logistica.carriers.write"
+description = "Crear y editar transportistas"
+
+[[permissions]]
+key = "logistica.vehicles.read"
+description = "Ver vehículos"
+
+[[permissions]]
+key = "logistica.vehicles.write"
+description = "Crear y editar vehículos"
+
+[[permissions]]
+key = "logistica.shipments.read"
+description = "Ver envíos"
+
+[[permissions]]
+key = "logistica.shipments.write"
+description = "Crear y editar envíos"
+
+[[permissions]]
+key = "logistica.delivery_orders.read"
+description = "Ver órdenes de entrega"
+
+[[permissions]]
+key = "logistica.delivery_orders.write"
+description = "Crear y editar órdenes de entrega"
+
+[events]
+emits = ["logistica.shipment.created", "logistica.shipment.delivered"]
+listens = ["crm.quote.accepted"]
+
+[runtime]
+port = 8150
+
+[[config]]
+key = "logistica.default_currency"
+type = "string"
+label = "Moneda por defecto"
+description = "Moneda para costos de envío."
+default = "MXN"
+permission = "logistica.shipments.write"

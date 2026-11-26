@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referencia técnica — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav active" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Equipo / Referencia técnica</div>
+    <article>
+      <h1>Referencia técnica</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Los datos duros en un solo lugar: el stack con sus versiones reales, puertos, todas las variables
+      de entorno, los dos CLIs homónimos, catálogos de permisos y eventos, la anatomía de un módulo y su manifiesto,
+      las rutas del frontend, los 19 contratos del repo y un glosario para hablar el mismo idioma.</p>
+
+      <h2>Stack (fijo por contrato)</h2>
+      <table>
+        <tr><th>Capa</th><th>Tecnología y versión</th><th>Fuente</th></tr>
+        <tr><td>Kernel</td><td>Rust stable, edición 2021, 7 crates (<code>novvus-common</code>, <code>identity</code>, <code>rbac</code>, <code>registry</code>, <code>events</code>, <code>files</code>, <code>gateway</code>) · axum 0.8 (multipart) · tokio 1 · sqlx 0.8 (postgres, migrate, json) · tower-http 0.6 (trace, cors) · jsonwebtoken 9 · argon2 0.5 · hmac 0.12 + sha2 0.10 · ed25519-dalek 2 · object_store 0.11 (aws) · reqwest 0.12 · uuid 1 (v7) · semver 1 · toml 0.8</td><td><code>kernel/Cargo.toml</code></td></tr>
+        <tr><td>CLI administrativo</td><td>Rust, binario <code>novvus</code>: clap 4, ureq 2 (rustls, sin OpenSSL), sha2, rand; release con <code>strip</code> + <code>lto</code>, estático musl</td><td><code>cli/Cargo.toml</code></td></tr>
+        <tr><td>SDK y módulos</td><td>Python ≥ 3.12 · FastAPI ≥ 0.115 · Pydantic ≥ 2.9 · SQLAlchemy[asyncio] ≥ 2.0.35 · psycopg[binary] ≥ 3.2 · Alembic ≥ 1.13 · httpx ≥ 0.27 · uvicorn ≥ 0.30 · uuid6 · openpyxl ≥ 3.1; dev: pytest 8, pytest-asyncio, pytest-cov, mypy ≥ 1.11, ruff ≥ 0.6</td><td><code>sdk/pyproject.toml</code></td></tr>
+        <tr><td>Base de datos</td><td>PostgreSQL 16 (<code>postgres:16-alpine</code>); RLS multi-tenant en <code>mod_*</code>, filtrado explícito en <code>core</code></td><td>composes, <code>ci.yml</code></td></tr>
+        <tr><td>Frontend</td><td>Next.js 16.2.10 (App Router) · React 19.2.4 · TypeScript 5 · Tailwind 4 · shadcn 4 sobre @base-ui/react 1.6 · TanStack Query 5 · @dnd-kit/core 6 · recharts 3 · lucide-react · sonner · flowbite-datepicker; tests: Vitest 4 + Testing Library + jsdom, Playwright 1.62; ESLint 9; Node 22</td><td><code>apps/web/package.json</code></td></tr>
+        <tr><td>Kernel ↔ módulos</td><td>HTTP interno con headers HMAC-SHA256; eventos por tabla + <code>LISTEN/NOTIFY</code>; SSE hacia el navegador por <code>pg_notify('novvus_notify')</code></td><td><code>internal.rs</code>, <code>stream.rs</code></td></tr>
+        <tr><td>Auth</td><td>JWT HS256 (access 15 min, refresh 14 días con rotación y detección de reuso) · Argon2id 19 MiB / t=2 / p=1</td><td><code>SECURITY.md</code></td></tr>
+        <tr><td>Distribución</td><td>Docker Compose v2 · imágenes GHCR <code>ghcr.io/novvus/*</code> · Cloudflare R2 detrás de <code>downloads.novvus.dev</code> / <code>install.novvus.dev</code></td><td><code>release.yml</code></td></tr>
+      </table>
+
+      <h2>Puertos y URLs</h2>
+      <table>
+        <tr><th>Servicio</th><th>Desarrollo</th><th>Producción (<code>docker-compose.prod.yml</code>)</th></tr>
+        <tr><td>Web (Next.js)</td><td><code>http://localhost:3000</code></td><td><code>http://&lt;servidor&gt;:8077</code> (<code>NOVVUS_WEB_PORT</code>; contenedor 3000). <strong>Único puerto en el host.</strong></td></tr>
+        <tr><td>Kernel (gateway)</td><td><code>http://127.0.0.1:8000</code> — <code>/health</code>, <code>/metrics</code>, <code>/api/core/*</code>, <code>/api/{módulo}/*</code></td><td>Solo red interna (<code>kernel:8000</code>); el navegador llega por el rewrite <code>/api</code> de la web.</td></tr>
+        <tr><td>Módulo CRM</td><td><code>127.0.0.1:8110</code> (interno; usa el gateway)</td><td><code>crm:8110</code> interno</td></tr>
+        <tr><td>Módulo Proyectos</td><td><code>127.0.0.1:8120</code></td><td><code>projects:8120</code> interno</td></tr>
+        <tr><td>Módulo SalesMX</td><td>Puerto elegido al hacer <code>novvus run --port</code> (default 8100); no está en ningún compose</td><td>No se distribuye todavía</td></tr>
+        <tr><td>PostgreSQL</td><td><code>localhost:5432</code> (<code>POSTGRES_PORT</code>), BD/usuario <code>novvus</code></td><td>Solo red interna; volumen <code>pgdata</code></td></tr>
+        <tr><td>MinIO (opcional, profile <code>s3</code> del compose full)</td><td><code>localhost:9000</code></td><td>—</td></tr>
+      </table>
+
+      <h2>Variables de entorno</h2>
+      <h3>Kernel (<code>novvus-common/src/config.rs</code> y crates)</h3>
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>Qué controla</th></tr>
+        <tr><td><code>DATABASE_URL</code></td><td><code>postgres://novvus:novvus_dev_password@localhost:5432/novvus</code></td><td>Conexión del kernel (rol <code>novvus</code>, dueño de <code>core</code>).</td></tr>
+        <tr><td><code>NOVVUS_BIND_ADDR</code></td><td><code>0.0.0.0:8000</code></td><td>Dirección de escucha del gateway.</td></tr>
+        <tr><td><code>NOVVUS_JWT_ACCESS_SECRET</code> · <code>NOVVUS_JWT_REFRESH_SECRET</code></td><td>valores <code>dev-…-change-me</code></td><td>Secretos HS256 separados para access y refresh. Obligatorios en producción (<code>openssl rand -hex 32</code>).</td></tr>
+        <tr><td><code>NOVVUS_ACCESS_TOKEN_TTL_SECONDS</code> · <code>NOVVUS_REFRESH_TOKEN_TTL_SECONDS</code></td><td><code>900</code> · <code>1209600</code></td><td>15 minutos · 14 días.</td></tr>
+        <tr><td><code>NOVVUS_INTERNAL_HMAC_SECRET</code></td><td>valor dev</td><td>Firma de los headers internos gateway → módulo; se entrega al módulo en el handshake.</td></tr>
+        <tr><td><code>NOVVUS_MODULE_DB_PASSWORD</code></td><td><code>novvus_module_dev_password</code></td><td>Contraseña del rol compartido <code>novvus_module</code> que el kernel aprovisiona en <code>install</code>.</td></tr>
+        <tr><td><code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE</code></td><td><code>30</code></td><td>Peticiones por minuto y por IP en <code>/api/core/auth/*</code>. (<code>SECURITY.md §8</code> menciona «p. ej. 10»; el código manda.)</td></tr>
+        <tr><td><code>NOVVUS_CORS_ORIGINS</code></td><td>vacío = CORS deshabilitado</td><td>Lista de orígenes separada por comas; con valor, todos los métodos y headers para esos orígenes.</td></tr>
+        <tr><td><code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code></td><td>vacío = publicar deshabilitado</td><td>Claves públicas Ed25519 (base64) que pueden firmar paquetes del catálogo. Fail-closed.</td></tr>
+        <tr><td><code>NOVVUS_BOOTSTRAP_TOKEN</code></td><td>ninguno (sin default de desarrollo)</td><td>Habilita <code>x-novvus-bootstrap-token</code> en los 6 endpoints de instancia. Ausente = bootstrap de plataforma deshabilitado.</td></tr>
+        <tr><td><code>NOVVUS_LOG_LEVEL</code></td><td><code>info</code></td><td>Nivel de <code>tracing</code>.</td></tr>
+        <tr><td><code>NOVVUS_VERSION</code></td><td>archivo <code>VERSION</code></td><td>Solo en build (<code>build.rs</code>, build-arg del Dockerfile): versión que reporta <code>/health</code>.</td></tr>
+        <tr><td><code>NOVVUS_FILES_BACKEND</code></td><td><code>local</code></td><td><code>local</code> | <code>s3</code> (S3/R2/MinIO vía <code>object_store</code>).</td></tr>
+        <tr><td><code>NOVVUS_FILES_LOCAL_ROOT</code></td><td><code>./data/files</code></td><td>Raíz del backend local (volumen <code>files</code> en producción).</td></tr>
+        <tr><td><code>NOVVUS_FILES_S3_BUCKET</code> · <code>_S3_ENDPOINT</code> · <code>_S3_REGION</code> · <code>_S3_ACCESS_KEY</code> · <code>_S3_SECRET_KEY</code></td><td>ninguno</td><td>Backend S3; el bucket es obligatorio con <code>backend=s3</code>.</td></tr>
+        <tr><td><code>NOVVUS_FILES_MAX_SIZE_BYTES</code></td><td><code>52428800</code> (50 MB)</td><td>Tamaño máximo por adjunto.</td></tr>
+        <tr><td><code>NOVVUS_FILES_ORG_QUOTA_BYTES</code></td><td><code>10737418240</code> (10 GB)</td><td>Cuota por organización (413 al excederla).</td></tr>
+        <tr><td><code>NOVVUS_FILES_GC_RETENTION_DAYS</code></td><td><code>30</code></td><td>Días antes de que el GC libere blobs de adjuntos borrados.</td></tr>
+        <tr><td><code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code></td><td><code>15</code></td><td>Ventana de edición de mensajes (solo el autor).</td></tr>
+        <tr><td><code>NOVVUS_CUSTOM_FIELDS_LIMIT</code></td><td><code>50</code></td><td>Campos personalizados por modelo y organización.</td></tr>
+      </table>
+      <h3>SDK y runtime de módulo (<code>app.py</code>, <code>cli.py</code>)</h3>
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>Qué controla</th></tr>
+        <tr><td><code>NOVVUS_SERVICE_TOKEN</code></td><td>—</td><td>Token <code>nvk_…</code> del módulo. Con él, <code>novvus run</code> hace handshake con el kernel (modo conectado).</td></tr>
+        <tr><td><code>NOVVUS_KERNEL_URL</code></td><td><code>http://127.0.0.1:8000</code></td><td>Dónde está el gateway (handshake, eventos, config, <code>module.call</code>; también default de <code>novvus deploy --kernel</code>).</td></tr>
+        <tr><td><code>NOVVUS_MODULE_PORT</code></td><td><code>[runtime] port</code> o <code>8100</code></td><td>Puerto de escucha de <code>novvus run</code> (también <code>--port</code>).</td></tr>
+        <tr><td><code>NOVVUS_MODULE_BASE_URL</code></td><td><code>http://127.0.0.1:{port}</code></td><td>URL que el runtime anuncia en el handshake y a la que el kernel proxya (en Docker, <code>http://crm:8110</code>).</td></tr>
+        <tr><td><code>NOVVUS_DATABASE_URL</code></td><td>—</td><td><strong>Modo offline</strong> (con <code>NOVVUS_INTERNAL_HMAC_SECRET</code>): tests y desarrollo sin kernel. También la usan <code>novvus seed</code> y <code>novvus makemigration</code> (diff Alembic) con el rol <code>novvus_module</code>.</td></tr>
+        <tr><td><code>NOVVUS_INTERNAL_HMAC_SECRET</code></td><td>—</td><td>Secreto de verificación en modo offline; en modo conectado llega por el handshake.</td></tr>
+      </table>
+      <h3>Web, bootstrap y compose de producción</h3>
+      <table>
+        <tr><th>Variable</th><th>Dónde</th><th>Qué controla</th></tr>
+        <tr><td><code>NOVVUS_KERNEL_URL</code></td><td><code>apps/web/next.config.ts</code></td><td>Destino del rewrite <code>/api/:path*</code>. Se captura en <code>next build</code> (build-arg en Docker); default <code>http://127.0.0.1:8000</code>.</td></tr>
+        <tr><td><code>NOVVUS_BOOTSTRAP_TOKEN</code></td><td><code>scripts/bootstrap.py</code></td><td>Si está definido, <strong>modo plataforma</strong>: registra/instala/migra/habilita <code>crm</code> y <code>projects</code> a nivel instancia sin crear usuarios ni organizaciones (first-run).</td></tr>
+        <tr><td><code>NOVVUS_DEMO=1</code> · <code>SEED=1</code></td><td><code>bootstrap.py</code></td><td><strong>Modo demo</strong>: crea usuario, organización, roles «Ventas» y «Gerente de ventas», habilita módulos por org y corre <code>novvus seed</code>.</td></tr>
+        <tr><td><code>NOVVUS_ADMIN_EMAIL</code> · <code>NOVVUS_ADMIN_PASSWORD</code> · <code>NOVVUS_ORG_NAME</code> · <code>NOVVUS_ORG_SLUG</code></td><td><code>bootstrap.py</code> (demo)</td><td>Sobrescriben <code>demo@novvus.dev</code> / «Novvus Demo» / <code>novvus-demo</code>.</td></tr>
+        <tr><td><code>NOVVUS_TOKENS_DIR</code> · <code>NOVVUS_MODULES_DIR</code></td><td><code>bootstrap.py</code>, CI e2e</td><td>Dónde escribe <code>&lt;módulo&gt;.env</code> con el token de servicio (volumen <code>tokens</code> = <code>/run/novvus</code>) y dónde busca los manifiestos.</td></tr>
+        <tr><td><code>NOVVUS_VERSION</code> · <code>NOVVUS_REGISTRY</code> · <code>POSTGRES_USER/PASSWORD/DB</code> · los 4 secretos · <code>NOVVUS_BOOTSTRAP_TOKEN</code> · <code>NOVVUS_WEB_PORT</code> · <code>NOVVUS_LOG_LEVEL</code></td><td><code>/opt/novvus/.env</code> (perm. 600)</td><td>Lo que genera <code>novvus install</code> y consume <code>docker-compose.prod.yml</code>; el compose falla si falta un secreto. <code>novvus update</code> solo reescribe <code>NOVVUS_VERSION</code> y añade claves faltantes, nunca regenera un secreto.</td></tr>
+      </table>
+      <h3>CLI administrativo e instalador (uso interno y tests)</h3>
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>Qué controla</th></tr>
+        <tr><td><code>NOVVUS_HOME</code></td><td><code>/opt/novvus</code></td><td>Directorio de instalación (<code>docker-compose.yml</code>, <code>.env</code>, <code>novvus.json</code>, <code>backups/</code>, <code>logs/</code>, <code>.update/</code>).</td></tr>
+        <tr><td><code>NOVVUS_REGISTRY</code></td><td><code>ghcr.io/novvus</code></td><td>Namespace de imágenes.</td></tr>
+        <tr><td><code>NOVVUS_DOWNLOADS_BASE</code></td><td><code>https://downloads.novvus.dev</code></td><td>Origen de <code>latest</code>, <code>manifest.json</code> y binarios, tanto para <code>install.sh</code> como para <code>novvus update</code>.</td></tr>
+        <tr><td><code>NOVVUS_INSTALL_DIR</code></td><td><code>/usr/local/bin</code></td><td>Solo <code>install.sh</code>: dónde deja el binario.</td></tr>
+        <tr><td><code>NOVVUS_CLI_PATH</code></td><td><code>/usr/local/bin/novvus</code></td><td>Solo <code>novvus update</code>: binario a reemplazar por rename atómico.</td></tr>
+        <tr><td><code>NOVVUS_WEB_PORT</code></td><td><code>8077</code></td><td><code>NOVVUS_WEB_PORT=8088 novvus install</code>; si el puerto está ocupado el CLI se detiene y sugiere otro, nunca elige solo.</td></tr>
+      </table>
+
+      <h2>Rutas, volúmenes e imágenes en producción</h2>
+      <table>
+        <tr><th>Elemento</th><th>Valor</th><th>Notas</th></tr>
+        <tr><td>Binario del CLI</td><td><code>/usr/local/bin/novvus</code></td><td>Reemplazado por rename atómico en <code>novvus update</code>.</td></tr>
+        <tr><td>Instalación</td><td><code>/opt/novvus/docker-compose.yml</code>, <code>.env</code> (600), <code>novvus.json</code></td><td><code>novvus.json</code> avanza de versión solo al final de un update exitoso.</td></tr>
+        <tr><td>Updates</td><td><code>/opt/novvus/.update/</code> (lock, <code>docker-compose.next.yml</code>, <code>.env.next</code>), <code>backups/&lt;ts&gt;-&lt;de&gt;-to-&lt;a&gt;/</code>, <code>logs/update-*.log</code></td><td>Backups con permisos 0700/0600; nunca se borran solos; logs sin secretos.</td></tr>
+        <tr><td>Volumen <code>pgdata</code></td><td>Postgres</td><td><strong>Respaldar.</strong></td></tr>
+        <tr><td>Volumen <code>files</code></td><td>Adjuntos (<code>NOVVUS_FILES_LOCAL_ROOT</code>)</td><td><strong>Respaldar.</strong></td></tr>
+        <tr><td>Volumen <code>tokens</code></td><td><code>/run/novvus/&lt;módulo&gt;.env</code> con los tokens de servicio</td><td>No hace falta respaldar, pero <strong>no borrar</strong>: sin él los módulos no pueden hacer handshake.</td></tr>
+        <tr><td>Imágenes</td><td><code>ghcr.io/novvus/{core, web, bootstrap, crm, projects}:X.Y.Z</code></td><td>Cinco por release; <code>X.Y.Z</code> inmutable, <code>latest</code> solo conveniencia.</td></tr>
+        <tr><td>Orden de arranque</td><td>postgres → kernel → bootstrap (<code>Exited (0)</code> esperado) → crm, projects → web</td><td>Seis healthchecks; <code>novvus install</code> espera hasta 300 s, <code>novvus update</code> hasta 420 s.</td></tr>
+      </table>
+
+      <h2>Los dos CLIs llamados <code>novvus</code></h2>
+      <p>Nunca coexisten en la misma máquina: el del SDK vive en tu entorno de desarrollo y en los contenedores de módulos; el administrativo, en el servidor de producción.</p>
+      <table>
+        <tr><th></th><th>CLI del SDK (Python, <code>sdk/src/novvus_sdk/cli.py</code>)</th><th>CLI administrativo (Rust, <code>cli/</code>)</th></tr>
+        <tr><td>Se instala con</td><td><code>pip install -e sdk</code> (script <code>novvus = novvus_sdk.cli:main</code>)</td><td><code>curl -fsSL https://install.novvus.dev/install.sh | bash</code> (Linux x86_64/arm64; SHA-256 obligatorio)</td></tr>
+        <tr><td>Crear módulo</td><td><code>novvus new-module &lt;id&gt; [--dir]</code>: manifiesto, <code>module.py</code>, <code>tests/test_smoke.py</code>, <code>migrations/0001</code></td><td>—</td></tr>
+        <tr><td>Migraciones</td><td><code>novvus makemigration [-m msg]</code> (inicial desde el modelo; después diff Alembic con <code>NOVVUS_DATABASE_URL</code>)</td><td>Las aplica el kernel al arrancar (<code>sqlx::migrate!</code>) y el bootstrap vía <code>POST /modules/{id}/migrate</code></td></tr>
+        <tr><td>Desplegar módulo</td><td><code>novvus deploy [--kernel URL] --token &lt;JWT&gt;</code>: register + install + enable; imprime <code>NOVVUS_SERVICE_TOKEN</code> una sola vez</td><td>—</td></tr>
+        <tr><td>Arrancar</td><td><code>novvus run [--host] [--port]</code>: uvicorn + handshake; en Windows fuerza <code>SelectorEventLoop</code></td><td><code>sudo novvus install</code>: valida Linux/Docker/Compose v2/root, genera secretos, escribe <code>/opt/novvus/{docker-compose.yml,.env}</code>, <code>docker compose pull</code>, 6 healthchecks (300 s), <code>novvus.json</code>; se detiene si ya hay instalación</td></tr>
+        <tr><td>Datos demo</td><td><code>novvus seed --org &lt;uuid&gt;</code> (ejecuta <code>@module.seed</code>)</td><td>— (producción arranca en first-run sin usuario ni organización)</td></tr>
+        <tr><td>Estado</td><td>—</td><td><code>novvus status</code>: versión + tabla de los 6 servicios + URL; exit 0 solo si todo está sano</td></tr>
+        <tr><td>Versión</td><td>—</td><td><code>novvus version</code>: «Novvus CLI: 0.1.6» y «Novvus Core: 0.1.6» (o «not installed»)</td></tr>
+        <tr><td>Actualizar</td><td>—</td><td><code>sudo novvus update [VERSION] [-y|--yes]</code>: delegador → descarga y verifica el CLI destino → etapa core (preflight, pull sin tocar el despliegue, backup obligatorio en <code>backups/&lt;ts&gt;-&lt;de&gt;-to-&lt;a&gt;/</code>, swap atómico, verificación de 6 servicios + <code>/health.version</code>, rollback automático). Rechaza downgrades. Flags <code>--stage/--from/--caller</code> son internos. Exit: 0 ok · 1 fallo con rollback · 2 rollback fallido</td></tr>
+        <tr><td>Requiere</td><td><code>module.py</code> con <code>module = NovvusModule()</code> junto a <code>novvus.toml</code></td><td>root, Docker + Compose v2, Linux</td></tr>
+      </table>
+
+      <h2>Catálogo de permisos</h2>
+      <h3>Del kernel (<code>core.*</code>, migraciones 0001 y 0010)</h3>
+      <table>
+        <tr><th>Clave</th><th>Descripción</th><th>Endpoints que la exigen</th></tr>
+        <tr><td><code>*</code></td><td>Todo (rol Owner, asignado al creador de la organización).</td><td>—</td></tr>
+        <tr><td><code>core.orgs.read</code> · <code>core.orgs.manage</code></td><td>Ver / administrar la organización.</td><td>Reservados; hoy ningún handler del gateway los consulta.</td></tr>
+        <tr><td><code>core.members.manage</code></td><td>Administrar miembros.</td><td><code>GET/POST /orgs/{org}/members</code>; muestra «Administración» en la shell.</td></tr>
+        <tr><td><code>core.roles.read</code></td><td>Ver roles y permisos.</td><td><code>GET /roles</code>.</td></tr>
+        <tr><td><code>core.roles.manage</code></td><td>Administrar roles y permisos.</td><td><code>POST /roles</code>, <code>/roles/{id}/permissions</code>, <code>/roles/{id}/assign</code>; «Administración».</td></tr>
+        <tr><td><code>core.modules.read</code></td><td>Ver módulos.</td><td><code>GET /catalog</code>. (Listar módulos solo pide sesión con organización.)</td></tr>
+        <tr><td><code>core.modules.manage</code></td><td>Administrar módulos.</td><td>Ciclo de vida de instancia (o token de bootstrap), por organización (<code>install/enable/disable/uninstall</code>), <code>PUT …/config</code> para campos sin permiso propio, <code>POST /catalog</code>, <code>/catalog/{id}/register</code>; «Administración».</td></tr>
+        <tr><td><code>core.custom_fields.manage</code></td><td>Administrar campos personalizados.</td><td><code>POST/PATCH/DELETE /custom-fields</code>; página <code>/settings/custom-fields</code>.</td></tr>
+        <tr><td><code>core.audit.read</code></td><td>Ver el registro de auditoría.</td><td>Reservado (sin endpoint de lectura todavía).</td></tr>
+      </table>
+      <h3>De los módulos instalados</h3>
+      <table>
+        <tr><th>Módulo</th><th>Permisos</th></tr>
+        <tr><td>CRM (15)</td><td><code>crm.companies</code> · <code>crm.contacts</code> · <code>crm.leads</code> · <code>crm.opportunities</code> · <code>crm.activities</code> · <code>crm.tags</code> con <code>.read</code>/<code>.write</code>; <code>crm.pipelines.read</code>, <code>crm.pipelines.manage</code> (también protegen <code>stages</code> vía <code>__novvus_api__</code>); <code>crm.reports.read</code>. Config: las tres claves <code>crm.*</code> exigen <code>crm.pipelines.manage</code>.</td></tr>
+        <tr><td>Proyectos (4)</td><td><code>projects.projects.read/write</code>, <code>projects.tasks.read/write</code>. Como servicio usa <code>crm.contacts.read</code> (<code>service_permissions</code>).</td></tr>
+        <tr><td>SalesMX (0)</td><td>No declara permisos: solo <code>[extensions]</code>. Sus campos <code>ext.salesmx.rfc</code> y <code>ext.salesmx.regimen</code> se leen y escriben con los permisos de <code>crm.contacts</code>.</td></tr>
+      </table>
+
+      <h2>Headers <code>x-novvus-*</code></h2>
+      <table>
+        <tr><th>Header</th><th>Dirección</th><th>Significado</th></tr>
+        <tr><td><code>x-novvus-service-token</code></td><td>módulo → gateway</td><td>Token <code>nvk_…</code>; identifica al módulo llamante por su hash.</td></tr>
+        <tr><td><code>x-novvus-bootstrap-token</code></td><td>bootstrap → gateway</td><td>Secreto de plataforma; solo 6 endpoints de instancia.</td></tr>
+        <tr><td><code>x-novvus-org</code></td><td>módulo → gateway · gateway → módulo</td><td>Tenant de una llamada de servicio; en el proxy, el tenant firmado del llamante.</td></tr>
+        <tr><td><code>x-novvus-user</code></td><td>gateway → módulo</td><td>UUID del usuario; vacío en llamadas de servicio.</td></tr>
+        <tr><td><code>x-novvus-perms</code></td><td>gateway → módulo</td><td>Permisos efectivos separados por coma (o los <code>service_permissions</code> del módulo llamante).</td></tr>
+        <tr><td><code>x-novvus-timestamp</code> · <code>x-novvus-signature</code></td><td>gateway → módulo</td><td>Unix seconds + HMAC-SHA256 hex sobre <code>user\norg\nperms\nts\nMÉTODO\nruta</code>; ±60 s de tolerancia.</td></tr>
+        <tr><td><code>x-novvus-locale</code></td><td>navegador → gateway → módulo</td><td>Locale preferido (<code>es-MX</code> por defecto); informativo, fuera de la firma.</td></tr>
+      </table>
+
+      <h2>Estados de un módulo</h2>
+      <table>
+        <tr><th>Nivel</th><th>Estados</th><th>Dónde</th></tr>
+        <tr><td>Instancia (<code>instance_status</code>)</td><td><code>registered</code> → <code>installed</code> → <code>enabled</code> ⇄ <code>disabled</code> → (uninstall)</td><td><code>core.modules.status</code>; lo cambian los 6 endpoints de instancia. Solo <code>enabled</code> recibe tráfico y eventos.</td></tr>
+        <tr><td>Organización (<code>status</code>)</td><td><code>not-installed</code> → <code>installed</code> → <code>enabled</code> ⇄ <code>disabled</code> → (uninstall, no destructivo)</td><td><code>core.org_modules</code>; lo cambian <code>/orgs/{org}/modules/{id}/*</code>. El meta, los adjuntos, el chatter y los campos custom exigen <code>enabled</code> en la org.</td></tr>
+        <tr><td>Runtime</td><td><code>ok</code> | <code>degraded</code></td><td><code>GET /health</code> del módulo; <code>degraded</code> si una dependencia declarada no está <code>enabled</code> en la instancia.</td></tr>
+      </table>
+
+      <h2>Catálogo de eventos</h2>
+      <table>
+        <tr><th>Evento</th><th>Emisor</th><th>Payload</th><th>Cuándo</th></tr>
+        <tr><td><code>crm.lead.created</code></td><td>CRM</td><td><code>lead_id, source</code></td><td><code>POST /api/crm/leads</code></td></tr>
+        <tr><td><code>crm.lead.converted</code></td><td>CRM</td><td><code>lead_id, opportunity_id</code></td><td><code>POST /leads/{id}/convert</code></td></tr>
+        <tr><td><code>crm.opportunity.stage_changed</code></td><td>CRM</td><td><code>opportunity_id, name, from_stage_id, to_stage_id, amount, currency, contact_id, company_id</code></td><td>Todo <code>POST /opportunities/{id}/move</code></td></tr>
+        <tr><td><code>crm.opportunity.won</code> · <code>.lost</code></td><td>CRM</td><td>igual que <code>stage_changed</code></td><td>Además, al mover a una etapa <code>is_won</code> / <code>is_lost</code></td></tr>
+        <tr><td><code>crm.activity.completed</code></td><td>CRM</td><td><code>activity_id, type</code></td><td><code>POST /activities/{id}/complete</code> (solo la primera vez)</td></tr>
+        <tr><td><code>projects.project.created</code></td><td>Proyectos</td><td><code>project_id, opportunity_id</code></td><td>Al crear el proyecto desde una oportunidad ganada</td></tr>
+      </table>
+      <p>Suscripciones: Proyectos escucha <code>crm.opportunity.won</code>. Sobre esquema (<code>{id, org_id, event_type, emitted_by, payload, occurred_at}</code>), garantías at-least-once y sin orden global, ver <code>EVENTS.md</code>. Los planos de chatter/notificaciones <strong>no</strong> pasan por este bus.</p>
+
+      <h2>Estructura de un módulo</h2>
+<pre class="diagram">
+modules/{id}/
+├── novvus.toml        # manifiesto: la única fuente de verdad
+├── module.py          # module = NovvusModule(); @module.model / .on / .seed / .cron / .on_install…; app = module.create_app()
+├── models.py          # NovvusModel + __resource__, __novvus_api__, __novvus_views__
+├── business.py        # endpoints custom sobre module.router (opcional)
+├── seed.py            # datos demo (opcional)
+├── i18n/              # es-MX.json (fuente) y en-US.json — patrón gettext
+├── migrations/        # NNNN_nombre.sql: las ejecuta el kernel, con RLS + columnas ext/custom
+├── tests/             # conftest con BD efímera, app en modo offline, peticiones firmadas
+├── pytest.ini         # asyncio_mode=auto; silencia la deprecación del event loop policy
+├── requests.http      # ejemplos contra el gateway (CRM)
+└── .env               # NOVVUS_SERVICE_TOKEN (fuera de git)
+</pre>
+      <p><strong>El caso sin modelos.</strong> <code>modules/salesmx/</code> solo tiene <code>novvus.toml</code>, <code>module.py</code>, <code>pytest.ini</code> y <code>tests/</code>: sin <code>models.py</code> ni <code>migrations/</code>. Un módulo así no crea tablas de negocio en <code>mod_salesmx</code>, no aparece en el meta y aporta valor exclusivamente por <code>[extensions]</code> (o por eventos y endpoints custom).</p>
+
+      <h2>Secciones del manifiesto <code>novvus.toml</code></h2>
+      <table>
+        <tr><th>Sección</th><th>Claves</th><th>Notas</th></tr>
+        <tr><td><code>[module]</code></td><td><code>id</code>, <code>name</code>, <code>version</code>, <code>description?</code></td><td>Obligatoria. Semver; id con la forma de arriba.</td></tr>
+        <tr><td><code>[dependencies]</code></td><td><code>modules = ["crm&gt;=0.1"]</code>, <code>service_permissions = [...]</code></td><td><code>enable</code> exige dependencias habilitadas (instancia y org); si caen después, estado degradado. <code>service_permissions</code> nunca <code>core.*</code>.</td></tr>
+        <tr><td><code>[[permissions]]</code></td><td><code>key</code>, <code>description</code></td><td>Solo el propio namespace; se registran en <code>install</code>.</td></tr>
+        <tr><td><code>[events]</code></td><td><code>emits</code>, <code>listens</code></td><td>Emitir lo no declarado es error; <code>@module.on</code> exige estar en <code>listens</code>.</td></tr>
+        <tr><td><code>[runtime]</code></td><td><code>port?</code>, <code>healthcheck = "/health"</code></td><td>El kernel usa el <code>base_url</code> del handshake como verdad.</td></tr>
+        <tr><td><code>[presentation]</code></td><td><code>display_name</code>, <code>summary</code>, <code>category</code>, <code>icon</code> (slug), <code>accent</code> (clases Tailwind), <code>publisher</code>, <code>website</code> (http/https), <code>license</code>, <code>screenshots[]</code></td><td>Solo tienda de apps y launcher; nunca afecta datos ni permisos.</td></tr>
+        <tr><td><code>[ui]</code></td><td><code>entry</code>; <code>[[ui.nav]]</code> <code>path, label, icon?, permission?, exact?</code>; <code>[[ui.dashboard]]</code> <code>title, description?, icon?, path, permission?</code>; <code>[[ui.settings]]</code> <code>label, description?, icon?, path, permission?</code></td><td>Toda <code>path</code> bajo <code>/{id}</code>; <code>nav</code> pinta el chrome del propio módulo, <code>dashboard</code> el launcher, <code>settings</code> la página <code>/settings</code>.</td></tr>
+        <tr><td><code>[[config]]</code></td><td><code>key</code>, <code>type = string|number|boolean|select</code>, <code>label?</code>, <code>description?</code>, <code>default?</code>, <code>options[]</code> (obligatorio en <code>select</code>), <code>permission?</code>, <code>secret = false</code></td><td>Valores por organización en <code>core.org_module_config</code>; gating por campo; <code>secret</code> enmascara en respuestas de usuario.</td></tr>
+        <tr><td><code>[[cron]]</code></td><td><code>name</code>, <code>interval_seconds ≥ 1</code>, <code>description?</code></td><td>Sembrado en <code>core.cron_jobs</code>; una fila por job × org en <code>core.cron_runs</code>; handler con <code>@module.cron(name)</code>.</td></tr>
+        <tr><td><code>[[extensions.fields]]</code></td><td><code>target = "{módulo}.{modelo}"</code>, <code>name</code>, <code>type</code> (string|text|integer|decimal|boolean|date|datetime), <code>label</code>, <code>required = false</code>, <code>config?</code> (<code>max_length</code>, <code>pattern</code>, <code>choices</code>)</td><td>El target debe ser una dependencia declarada y nunca el propio módulo; máx. 32 campos.</td></tr>
+        <tr><td><code>[[extensions.ui]]</code></td><td><code>target = "{módulo}.{modelo}.form"</code>, <code>slot = "after:{campo}" | "section:end"</code>, <code>group_label</code>, <code>fields[]</code></td><td>Solo la vista <code>form</code> en v1; los campos deben estar declarados arriba.</td></tr>
+      </table>
+
+      <h2>Esquema <code>core</code>: 27 tablas y 11 migraciones</h2>
+      <table>
+        <tr><th>Bloque</th><th>Tablas</th></tr>
+        <tr><td>Identidad</td><td><code>organizations</code>, <code>users</code>, <code>memberships</code>, <code>refresh_tokens</code></td></tr>
+        <tr><td>RBAC</td><td><code>roles</code>, <code>permissions</code>, <code>role_permissions</code>, <code>membership_roles</code></td></tr>
+        <tr><td>Módulos</td><td><code>modules</code> (con <code>manifest</code> y <code>meta</code> JSONB, <code>service_token_hash</code>, <code>base_url</code>), <code>module_migration_sources</code>, <code>module_migrations</code>, <code>org_modules</code>, <code>org_module_config</code>, <code>module_catalog</code></td></tr>
+        <tr><td>Automatización</td><td><code>cron_jobs</code>, <code>cron_runs</code></td></tr>
+        <tr><td>Bus y auditoría</td><td><code>events</code>, <code>event_deliveries</code>, <code>audit_log</code></td></tr>
+        <tr><td>v2</td><td><code>attachments</code>, <code>attachment_blobs</code>, <code>model_extensions</code>, <code>custom_fields</code>, <code>messages</code>, <code>followers</code>, <code>activities</code>, <code>notifications</code></td></tr>
+      </table>
+      <p>Migraciones embebidas (<code>kernel/migrations/</code>): <code>0001_core</code>, <code>0002_org_modules</code>, <code>0003_org_module_config</code>, <code>0004_automation</code>, <code>0005_module_catalog</code>, <code>0006_module_meta</code>, <code>0007_attachments</code>, <code>0008_attachments_service</code>, <code>0009_model_extensions</code>, <code>0010_custom_fields</code>, <code>0011_chatter</code>. Cada tabla del SDK en <code>mod_*</code> lleva además <code>id</code>, <code>org_id</code>, <code>created_at</code>, <code>updated_at</code>, <code>deleted_at</code>, <code>ext</code> y <code>custom</code>, más la tabla interna <code>_processed_events</code>.</p>
+
+      <h2>Tipos de campo y límites</h2>
+      <table>
+        <tr><th>Concepto</th><th>Valores</th></tr>
+        <tr><td>Tipos del meta</td><td><code>string</code>, <code>text</code>, <code>integer</code>, <code>decimal</code>, <code>boolean</code>, <code>date</code>, <code>datetime</code>, <code>uuid</code>, <code>relation</code>. Comparables: integer/decimal/date/datetime; texto: string/text; agrupables: string/boolean/date/relation (y ext/custom con <code>choices</code> o booleanos).</td></tr>
+        <tr><td>Tipos de extensión y campo custom</td><td>Los siete primeros del meta; sin <code>relation</code> ni <code>json</code> en v1.</td></tr>
+        <tr><td>Tipos de config</td><td><code>string</code>, <code>number</code>, <code>boolean</code>, <code>select</code>.</td></tr>
+        <tr><td>Tipos de actividad · de mensaje</td><td><code>call/meeting/email/todo</code> · <code>comment/note/system</code>.</td></tr>
+      </table>
+      <table>
+        <tr><th>Límite</th><th>Valor</th><th>Dónde</th></tr>
+        <tr><td>Listado</td><td><code>limit</code> 1–200, default 50</td><td><code>autoapi.py</code></td></tr>
+        <tr><td>Export</td><td>100 000 filas (<code>__novvus_api__["export_max_rows"]</code>)</td><td><code>autoapi.py</code></td></tr>
+        <tr><td>DSL de filtros</td><td>profundidad 5 · 50 condiciones · 100 valores en <code>in</code></td><td><code>filters.py</code></td></tr>
+        <tr><td>Meta</td><td>≤ 512 KB por módulo, serde estricto</td><td><code>novvus-registry/src/meta.rs</code></td></tr>
+        <tr><td>Extensiones</td><td>16 extensores por modelo · 32 campos por extensor</td><td><code>lifecycle.rs</code>, <code>manifest.rs</code></td></tr>
+        <tr><td>Campos custom</td><td>50 por modelo y org (<code>NOVVUS_CUSTOM_FIELDS_LIMIT</code>)</td><td><code>custom_fields.rs</code></td></tr>
+        <tr><td>Adjuntos</td><td>50 MB por archivo · 10 GB por org · GC a 30 días</td><td><code>novvus-files/src/config.rs</code></td></tr>
+        <tr><td>Chatter</td><td>10 000 caracteres por mensaje · edición 15 min · hilo 1–200 por página · buzón 1–100</td><td><code>chatter.rs</code></td></tr>
+        <tr><td>Proxy</td><td>cuerpo ≤ 10 MB · tolerancia de firma ±60 s</td><td><code>proxy.rs</code>, <code>internal.rs</code></td></tr>
+        <tr><td>Auth</td><td>30 req/min/IP en <code>/auth/*</code> · access 15 min · refresh 14 días · caché RBAC 30 s</td><td><code>config.rs</code>, <code>SECURITY.md</code></td></tr>
+        <tr><td>Tiempo real y cachés</td><td>heartbeat SSE 25 s · meta <code>max-age=60</code> · TTL 60 s de extensiones/custom en el SDK · estado de dependencias 10 s</td><td><code>stream.rs</code>, <code>meta.rs</code>, <code>app.py</code></td></tr>
+        <tr><td>Bus</td><td>barrido de deliveries cada 5 s; reintentos con backoff exponencial</td><td><code>EVENTS.md</code></td></tr>
+      </table>
+
+      <h2>Rutas del frontend</h2>
+      <table>
+        <tr><th>Ruta</th><th>Superficie</th><th>Qué hay</th></tr>
+        <tr><td><code>/login</code></td><td>pública</td><td>Registro e inicio de sesión; en first-run, creación de la primera cuenta.</td></tr>
+        <tr><td><code>/</code></td><td>shell de plataforma</td><td>Launcher: grid de aplicaciones habilitadas y widgets <code>[[ui.dashboard]]</code>.</td></tr>
+        <tr><td><code>/apps</code> · <code>/apps/{moduleId}</code></td><td>shell</td><td>Tienda: estado por organización, plan de dependencias (<code>/plan</code>), instalar/habilitar/deshabilitar; detalle con presentación del manifiesto.</td></tr>
+        <tr><td><code>/settings</code> · <code>/settings/custom-fields</code></td><td>shell</td><td>Selector de idioma, formulario genérico de <code>[[config]]</code> por módulo, secciones <code>[[ui.settings]]</code>; alta de campos personalizados.</td></tr>
+        <tr><td><code>/admin</code></td><td>shell (gateada por permiso)</td><td>Miembros y roles; visible con <code>core.members.manage</code>, <code>core.roles.manage</code> o <code>core.modules.manage</code>.</td></tr>
+        <tr><td><code>/m/{moduleId}/{model}</code> · <code>/m/{moduleId}/{model}/{id}</code></td><td>genéricas bajo <code>ModuleShell</code></td><td>Lista, kanban, calendario, export y filtros visuales desde el meta; formulario con chatter, adjuntos, secciones de extensión y campos custom. Layout dinámico <code>m/[moduleId]/layout.tsx</code>.</td></tr>
+        <tr><td><code>/crm</code>, <code>/crm/leads</code>, <code>/crm/contacts</code>, <code>/crm/companies</code>, <code>/crm/opportunities/{id}</code>, <code>/crm/reports</code>, <code>/crm/settings/pipelines</code></td><td>páginas propias del CRM</td><td>Pipeline kanban, listas bespoke, detalle de oportunidad, reportes con gráficas, configuración de pipelines.</td></tr>
+        <tr><td><code>/projects</code>, <code>/projects/tasks</code></td><td>páginas propias de Proyectos</td><td>Proyectos y tareas.</td></tr>
+      </table>
+
+      <h2>Los 19 documentos de <code>documents/docs/</code></h2>
+      <table>
+        <tr><th>Documento</th><th>En una línea</th></tr>
+        <tr><td><code>ARCHITECTURE.md</code></td><td>Los cuatro planos (web, kernel de 7 crates, SDK/módulos, Postgres), los flujos de petición y evento, las dos superficies de frontend y los seis principios inquebrantables.</td></tr>
+        <tr><td><code>MODULE_CONTRACT.md</code></td><td><strong>El más importante:</strong> manifiesto completo, ciclo de vida, prohibiciones absolutas, <code>[ui]</code>, vistas genéricas, config, cron/hooks, i18n, paquete firmado y criterio de conformidad.</td></tr>
+        <tr><td><code>BUILDING_MODULES.md</code></td><td>Guía operativa corta: scaffold → manifiesto → modelos → eventos → <code>module.call</code> → migración → deploy/run → seed y tests.</td></tr>
+        <tr><td><code>DATA_MODEL.md</code></td><td>DDL de las 27 tablas de <code>core</code> con la justificación de cada índice; UUIDv7, <code>timestamptz</code>, JSONB.</td></tr>
+        <tr><td><code>MULTITENANCY.md</code></td><td><code>org_id</code> + <code>SET LOCAL app.org_id</code> + RLS fail-closed; roles <code>novvus</code>/<code>novvus_module</code>; habilitación por organización y <code>/plan</code>.</td></tr>
+        <tr><td><code>EVENTS.md</code></td><td>Esquema de evento, transporte por tabla + NOTIFY, at-least-once, idempotencia por <code>event.id</code>, cron/hooks y criterios para migrar a NATS/Redpanda.</td></tr>
+        <tr><td><code>SECURITY.md</code></td><td>JWT, Argon2id, rotación de refresh, headers firmados, RBAC, superficie de ataque de módulos, token de bootstrap, rate limiting, checklist.</td></tr>
+        <tr><td><code>VIEWS.md</code></td><td>Pipeline de metadatos: <code>__novvus_views__</code> → meta en el handshake → <code>GET /meta</code> → vistas genéricas; DSL de filtros, <code>/group</code>, <code>/export</code>.</td></tr>
+        <tr><td><code>FILES.md</code></td><td>Adjuntos: metadatos en Postgres y binarios en <code>object_store</code>, dedup por org, permisos heredados, MIME por sniffing, descarga segura, GC.</td></tr>
+        <tr><td><code>EXTENSIONS.md</code></td><td>Un módulo aporta campos y UI a modelos de otro sin tocar su esquema: columna <code>ext</code>, un solo escritor, límites 16 × 32, fusión en el meta.</td></tr>
+        <tr><td><code>CUSTOM_FIELDS.md</code></td><td>Campos por organización sin DDL: <code>core.custom_fields</code> + columna <code>custom</code>, labels literales, purga diferida.</td></tr>
+        <tr><td><code>CHATTER.md</code></td><td>Mensajes, seguidores, actividades y notificaciones como infraestructura del kernel; fan-out síncrono; SSE por <code>novvus_notify</code>.</td></tr>
+        <tr><td><code>I18N.md</code></td><td>Idioma fuente <code>es-MX</code>, clave = texto, fallback, <code>x-novvus-locale</code> informativo, catálogos por módulo y por shell.</td></tr>
+        <tr><td><code>CLI.md</code></td><td>Los dos CLIs; <code>install</code>, <code>update</code> (dos etapas, backup, rollback), <code>status</code>, <code>version</code>.</td></tr>
+        <tr><td><code>DEPLOYMENT.md</code></td><td>Producción con <code>docker-compose.prod.yml</code> + GHCR, orden de arranque, first-run, volúmenes, superficie expuesta, release por tag.</td></tr>
+        <tr><td><code>DISTRIBUTION.md</code></td><td>Cadena de confianza <code>install.sh</code> → <code>latest</code> → manifest → binario con SHA-256; artefactos por release; publicación en R2.</td></tr>
+        <tr><td><code>QA.md</code></td><td>Suites y comandos, baseline de métricas, gates de CI, mutation testing, deuda de QA y bugs encontrados.</td></tr>
+        <tr><td><code>DECISIONS.md</code></td><td>Bitácora fechada de decisiones fuera de contrato, una línea cada una.</td></tr>
+        <tr><td><code>BACKLOG.md</code></td><td>Lo detectado y no implementado, por área; nada se adelanta a su fase.</td></tr>
+      </table>
+
+      <h2>Glosario</h2>
+      <table>
+        <tr><th>Término</th><th>Significado en NOVVUS</th></tr>
+        <tr><td><strong>Tenant / organización</strong></td><td>El espacio aislado de un cliente. Todo dato de negocio lleva <code>org_id</code>; un usuario puede pertenecer a varias y su JWT está ligado a una a la vez.</td></tr>
+        <tr><td><strong>RLS</strong></td><td>Row-Level Security de Postgres en las tablas <code>mod_*</code>, con <code>FORCE</code> y política fail-closed: sin <code>app.org_id</code> en la sesión no sale ninguna fila. <code>core</code> no usa RLS: el kernel filtra explícitamente.</td></tr>
+        <tr><td><strong>Kernel / gateway</strong></td><td>El proceso Rust: identidad, RBAC, registro y ciclo de vida de módulos, bus, archivos, chatter, y el reverse proxy firmado.</td></tr>
+        <tr><td><strong>Módulo</strong></td><td>Aplicación de negocio en Python sobre <code>novvus-sdk</code>, con esquema <code>mod_{id}</code>, namespace <code>/api/{id}</code> y un manifiesto.</td></tr>
+        <tr><td><strong>Manifiesto</strong></td><td><code>novvus.toml</code>: lo que un módulo declara (permisos, eventos, dependencias, UI, config, cron, extensiones, presentación). Los modelos no van ahí: viajan en el meta.</td></tr>
+        <tr><td><strong>Handshake</strong></td><td>El saludo runtime → kernel al arrancar: token de servicio + <code>base_url</code> + meta a cambio del secreto HMAC y el DSN del rol de módulo.</td></tr>
+        <tr><td><strong>Token de servicio</strong></td><td>Credencial <code>nvk_…</code> de un módulo, emitida una vez en <code>install</code> y guardada solo como hash. Autentica handshake, eventos, config y llamadas módulo→módulo.</td></tr>
+        <tr><td><strong>Token de bootstrap</strong></td><td>Secreto de plataforma (<code>NOVVUS_BOOTSTRAP_TOKEN</code>) que permite al aprovisionamiento inicial operar el ciclo de vida de instancia antes de que exista usuario alguno. Nunca es usuario ni tiene organización.</td></tr>
+        <tr><td><strong>Headers internos / HMAC</strong></td><td><code>x-novvus-user/org/perms/timestamp/signature</code>: cómo el gateway le dice al módulo quién llama y con qué permisos, firmado con HMAC-SHA256 sobre usuario, org, permisos, timestamp, método y ruta (±60 s).</td></tr>
+        <tr><td><strong>First-run</strong></td><td>Estado de una instalación de producción recién hecha: sin usuarios ni organizaciones. El flujo es Crear cuenta → Crear organización → App Store.</td></tr>
+        <tr><td><strong>Ciclo de vida de instancia vs. por organización</strong></td><td>Instancia: <code>register → install → enable → disable → uninstall</code> (destructivo). Por organización: <code>install/enable/disable/uninstall</code> en <code>core.org_modules</code> (no destructivo), con hooks.</td></tr>
+        <tr><td><strong>Plan de dependencias</strong></td><td>Respuesta de <code>/plan</code>: cierre transitivo de dependencias con <code>enable_order</code>, <code>satisfied</code> y <code>problems</code>; la tienda lo muestra antes de habilitar.</td></tr>
+        <tr><td><strong>Estado degradado</strong></td><td>Un módulo cuya dependencia no está habilitada sigue sirviendo y lo reporta en <code>/health</code> (<code>degraded_dependencies</code>). Nunca «roto».</td></tr>
+        <tr><td><strong>Meta</strong></td><td>Documento tipado de modelos, campos (con flags <code>searchable/sortable/filterable/groupable</code>), vistas y permisos que el SDK construye desde <code>__novvus_views__</code> y persiste en <code>core.modules.meta</code>. Inválido = handshake rechazado.</td></tr>
+        <tr><td><strong>Vista genérica</strong></td><td>Lista, formulario, kanban o calendario que la shell renderiza en <code>/m/{módulo}/{modelo}</code> a partir del meta, sin React del módulo. Sustituible con <code>registerViewOverride</code>.</td></tr>
+        <tr><td><strong>DSL de filtros</strong></td><td>JSON en <code>?filter=</code> con grupos <code>and/or</code> y condiciones <code>{field, op, value}</code>; whitelist de 10 operadores, profundidad ≤ 5, ≤ 50 condiciones.</td></tr>
+        <tr><td><strong>Cursor keyset</strong></td><td>Paginación estable por <code>(columna_de_orden, id)</code>: pides la siguiente página con el <code>next_cursor</code> anterior, sin <code>OFFSET</code> y sin saltos aunque entren filas nuevas.</td></tr>
+        <tr><td><strong>Extensión (<code>ext</code>)</strong></td><td>Campos y secciones de formulario que un módulo aporta a un modelo de otro. Los datos viven en la columna JSONB <code>ext</code> del base (<code>ext.{extensor}.{campo}</code>) y solo el base los escribe.</td></tr>
+        <tr><td><strong>Campo personalizado (<code>custom</code>)</strong></td><td>Campo definido por el administrador de una organización desde <code>/settings/custom-fields</code>, sin DDL: definición en <code>core.custom_fields</code>, valor en la columna JSONB <code>custom</code> (<code>custom.{nombre}</code>).</td></tr>
+        <tr><td><strong>Un solo escritor</strong></td><td>Regla de extensiones: solo el módulo dueño de la tabla escribe en ella, aunque el campo lo haya declarado otro.</td></tr>
+        <tr><td><strong>Adjunto / blob</strong></td><td><code>core.attachments</code> es la referencia (registro padre, nombre, MIME); <code>core.attachment_blobs</code> el contenido deduplicado por <code>(org, sha256)</code> con <code>refcount</code>. El binario vive en el backend <code>object_store</code>.</td></tr>
+        <tr><td><strong>Chatter</strong></td><td>Hilo de colaboración de cualquier registro: comentarios, notas internas y mensajes <code>system</code> (tracking de campos), en <code>core.messages</code>. El módulo solo declara <code>chatter = True</code>.</td></tr>
+        <tr><td><strong>Follower</strong></td><td>Usuario suscrito a un registro (<code>core.followers</code>); recibe <code>follower_message</code> por cada mensaje ajeno. El autor de un mensaje se auto-suscribe.</td></tr>
+        <tr><td><strong>Mención</strong></td><td><code>@[uuid]</code> dentro del cuerpo de un mensaje; solo cuenta si el usuario es miembro de la org; genera una notificación <code>mention</code>.</td></tr>
+        <tr><td><strong>Actividad</strong></td><td>Tarea planificada sobre un registro (<code>call/meeting/email/todo</code>) con vencimiento y asignado; notificaciones <code>activity_assigned</code> y <code>activity_due</code>; se cierra con <code>done</code> o <code>cancel</code>.</td></tr>
+        <tr><td><strong>Notificación</strong></td><td>Fila en <code>core.notifications</code> dirigida a un usuario en una org; buzón con contador de no leídas; las leídas de más de 90 días se purgan.</td></tr>
+        <tr><td><strong>SSE</strong></td><td>Server-Sent Events en <code>/api/core/stream?token=</code>: el gateway escucha <code>pg_notify('novvus_notify')</code> una vez por proceso y reparte en memoria; heartbeat cada 25 s; la shell hace polling como respaldo.</td></tr>
+        <tr><td><strong>Launcher</strong></td><td>La home <code>/</code> de la shell: grid de apps habilitadas y widgets de dashboard. Desde ahí cada módulo se abre a pantalla completa.</td></tr>
+        <tr><td><strong>ModuleShell</strong></td><td>El chrome de un módulo: barra con icono y acento del manifiesto, <code>ui.nav</code>, app-switcher, campana y tema. Envuelve tanto las páginas propias (<code>/crm/*</code>) como las genéricas (<code>/m/crm/*</code>).</td></tr>
+        <tr><td><strong>App Store / tienda</strong></td><td><code>/apps</code>: módulos disponibles en la instancia con su estado por organización y acciones de habilitación; alimentada por <code>GET /modules</code> y <code>[presentation]</code>.</td></tr>
+        <tr><td><strong>Catálogo (marketplace)</strong></td><td><code>core.module_catalog</code>: paquetes <em>disponibles para instalar</em>, distinto de <code>core.modules</code> (registrados en la instancia). Se llena por <code>POST /catalog</code>.</td></tr>
+        <tr><td><strong>Paquete firmado</strong></td><td>JSON <code>{format_version, manifest_toml, migrations, assets}</code> envuelto con <code>publisher</code>, <code>public_key</code> y firma Ed25519 sobre sus bytes canónicos; sin código ejecutable.</td></tr>
+        <tr><td><strong>Editor de confianza</strong></td><td>Clave pública listada en <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code>; sin ella no se publica ni se registra desde el catálogo (fail-closed).</td></tr>
+        <tr><td><strong>Cron y hooks</strong></td><td>Automatización orquestada por el kernel: jobs de <code>[[cron]]</code> ejecutados por org con <code>FOR UPDATE SKIP LOCKED</code>, y hooks <code>on_install/enable/disable/uninstall</code> best-effort, ambos entregados por el canal firmado.</td></tr>
+        <tr><td><strong>UUIDv7</strong></td><td>Identificador ordenable por tiempo generado por la aplicación (kernel y SDK); todas las PKs.</td></tr>
+        <tr><td><strong>Borrado suave</strong></td><td><code>deleted_at</code>: la fila desaparece de la API y del meta pero se conserva; se aplica a modelos de módulos, adjuntos, mensajes y campos custom.</td></tr>
+        <tr><td><strong>Idempotencia</strong></td><td>Procesar dos veces el mismo evento produce el mismo resultado. El SDK la garantiza con <code>mod_{id}._processed_events</code> (<code>ON CONFLICT DO NOTHING</code>) en la transacción del handler.</td></tr>
+        <tr><td><strong>At-least-once</strong></td><td>Garantía del bus: cada evento llega una o más veces a cada suscriptor (<code>event_deliveries</code> + NOTIFY + barrido cada 5 s), sin orden global; por eso los consumidores son idempotentes.</td></tr>
+        <tr><td><strong>Modo offline</strong></td><td>Runtime de módulo sin kernel (<code>NOVVUS_DATABASE_URL</code> + <code>NOVVUS_INTERNAL_HMAC_SECRET</code>): los eventos se registran con warning y no se publican; base de los tests.</td></tr>
+        <tr><td><strong>Trinquete de cobertura</strong></td><td>Umbral de CI fijado bajo el baseline real que solo puede subir; bajarlo exige una entrada en <code>DECISIONS.md</code>.</td></tr>
+        <tr><td><strong>Backup de update</strong></td><td>Carpeta <code>/opt/novvus/backups/&lt;ts&gt;-&lt;de&gt;-to-&lt;a&gt;/</code> con <code>pg_dump -Fc</code> verificado, volúmenes <code>files</code> y <code>tokens</code>, <code>.env</code>, compose y <code>backup.json</code> con SHA-256; nunca se borra sola.</td></tr>
+      </table>
+
+      <nav class="page-nav">
+        <a href="contribuir.html"><span class="dir">← Anterior</span>Contribuir y calidad</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

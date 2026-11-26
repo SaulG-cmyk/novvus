@@ -1,0 +1,162 @@
+# NOVVUS CRM — flujo completo demostrable (VS Code REST Client / IntelliJ HTTP)
+# Requisitos: plataforma corriendo (start.bat) y módulo CRM desplegado.
+# Flujo: login → roles → crear lead → convertir → mover por etapas → ganar → reporte.
+
+@kernel = http://127.0.0.1:8000
+
+### 0a. Registrar usuario admin (una sola vez; 409 si ya existe)
+POST {{kernel}}/api/core/auth/register
+Content-Type: application/json
+
+{ "email": "demo@novvus.dev", "password": "demo-password-123", "display_name": "Demo Admin" }
+
+### 0b. Login
+# @name login
+POST {{kernel}}/api/core/auth/login
+Content-Type: application/json
+
+{ "email": "demo@novvus.dev", "password": "demo-password-123" }
+
+###
+@token = {{login.response.body.tokens.access_token}}
+
+### 0c. (Primera vez) Crear organización — luego re-loguear para ligar el token
+POST {{kernel}}/api/core/orgs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Novvus Demo", "slug": "novvus-demo" }
+
+### 1. Crear el rol "Ventas" (mapeo de permisos del módulo)
+# @name rolVentas
+POST {{kernel}}/api/core/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Ventas", "description": "Operación diaria del CRM" }
+
+###
+@ventasId = {{rolVentas.response.body.id}}
+
+### 1b. Permisos del rol Ventas
+POST {{kernel}}/api/core/roles/{{ventasId}}/permissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "keys": ["crm.companies.read", "crm.companies.write", "crm.contacts.read",
+           "crm.contacts.write", "crm.leads.read", "crm.leads.write",
+           "crm.opportunities.read", "crm.opportunities.write",
+           "crm.activities.read", "crm.activities.write",
+           "crm.tags.read", "crm.tags.write", "crm.pipelines.read"] }
+
+### 2. Crear el rol "Gerente de ventas"
+# @name rolGerente
+POST {{kernel}}/api/core/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Gerente de ventas", "description": "Configura pipelines y ve reportes" }
+
+###
+@gerenteId = {{rolGerente.response.body.id}}
+
+### 2b. Permisos del gerente (los de Ventas + gestión y reportes)
+POST {{kernel}}/api/core/roles/{{gerenteId}}/permissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "keys": ["crm.companies.read", "crm.companies.write", "crm.contacts.read",
+           "crm.contacts.write", "crm.leads.read", "crm.leads.write",
+           "crm.opportunities.read", "crm.opportunities.write",
+           "crm.activities.read", "crm.activities.write",
+           "crm.tags.read", "crm.tags.write", "crm.pipelines.read",
+           "crm.pipelines.manage", "crm.reports.read"] }
+
+### 3. Ver el pipeline sembrado (novvus seed) y sus etapas
+GET {{kernel}}/api/crm/pipelines
+Authorization: Bearer {{token}}
+
+### 3b. Etapas
+GET {{kernel}}/api/crm/stages?order_by=position&limit=10
+Authorization: Bearer {{token}}
+
+### 4. Crear una empresa y su contacto
+# @name empresa
+POST {{kernel}}/api/crm/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Novvus Aceros del Norte", "industry": "Metalurgia", "phone": "+52 81 5555 0100" }
+
+###
+@empresaId = {{empresa.response.body.id}}
+
+### 4b. Contacto
+# @name contacto
+POST {{kernel}}/api/crm/contacts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Gabriela Ibarra", "email": "gibarra@acerosnorte.mx",
+  "job_title": "Gerente de Compras", "company_id": "{{empresaId}}" }
+
+###
+@contactoId = {{contacto.response.body.id}}
+
+### 5. Crear un lead (emite crm.lead.created)
+# @name lead
+POST {{kernel}}/api/crm/leads
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "source": "referral", "contact_id": "{{contactoId}}",
+  "company_id": "{{empresaId}}", "notes": "Pidió cotización de 40 toneladas" }
+
+###
+@leadId = {{lead.response.body.id}}
+
+### 6. Convertir el lead en oportunidad (emite crm.lead.converted)
+# @name oportunidad
+POST {{kernel}}/api/crm/leads/{{leadId}}/convert
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "amount": "480000.00", "currency": "MXN", "expected_close_date": "2026-09-15" }
+
+###
+@oppId = {{oportunidad.response.body.id}}
+
+### 6b. El lead quedó auditable: convertido y ligado a la oportunidad
+GET {{kernel}}/api/crm/leads/{{leadId}}
+Authorization: Bearer {{token}}
+
+### 7. Mover la oportunidad por etapas — obtén los stage_id del paso 3b
+# (emite crm.opportunity.stage_changed)
+POST {{kernel}}/api/crm/opportunities/{{oppId}}/move
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "stage_id": "PEGA-AQUI-EL-ID-DE-NEGOCIACION" }
+
+### 8. Ganarla (emite crm.opportunity.won — Projects escuchará esto en Fase 5)
+POST {{kernel}}/api/crm/opportunities/{{oppId}}/move
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "stage_id": "PEGA-AQUI-EL-ID-DE-GANADO" }
+
+### 9. Reporte de pipeline: conteo y monto por etapa
+GET {{kernel}}/api/crm/reports/pipeline
+Authorization: Bearer {{token}}
+
+### 9b. Tasa de conversión del periodo
+GET {{kernel}}/api/crm/reports/conversion?start=2026-07-01&end=2026-08-01
+Authorization: Bearer {{token}}
+
+### Extra: actividades y etiquetas
+POST {{kernel}}/api/crm/activities
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "type": "meeting", "title": "Visita a planta", "opportunity_id": "{{oppId}}",
+  "due_date": "2026-08-20T10:00:00Z" }

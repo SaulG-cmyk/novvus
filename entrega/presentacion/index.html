@@ -1,0 +1,1243 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novvus · Cómo funciona</title>
+<style>
+/* ------------------------------------------------------------------ fuentes */
+@font-face { font-family: "Barlow"; font-weight: 300; src: url("../documentacion/assets/fonts/Barlow-Light.ttf"); }
+@font-face { font-family: "Barlow"; font-weight: 400; src: url("../documentacion/assets/fonts/Barlow-Regular.ttf"); }
+@font-face { font-family: "Barlow"; font-weight: 500; src: url("../documentacion/assets/fonts/Barlow-Medium.ttf"); }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url("../documentacion/assets/fonts/Barlow-SemiBold.ttf"); }
+@font-face { font-family: "Barlow"; font-weight: 700; src: url("../documentacion/assets/fonts/Barlow-Bold.ttf"); }
+@font-face { font-family: "Barlow"; font-weight: 800; src: url("../documentacion/assets/fonts/Barlow-ExtraBold.ttf"); }
+
+:root {
+  --ink: #000;
+  --soft: #2b2b2b;
+  --muted: #6f6f6f;
+  --line: #e2e2e2;
+  --line-2: #cfcfcf;
+  --surface: #f7f7f7;
+  --surface-2: #efefef;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; height: 100%; }
+
+body {
+  background: #dcdcdc;
+  font-family: "Barlow", "Segoe UI", Arial, sans-serif;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- escenario */
+.deck {
+  position: absolute; left: 50%; top: 50%;
+  width: 1280px; height: 720px;
+  transform: translate(-50%, -50%) scale(var(--s, 1));
+  transform-origin: center center;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+
+.s {
+  position: absolute; inset: 0;
+  padding: 52px 64px 58px;
+  background: #fff;
+  display: none;
+  flex-direction: column;
+}
+.s.on { display: flex; }
+.s.dark { background: #000; color: #fff; }
+
+.s::after {
+  content: "";
+  position: absolute; left: 64px; right: 64px; top: 34px;
+  height: 1px; background: var(--line);
+  opacity: .9;
+}
+.s.dark::after { background: #2a2a2a; }
+.cover::after, .divider::after { display: none; }
+
+.foot {
+  position: absolute; left: 64px; right: 64px; bottom: 22px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase;
+  color: #8d8d8d;
+}
+.foot .wm {
+  font-size: 10px; font-weight: 800; letter-spacing: .34em;
+  text-transform: uppercase; color: #1a1a1a;
+}
+.s.dark .foot { color: #6d6d6d; border-color: #2a2a2a; }
+.s.dark .foot .wm { color: #9a9a9a; }
+.pg { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ cabeza */
+.eyebrow {
+  font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+  font-weight: 700; color: var(--muted); margin: 14px 0 12px;
+}
+.s.dark .eyebrow { color: #9a9a9a; }
+h2 {
+  margin: 0 0 8px;
+  font-size: 40px; line-height: 1.02; letter-spacing: -.005em;
+  font-weight: 800; text-transform: uppercase;
+}
+h2.sm { font-size: 32px; }
+.sub {
+  margin: 0 0 26px; font-size: 17px; line-height: 1.4;
+  color: var(--soft); max-width: 62ch; font-weight: 400;
+}
+.s.dark .sub { color: #cfcfcf; }
+.rule { height: 2px; background: var(--ink); width: 100%; margin: 0 0 26px; }
+.s.dark .rule { background: #fff; }
+
+.body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+
+/* ------------------------------------------------------------------- grids */
+.c2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.c3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.c4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.c5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.split { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
+.split.wide { grid-template-columns: 1.25fr .75fr; }
+.split > * { min-width: 0; }
+
+/* ------------------------------------------------------------------ fichas */
+.tile {
+  border: 1px solid var(--line-2); border-radius: 2px;
+  padding: 18px 18px 16px; background: #fff;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tile.solid { background: var(--surface); border-color: var(--line); }
+.tile h3 {
+  margin: 0; font-size: 15px; letter-spacing: .08em;
+  text-transform: uppercase; font-weight: 700;
+}
+.tile p { margin: 0; font-size: 12.5px; line-height: 1.45; color: #4a4a4a; }
+.tile .tag {
+  font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+  color: #8a8a8a; font-weight: 600;
+}
+.tile .big { font-size: 44px; line-height: 1; font-weight: 800; }
+
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .n { font-size: 46px; line-height: .95; font-weight: 800; }
+.kpi .l { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* ---------------------------------------------------------------- bullets */
+ul.clean { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
+ul.clean li {
+  position: relative; padding-left: 20px; font-size: 14.5px; line-height: 1.42; color: #222;
+}
+ul.clean li::before {
+  content: ""; position: absolute; left: 0; top: .42em;
+  width: 8px; height: 8px; background: #000;
+}
+ul.clean li b { font-weight: 700; }
+ul.clean.lg li { font-size: 16.5px; line-height: 1.45; }
+
+/* -------------------------------------------------------------------- etc */
+.lead { font-size: 22px; line-height: 1.38; font-weight: 400; max-width: 30ch; }
+.lead b { font-weight: 700; }
+.mono {
+  font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  font-size: .9em; background: var(--surface); border: 1px solid var(--line);
+  padding: 1px 5px; border-radius: 2px;
+}
+.quote { font-size: 30px; line-height: 1.2; font-weight: 300; letter-spacing: -.01em; max-width: 34ch; }
+.quote b { font-weight: 800; }
+
+.shot { display: flex; flex-direction: column; gap: 8px; }
+.shot img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid #cfcfcf; background: #0b0b0b;
+  filter: grayscale(1);
+}
+.shot .cap { font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+.shot .cap b { color: #000; letter-spacing: .12em; text-transform: uppercase; font-size: 9.5px; }
+.shot.dia img {
+  width: auto; max-width: 100%; max-height: 452px;
+  margin: 0 auto; background: #fff; border-color: var(--line);
+  padding: 4px;
+}
+.shot.fit img { width: auto; max-width: 100%; max-height: 392px; margin: 0 auto; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.req { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.req li { position: relative; padding-left: 13px; font-size: 12.2px; line-height: 1.4; color: #3f3f3f; }
+.req li::before { content: ""; position: absolute; left: 0; top: .5em; width: 5px; height: 5px; background: #000; }
+.req li b { color: #000; }
+
+.agent-steps { border-top: 1px solid var(--line-2); }
+.agent-steps .arow {
+  display: grid; grid-template-columns: 24px 1fr; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line); align-items: start;
+}
+.agent-steps .an {
+  width: 22px; height: 22px; background: #000; color: #fff;
+  font-size: 10px; font-weight: 700; display: flex;
+  align-items: center; justify-content: center;
+}
+.agent-steps h4 {
+  margin: 0 0 2px; font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .08em; font-weight: 700;
+}
+.agent-steps p { margin: 0; font-size: 12px; line-height: 1.35; color: #4c4c4c; }
+.s.dark .shot .cap { color: #9a9a9a; }
+.s.dark .shot .cap b { color: #fff; }
+
+.note {
+  margin-top: 18px; border-left: 3px solid #000; background: var(--surface);
+  padding: 12px 16px; font-size: 12.5px; line-height: 1.45; color: #333;
+}
+.note b { text-transform: uppercase; letter-spacing: .12em; font-size: 10px; display: block; margin-bottom: 3px; }
+
+/* ------------------------------------------------------------------ flujo */
+.flow { display: grid; gap: 10px; align-items: stretch; }
+.flow.six { grid-template-columns: repeat(6, 1fr); gap: 18px; }
+.flow.five { grid-template-columns: repeat(5, 1fr); }
+.flow.four { grid-template-columns: repeat(4, 1fr); gap: 28px; }
+.step {
+  border: 1px solid var(--line-2); padding: 14px 13px; position: relative;
+  display: flex; flex-direction: column; gap: 6px; background: #fff;
+}
+.step .num {
+  width: 22px; height: 22px; background: #000; color: #fff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.step h4 { margin: 2px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .07em; }
+.step p { margin: 0; font-size: 12px; line-height: 1.4; color: #4c4c4c; }
+.flow.six .step { min-height: 132px; padding: 15px 14px; }
+.step::after {
+  content: "→"; position: absolute; right: -21px; top: 50%;
+  transform: translateY(-50%); font-size: 14px; color: #a0a0a0; z-index: 2;
+}
+.step:last-child::after { display: none; }
+
+.chain { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.node {
+  border: 1px solid #000; padding: 10px 12px; font-size: 11.5px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: .06em; background: #fff;
+}
+.node.soft { border-color: var(--line-2); color: #333; font-weight: 500; }
+.chain .arw { color: #a5a5a5; font-size: 14px; }
+
+.rows { border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); }.rrow { display: grid; grid-template-columns: 190px 1fr; gap: 18px; align-items: center; padding: 14px 0; }
+.rrow + .rrow { border-top: 1px solid var(--line); }
+.rlab { font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #8a8a8a; font-weight: 700; line-height: 1.4; }
+.rrow .chain { justify-content: flex-start; }
+
+.layers { border-top: 2px solid #000; }
+.s.close .body { justify-content: center; }
+.closerows { border-top: 1px solid #333; }
+.crow { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; padding: 20px 0; border-bottom: 1px solid #333; }
+.crow .cn { font-size: 40px; font-weight: 800; line-height: 1; color: #fff; }
+.crow p { margin: 0; font-size: 19px; line-height: 1.35; color: #e2e2e2; max-width: 78ch; }
+.layer {
+  display: grid; grid-template-columns: 34px 150px 300px 1fr; gap: 16px;
+  align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line);
+}
+.lnum {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; color: #fff;
+  background: #000; padding: 3px 0; text-align: center; width: 26px;
+}
+.lname { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.ltech { font-size: 12px; color: #555; padding-left: 16px; border-left: 1px solid var(--line-2); }
+.lnote { font-size: 12.5px; color: #333; line-height: 1.4; }
+
+.c3.code > div { display: flex; flex-direction: column; min-width: 0; }
+.c3.code pre.code { flex: 1; }
+
+/* ------------------------------------------------------------------ código */
+pre.code {
+  margin: 0; background: #0b0b0b; color: #ededed; border: 1px solid #000;
+  padding: 14px 16px; font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10.6px; line-height: 1.55; overflow: hidden; height: 100%;
+}
+pre.code .c { color: #9a9a9a; }
+pre.code .k { color: #fff; font-weight: 700; }
+pre.code .s2 { color: #cfcfcf; }
+.codebar {
+  background: #000; color: #fff; font-size: 9.5px; letter-spacing: .16em;
+  text-transform: uppercase; padding: 7px 12px; font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- portada */
+.cover { justify-content: flex-start; padding: 0; }
+.cover .band {
+  background: #000; color: #fff; padding: 26px 64px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cover .band img { height: 56px; width: auto; }
+.cover .band span { font-size: 9px; letter-spacing: .3em; text-transform: uppercase; color: #bdbdbd; }
+.cover .in { padding: 52px 64px 0; }
+.cover .kicker { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; font-weight: 700; }
+.cover h1 {
+  margin: 16px 0 18px; font-size: 74px; line-height: .94;
+  letter-spacing: -.015em; font-weight: 800; text-transform: uppercase; max-width: 16ch;
+}
+.cover .sub { font-size: 19px; color: #4a4a4a; max-width: 56ch; }
+.cover .meta {
+  position: absolute; left: 64px; right: 64px; bottom: 48px;
+  display: flex; gap: 46px; border-top: 2px solid #000; padding-top: 12px;
+}
+.cover .meta div { display: flex; flex-direction: column; gap: 2px; }
+.cover .meta dt { font-size: 8.5px; letter-spacing: .2em; text-transform: uppercase; color: #8a8a8a; font-weight: 700; }
+.cover .meta dd { margin: 0; font-size: 12px; font-weight: 500; }
+
+/* -------------------------------------------------------------- separador */
+.divider { justify-content: center; }
+.divider .kicker { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: #9a9a9a; font-weight: 700; }
+.divider h2 { font-size: 60px; line-height: .98; margin: 16px 0 18px; max-width: 30ch; }
+.divider .sub { font-size: 18px; color: #c9c9c9; max-width: 56ch; }
+.divider .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px; }
+.divider .pill {
+  border: 1px solid #3a3a3a; color: #e6e6e6; padding: 6px 12px;
+  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+}
+
+/* ------------------------------------------------------- notas del orador */
+.notes {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  background: #111; color: #f2f2f2; padding: 16px 24px 20px;
+  font-size: 13px; line-height: 1.45; display: none;
+  border-top: 2px solid #000;
+}
+.notes.on { display: block; }
+.notes b { display: block; font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: #8f8f8f; margin-bottom: 6px; }
+
+/* ------------------------------------------------------------------ chrome */
+.chrome {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 3px; background: #b9b9b9;
+  z-index: 20;
+}
+.chrome .bar { height: 100%; width: 0; background: #000; transition: width .25s ease; }
+.hint {
+  position: fixed; right: 18px; bottom: 14px; z-index: 21;
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: #7a7a7a; background: rgba(255,255,255,.85); padding: 5px 9px;
+}
+
+/* ----------------------------------------------------------------- imprenta */
+@page { size: 1280px 720px; margin: 0; }
+@media print {
+  body { background: #fff; overflow: visible; }
+  .deck { position: static; width: auto; height: auto; transform: none; box-shadow: none; }
+  .s { position: relative; display: flex !important; width: 1280px; height: 720px; page-break-after: always; break-after: page; }
+  .s:last-child { page-break-after: auto; }
+  .notes, .chrome, .hint { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+<!-- 01 · PORTADA -->
+<section class="s cover">
+  <div class="band">
+    <img src="../documentacion/assets/novvus-white.svg" alt="Novvus">
+    <span>Business Suite</span>
+  </div>
+  <div class="in">
+    <div class="kicker">Presentación del sistema</div>
+    <h1>Cómo funciona Novvus</h1>
+    <p class="sub">Qué es, con qué está construido y cómo se comunican sus módulos. Un recorrido desde el problema hasta la factura emitida, con capturas del sistema en operación.</p>
+  </div>
+  <dl class="meta">
+    <div><dt>Producto</dt><dd>Novvus Core 0.3.72</dd></div>
+    <div><dt>Ambiente</dt><dd>http://localhost:8077</dd></div>
+    <div><dt>Fecha</dt><dd>Noviembre de 2026</dd></div>
+    <div><dt>Duración estimada</dt><dd>33 – 35 minutos</dd></div>
+  </dl>
+  <aside class="notes">Abrir con la idea central: Novvus es una suite empresarial modular. A lo largo de esta presentación veremos qué problema resuelve, cómo está construida por dentro y cómo un clic en ventas termina en una factura sin que nadie capture dos veces el mismo dato. Todo lo que se muestra proviene de un ambiente real con datos cargados.</aside>
+</section>
+
+<!-- 02 · QUÉ ES -->
+<section class="s">
+  <div class="eyebrow">01 · Introducción</div>
+  <h2>Ocho módulos sobre un núcleo común</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <p class="quote" style="margin:0 0 26px">Una <b>suite empresarial modular</b>: una sola sesión, un solo modelo de permisos y una sola base de datos para ventas, proyectos, operaciones, finanzas y talento.</p>
+    <div class="c3">
+      <div class="tile solid"><div class="big">8</div><h3>Módulos de negocio</h3><p>CRM, Proyectos, Reclutamiento, Logística, Auditorías, Facturación, Inventario y Automatización.</p></div>
+      <div class="tile solid"><div class="big">116</div><h3>Tablas en la base</h3><p>Un esquema compartido y un esquema independiente por módulo, con aislamiento por organización.</p></div>
+      <div class="tile solid"><div class="big">1</div><h3>Punto de acceso</h3><p>El usuario entra por el navegador a un único dominio; no instala nada ni conoce los servicios internos.</p></div>
+    </div>
+    <div class="note"><b>Resumen</b>No es un ERP copiado: es un núcleo propio que resuelve lo común y módulos que declaran su negocio y se conectan por eventos.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">02</span></div>
+  <aside class="notes">Definición corta y tres cifras que ordenan la charla: ocho módulos, 116 tablas, un solo acceso. Aclarar que no se replicó un ERP completo: se priorizó un recorrido comercial verificable de punta a punta.</aside>
+</section>
+
+<!-- 03 · PROBLEMA -->
+<section class="s">
+  <div class="eyebrow">02 · Problema</div>
+  <h2>Datos dispersos y captura duplicada</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <p class="sub">El costo no está en tener más funciones, sino en que el mismo dato se capture varias veces y nadie pueda reconstruir qué pasó.</p>
+    <div class="c2" style="gap:48px">
+      <div>
+        <h3 style="margin:0 0 14px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a8a8a">Lo que pasa hoy</h3>
+        <ul class="clean lg">
+          <li><b>Una herramienta por área.</b> Ventas en un CRM, proyectos en hojas de cálculo, facturas en otro sistema.</li>
+          <li><b>El dato se captura dos veces.</b> Al cerrar una venta alguien vuelve a escribir el cliente, el importe y la fecha.</li>
+          <li><b>Nadie sabe qué pasó.</b> Cuando un registro aparece mal, no hay rastro de quién lo creó ni por qué.</li>
+          <li><b>Permisos dispersos.</b> Cada herramienta decide por su cuenta quién ve qué.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="margin:0 0 14px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8a8a8a">Lo que propone Novvus</h3>
+        <ul class="clean lg">
+          <li><b>Una suite modular.</b> Ocho aplicaciones con la misma sesión, el mismo menú y el mismo estilo.</li>
+          <li><b>Un dueño por dato.</b> El cliente vive en el CRM; los demás módulos lo leen, no lo copian.</li>
+          <li><b>Hechos que se anuncian.</b> Cada cambio relevante se publica como evento y queda auditado.</li>
+          <li><b>Permisos centralizados.</b> El núcleo autoriza cada operación con la misma regla para todos.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">03</span></div>
+  <aside class="notes">No atacar a Odoo ni a nadie: describir el costo real de la dispersión. La propuesta no es “más funciones”, es que el dato viaje una sola vez y quede registro de cada paso.</aside>
+</section>
+
+<!-- 04 · NÚCLEO + MÓDULOS -->
+<section class="s">
+  <div class="eyebrow">03 · Concepto</div>
+  <h2>Núcleo y módulos: responsabilidades separadas</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c2" style="gap:34px">
+      <div class="tile" style="padding:24px 24px 20px">
+        <div class="tag">Kernel · una sola vez</div>
+        <h3 style="font-size:20px;letter-spacing:.02em;text-transform:none;margin-top:6px">Lo transversal</h3>
+        <ul class="clean" style="margin-top:10px">
+          <li>Inicio de sesión y renovación del token.</li>
+          <li>Permisos por rol, recurso y operación.</li>
+          <li>Enrutamiento firmado hacia cada módulo.</li>
+          <li>Bus de eventos y bitácora de auditoría.</li>
+          <li>Archivos adjuntos y cuotas.</li>
+        </ul>
+      </div>
+      <div class="tile" style="padding:24px 24px 20px">
+        <div class="tag">Módulo · ocho veces</div>
+        <h3 style="font-size:20px;letter-spacing:.02em;text-transform:none;margin-top:6px">Lo del dominio</h3>
+        <ul class="clean" style="margin-top:10px">
+          <li>Modelos y reglas de su área.</li>
+          <li>Vistas, etiquetas y formularios.</li>
+          <li>Migraciones de su propio esquema.</li>
+          <li>Suscripción a los eventos que le importan.</li>
+          <li>Nada de autenticación ni de permisos.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><b>Criterio</b>Ningún módulo reimplementa la seguridad y ningún módulo escribe en las tablas de otro. Si necesita un dato ajeno, lo pide por la API o reacciona a un evento.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">04</span></div>
+  <aside class="notes">Analogía del edificio: el kernel es la recepción y el conserje —valida quién entra, a qué piso va y deja el registro—; cada módulo es una oficina especializada con su propio archivo. Ninguna oficina entra al archivo de otra.</aside>
+</section>
+
+<!-- 05 · MÓDULOS -->
+<section class="s">
+  <div class="eyebrow">04 · Módulos</div>
+  <h2>Catálogo de módulos</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c4" style="gap:12px">
+      <div class="tile"><div class="tag">Ventas</div><h3>CRM</h3><p>Empresas, contactos, oportunidades, cotizaciones y actividades.</p></div>
+      <div class="tile"><div class="tag">Operaciones</div><h3>Proyectos</h3><p>Portafolio, fases, tareas, hitos, entregables y riesgos.</p></div>
+      <div class="tile"><div class="tag">Talento</div><h3>Reclutamiento</h3><p>Puestos, candidatos, entrevistas, ofertas y contratación.</p></div>
+      <div class="tile"><div class="tag">Operaciones</div><h3>Logística</h3><p>Almacenes, transportistas, envíos y órdenes de entrega.</p></div>
+      <div class="tile"><div class="tag">Calidad</div><h3>Auditorías</h3><p>Auditorías, listas de verificación, hallazgos e informes.</p></div>
+      <div class="tile"><div class="tag">Finanzas</div><h3>Facturación</h3><p>Facturas, líneas, pagos y control de saldos.</p></div>
+      <div class="tile"><div class="tag">Operaciones</div><h3>Inventario</h3><p>Productos, existencias por almacén y movimientos.</p></div>
+      <div class="tile"><div class="tag">Operaciones</div><h3>Automatización</h3><p>Procesos, pasos, ejecuciones, registros y avisos.</p></div>
+    </div>
+    <div class="c5" style="margin-top:18px">
+      <div class="kpi"><span class="n">20</span><span class="l">tablas CRM</span></div>
+      <div class="kpi"><span class="n">27</span><span class="l">tablas Proyectos</span></div>
+      <div class="kpi"><span class="n">6</span><span class="l">tablas Logística</span></div>
+      <div class="kpi"><span class="n">4</span><span class="l">tablas Facturación</span></div>
+      <div class="kpi"><span class="n">16</span><span class="l">eventos publicados</span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">05</span></div>
+  <aside class="notes">No leer los ocho. Señalar tres o cuatro y decir que todos comparten la misma forma de instalarse: manifiesto, permisos, migraciones y eventos. La categoría la declara el propio módulo.</aside>
+</section>
+
+<!-- 06 · UN SOLO LUGAR -->
+<section class="s">
+  <div class="eyebrow">05 · Experiencia</div>
+  <h2>Una interfaz común</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split wide" style="align-items:start">
+      <div class="shot">
+        <img src="../capturas/02-home.png" alt="Panel de inicio de Novvus">
+        <div class="cap"><b>Panel de inicio.</b> Indicadores de todos los módulos en una sola vista, con datos del ambiente de demostración.</div>
+      </div>
+      <div>
+        <ul class="clean lg">
+          <li><b>Una sesión.</b> El mismo usuario entra a ventas, proyectos o facturación sin volver a identificarse.</li>
+          <li><b>Un panel.</b> Los indicadores de cada módulo se suman en la portada: oportunidades, proyectos, facturas, envíos.</li>
+          <li><b>Un menú.</b> Se arma con los manifiestos instalados: si un módulo no está, no aparece.</li>
+          <li><b>Un permiso.</b> Cada cuenta ve solo los módulos que su rol autoriza.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">06</span></div>
+  <aside class="notes">Esta captura es la primera impresión del usuario. Insistir en que los números no son maquetas: vienen de la base, con 71 oportunidades y 116 empresas cargadas para la demostración.</aside>
+</section>
+
+<!-- 07 · ARQUITECTURA -->
+<section class="s">
+  <div class="eyebrow">06 · Arquitectura</div>
+  <h2>Capas y límites de confianza</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="layers">
+      <div class="layer">
+        <span class="lnum">01</span>
+        <span class="lname">Cliente</span>
+        <span class="ltech">Navegador · Chrome, Brave o Edge</span>
+        <span class="lnote">Solo conoce la capa web. Nunca ve puertos, módulos ni la base.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">02</span>
+        <span class="lname">Capa web</span>
+        <span class="ltech">Next.js · Node 22 · puerto 8077</span>
+        <span class="lnote">Renderiza las vistas y reenvía cada llamada al kernel con el token.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">03</span>
+        <span class="lname">Kernel</span>
+        <span class="ltech">Rust · novvus_gateway</span>
+        <span class="lnote">Valida la sesión, autoriza el permiso, firma y enruta hacia el módulo.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">04</span>
+        <span class="lname">Módulos</span>
+        <span class="ltech">Python 3.12 · FastAPI · SDK</span>
+        <span class="lnote">Exponen solo su API interna; el kernel es su único cliente.</span>
+      </div>
+      <div class="layer">
+        <span class="lnum">05</span>
+        <span class="lname">Datos</span>
+        <span class="ltech">PostgreSQL 16 · RLS</span>
+        <span class="lnote">Un esquema por módulo y una política que filtra por organización.</span>
+      </div>
+    </div>
+    <p style="font-size:13.5px;line-height:1.45;color:#3d3d3d;margin:20px 0 0;max-width:104ch">Cada paso es un límite que ninguna otra capa puede saltarse: el navegador nunca toca la base y los módulos no son alcanzables desde fuera. Por eso agregar un módulo no obliga a tocar ni la web ni el kernel.</p>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">07</span></div>
+  <aside class="notes">Recorrer las cinco filas de arriba abajo. Subrayar la consecuencia práctica: para agregar un módulo no se toca ni la web ni el kernel. Y si un módulo se compromete, no alcanza al usuario ni a la base. El diagrama con flechas está en el reporte técnico, capítulo 2.</aside>
+</section>
+
+<!-- 08 · PETICIÓN -->
+<section class="s">
+  <div class="eyebrow">07 · Petición</div>
+  <h2>Ciclo de una petición</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="flow six" style="margin-top:6px">
+      <div class="step"><div class="num">1</div><h4>Navegador</h4><p>Pide una vista a la capa web en el puerto 8077.</p></div>
+      <div class="step"><div class="num">2</div><h4>Web</h4><p>Llama a <span class="mono">/api/módulo</span> con el token del usuario.</p></div>
+      <div class="step"><div class="num">3</div><h4>Kernel</h4><p>Valida el token y el permiso; resuelve a qué módulo va.</p></div>
+      <div class="step"><div class="num">4</div><h4>Módulo</h4><p>Recibe la llamada firmada, con la organización en contexto.</p></div>
+      <div class="step"><div class="num">5</div><h4>Base</h4><p>Consulta su esquema con RLS: solo ve su organización.</p></div>
+      <div class="step"><div class="num">6</div><h4>Auditoría</h4><p>El kernel registra la operación y devuelve la respuesta.</p></div>
+    </div>
+    <div class="c3" style="margin-top:26px">
+      <div class="tile solid"><h3>Nada se salta</h3><p>El módulo no recibe llamadas del navegador: solo del kernel, por la red interna.</p></div>
+      <div class="tile solid"><h3>Permiso antes que datos</h3><p>Si el rol no tiene la operación, la petición no llega al módulo.</p></div>
+      <div class="tile solid"><h3>Todo queda escrito</h3><p>Cada operación deja rastro: quién, cuándo, sobre qué registro.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">08</span></div>
+  <aside class="notes">Recorrer los seis pasos con el dedo. Ejemplo concreto: abrir facturas del cliente X. El kernel comprueba el permiso facturacion.invoices.read, firma la llamada, el módulo consulta su esquema con RLS y el kernel anota la lectura.</aside>
+</section>
+
+<!-- 09 · TECNOLOGÍAS -->
+<section class="s">
+  <div class="eyebrow">08 · Tecnologías</div>
+  <h2>Componentes de la plataforma</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c5" style="align-items:stretch">
+      <div class="tile"><div class="tag">Kernel</div><h3>Rust</h3><p>Servicio <span class="mono">novvus_gateway</span>. Seguridad, concurrencia y un solo punto de autorización.</p></div>
+      <div class="tile"><div class="tag">Interfaz</div><h3>Next.js</h3><p>Node 22. Renderiza las vistas y hace de proxy hacia el kernel.</p></div>
+      <div class="tile"><div class="tag">Módulos</div><h3>Python 3.12</h3><p>FastAPI, SQLAlchemy 2 y Pydantic sobre uvicorn. API generada por el SDK.</p></div>
+      <div class="tile"><div class="tag">Datos</div><h3>PostgreSQL 16</h3><p>Transacciones, políticas RLS y un esquema <span class="mono">mod_*</span> por módulo.</p></div>
+      <div class="tile"><div class="tag">Empaque</div><h3>Docker</h3><p>Once contenedores sobre WSL2, con versiones fijadas y un solo comando.</p></div>
+    </div>
+    <div class="split" style="margin-top:24px;grid-template-columns:1.1fr .9fr;align-items:start">
+      <ul class="clean">
+        <li><b>Un SDK propio.</b> <span class="mono">novvus-sdk 0.1.0</span> convierte modelos y permisos en API, validaciones y migraciones.</li>
+        <li><b>Versiones fijadas.</b> Kernel y web se consumen como imágenes <span class="mono">0.3.72</span>; los módulos declaran su versión en el manifiesto.</li>
+        <li><b>Sin servicios de pago.</b> Diagramas con Mermaid, documentos con HTML y el motor de impresión del navegador.</li>
+      </ul>
+      <div class="note" style="margin-top:0"><b>Criterio técnico</b>Rust para el punto que concentra la seguridad; Python para la velocidad de escribir reglas de negocio; Postgres para garantizar el aislamiento con RLS.</div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">09</span></div>
+  <aside class="notes">No entrar en cada librería. La idea es que cada tecnología está donde aporta: Rust en el borde de confianza, Python en el negocio, Postgres en el aislamiento. Mencionar que el SDK es lo que hace que ocho módulos se vean y se comporten igual.</aside>
+</section>
+
+<!-- 10 · REQUISITOS -->
+<section class="s">
+  <div class="eyebrow">09 · Requisitos</div>
+  <h2>Requisitos de instalación</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <p class="sub" style="margin-bottom:20px">El usuario final no instala nada; el servidor concentra Docker, los datos y los respaldos. Lo que cambia entre demo, desarrollo y producción son los secretos y el origen de los datos.</p>
+    <div class="c3" style="gap:16px;align-items:stretch">
+      <div class="tile"><div class="tag">Usuario final</div><h3>Solo navegador</h3>
+        <ul class="req">
+          <li>Chrome, Edge o Brave: cualquiera basado en Chromium.</li>
+          <li>Nada que instalar ni configurar en el equipo.</li>
+          <li>Entra por el puerto publicado: <span class="mono">8077</span> en la demo.</li>
+          <li>No abre puertos de módulos ni de base.</li>
+        </ul>
+      </div>
+      <div class="tile"><div class="tag">Demo y desarrollo</div><h3>Un equipo con WSL2</h3>
+        <ul class="req">
+          <li>Windows 10/11 con WSL2 y una distribución Ubuntu.</li>
+          <li><b>Docker Engine 24 o superior</b> dentro de WSL; no Docker Desktop.</li>
+          <li><b>8 GB de RAM</b> y 4 GB libres en disco.</li>
+          <li>Acceso a <span class="mono">ghcr.io/novvus</span> para las imágenes del núcleo.</li>
+          <li>Código y editor; Python 3.12 y Node 22 si se prueba fuera de contenedores.</li>
+        </ul>
+      </div>
+      <div class="tile"><div class="tag">Producción</div><h3>Servidor y operación</h3>
+        <ul class="req">
+          <li>Servidor con Docker Engine 24+ y <b>TLS</b> en el borde.</li>
+          <li>Secretos regenerados; no los del ambiente demo.</li>
+          <li>Respaldos automáticos fuera del servidor.</li>
+          <li>Monitoreo de salud con alertas.</li>
+          <li>SSO o directorio corporativo, con roles revisados.</li>
+          <li>Restauración completa probada antes de migrar.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><b>Dimensionamiento</b>Los 8 GB de RAM y 4 GB de disco son el mínimo del ambiente probado. En producción, la capacidad se calcula según usuarios y volumen de datos; el cliente nunca ve la base ni los módulos.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">10</span></div>
+  <aside class="notes">Separar tres audiencias: el usuario solo abre el navegador; el equipo técnico necesita WSL2 y Docker Engine, no Docker Desktop; producción exige TLS, secretos nuevos, respaldos fuera del servidor y monitoreo. Aclarar que 8 GB y 4 GB son el mínimo probado, no una recomendación de capacidad.</aside>
+</section>
+
+<!-- 11 · INSTALACIÓN -->
+<section class="s">
+  <div class="eyebrow">10 · Instalación</div>
+  <h2>Puesta en marcha</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <p class="sub" style="margin-bottom:16px">Todo ocurre en WSL, dentro de <span class="mono">/opt/novvus</span>. La misma composición sirve para demo y producción; cambian los secretos y el origen de los datos.</p>
+    <div class="flow six">
+      <div class="step"><div class="num">1</div><h4>Sistema</h4><p>WSL2 con Ubuntu y Docker Engine 24 o superior.</p></div>
+      <div class="step"><div class="num">2</div><h4>Directorio</h4><p>Copiar <span class="mono">docker/</span> a <span class="mono">/opt/novvus</span> y los módulos base.</p></div>
+      <div class="step"><div class="num">3</div><h4>Entorno</h4><p>Revisar <span class="mono">.env</span>; en producción, regenerar cada secreto.</p></div>
+      <div class="step"><div class="num">4</div><h4>Base</h4><p>Levantar PostgreSQL; en demo, restaurar el respaldo.</p></div>
+      <div class="step"><div class="num">5</div><h4>Plataforma</h4><p><span class="mono">up -d</span>: el bootstrap aplica las migraciones pendientes.</p></div>
+      <div class="step"><div class="num">6</div><h4>Módulos</h4><p>Construir el runtime, ejecutar <span class="mono">run-modulos.sh</span> y abrir <span class="mono">:8077</span>.</p></div>
+    </div>
+    <pre class="code" style="margin-top:20px;height:auto;font-size:10.2px">PKG=/mnt/c/Users/&lt;usuario&gt;/Desktop/Novvus-Sistema
+sudo mkdir -p /opt/novvus
+sudo cp -r $PKG/docker/. /opt/novvus/
+sudo cp -r /opt/novvus/modules-base/. /opt/novvus/modules/
+cd /opt/novvus
+
+<span class="c"># demo: restaurar el respaldo incluido (producción: base vacía)</span>
+docker compose -f docker-compose.yml -f modules.compose.yml up -d postgres
+docker exec -i novvus-prod-postgres-1 pg_restore -U novvus -d novvus \
+  --clean --if-exists --no-owner &lt; novvus_demo.dump
+docker compose -f docker-compose.yml -f modules.compose.yml up -d
+docker build -f $PKG/codigo/Dockerfile.modulo -t novvus-runtime:local $PKG/codigo
+IMAGE=novvus-runtime:local CODE=$PKG/codigo/modules bash /opt/novvus/run-modulos.sh</pre>
+    <p style="font-size:11px;color:#6f6f6f;margin:10px 0 0">El <span class="mono">pg_restore</span> es solo para la demo. En producción se arranca con la base vacía y el bootstrap aplica las migraciones.</p>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">11</span></div>
+  <aside class="notes">No leer el bloque completo: señalar los tres momentos. Primero copiar el paquete a /opt/novvus; segundo, decidir si se restaura el respaldo de demo o se arranca vacío; tercero, construir el runtime de los módulos y abrirlo en el 8077. El bootstrap es idempotente: repetirlo no rompe nada.</aside>
+</section>
+
+<!-- 12 · SEGURIDAD -->
+<section class="s">
+  <div class="eyebrow">11 · Seguridad</div>
+  <h2>Seguridad centralizada</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split wide" style="align-items:start">
+      <div>
+        <ul class="clean">
+          <li><b>Token JWT.</b> Vida corta, renovación por dispositivo y cierre de sesión que invalida el refresco.</li>
+          <li><b>Permisos por operación.</b> La forma es <span class="mono">módulo.recurso.operación</span>: leer, escribir, administrar.</li>
+          <li><b>Aislamiento por organización.</b> Todas las tablas llevan <span class="mono">org_id</span> y una política RLS que filtra cada consulta.</li>
+          <li><b>Llamadas firmadas.</b> El kernel reenvía a los módulos con HMAC: aunque alguien alcance la red interna, no puede falsificar el origen.</li>
+          <li><b>Bitácora.</b> Cada operación relevante queda registrada con usuario, recurso y momento.</li>
+        </ul>
+      </div>
+      <div class="shot">
+        <img src="../capturas/18-administracion.png" alt="Administración de miembros y roles">
+        <div class="cap"><b>Administración.</b> Miembros, rol y alcance de cada cuenta desde una sola pantalla.</div>
+      </div>
+    </div>
+    <div class="note"><b>Importancia</b>Un error de programación en un módulo no puede filtrar datos de otra empresa: la base aplica la política, no el código del módulo.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">12</span></div>
+  <aside class="notes">Aquí vale la pena la frase clave: la seguridad vive en el kernel y en la base, no en la buena voluntad de cada módulo. En la captura se ven los ocho usuarios de demostración con roles distintos.</aside>
+</section>
+
+<!-- 13 · DATOS -->
+<section class="s">
+  <div class="eyebrow">12 · Modelo de datos</div>
+  <h2>Esquema de la base de datos</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="rows">
+      <div class="rrow">
+        <span class="rlab">Recorrido comercial</span>
+        <div class="chain">
+          <div class="node">Empresa</div><span class="arw">→</span>
+          <div class="node">Oportunidad</div><span class="arw">→</span>
+          <div class="node">Cotización</div><span class="arw">→</span>
+          <div class="node">Factura</div><span class="arw">→</span>
+          <div class="node">Pago</div>
+        </div>
+      </div>
+      <div class="rrow">
+        <span class="rlab">Al aceptar la cotización</span>
+        <div class="chain">
+          <div class="node">Proyecto</div><span class="arw">→</span>
+          <div class="node">Tarea</div><span class="arw">→</span>
+          <div class="node soft">Entregable</div>
+          <div class="node" style="margin-left:22px">Envío</div><span class="arw">→</span>
+          <div class="node soft">Orden de entrega</div>
+        </div>
+      </div>
+    </div>
+    <div class="c2" style="gap:44px;align-items:start;margin-top:26px">
+      <div>
+        <p style="font-size:14.5px;line-height:1.5;margin:0 0 10px">Cada entidad tiene un módulo dueño y un esquema propio. Las relaciones son llaves foráneas: no quedan facturas sin cotización ni pagos sin factura.</p>
+        <p style="font-size:14.5px;line-height:1.5;margin:0">El tablero, las listas y los reportes se apoyan en las mismas tablas: un indicador no se calcula dos veces con criterios distintos.</p>
+      </div>
+      <div class="c2" style="gap:26px">
+        <div class="kpi"><span class="n">116</span><span class="l">tablas en total</span></div>
+        <div class="kpi"><span class="n">38</span><span class="l">en el esquema core</span></div>
+        <div class="kpi"><span class="n">78</span><span class="l">en los esquemas mod_*</span></div>
+        <div class="kpi"><span class="n">100%</span><span class="l">con org_id y RLS</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">13</span></div>
+  <aside class="notes">Explicar la cadena como el recorrido del negocio: la empresa origina la oportunidad, la oportunidad se cotiza, la cotización se convierte en factura y en proyecto. Los importes se guardan como numeric(14,2), nunca como texto.</aside>
+</section>
+
+<!-- 14 · SEPARADOR -->
+<section class="s dark divider">
+  <div class="kicker">13 · Demostración</div>
+  <h2>Recorrido por la aplicación</h2>
+  <p class="sub">Pantallas del sistema en operación, desde la oportunidad hasta la factura emitida.</p>
+  <div class="pills">
+    <span class="pill">Acceso</span><span class="pill">Panel</span><span class="pill">CRM</span><span class="pill">Cotización</span><span class="pill">Proyecto</span><span class="pill">Envío</span><span class="pill">Factura</span><span class="pill">Automatización</span>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">14</span></div>
+  <aside class="notes">Cambio de ritmo: hasta aquí la teoría, ahora el sistema. Avisar que todas las capturas son del ambiente de demostración, no maquetas.</aside>
+</section>
+
+<!-- 15 · ACCESO -->
+<section class="s">
+  <div class="eyebrow">14 · Acceso</div>
+  <h2>Inicio de sesión</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split wide" style="align-items:start">
+      <div class="shot">
+        <img src="../capturas/01-login.png" alt="Pantalla de inicio de sesión">
+        <div class="cap"><b>Figura 1.</b> Pantalla de acceso en <span class="mono">http://localhost:8077</span>.</div>
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>Credenciales de demostración.</b> Ocho cuentas, una por rol: ventas, proyectos, logística, recursos humanos, auditoría, automatización y administración.</li>
+          <li><b>La sesión es un token.</b> Viaja en cada petición y se renueva sin pedir la contraseña otra vez.</li>
+          <li><b>Un solo dominio.</b> El usuario nunca ve los puertos internos ni la base de datos.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">15</span></div>
+  <aside class="notes">Si se hace demo en vivo, entrar con la cuenta de administración y luego cambiar a ventas@novvus.demo para mostrar que el menú cambia según el rol. Ese contraste explica los permisos mejor que cualquier diapositiva.</aside>
+</section>
+
+<!-- 16 · PANEL -->
+<section class="s">
+  <div class="eyebrow">15 · Menú</div>
+  <h2>Menú según módulos instalados</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split wide" style="align-items:start">
+      <div class="shot">
+        <img src="../capturas/03-home-modulos.png" alt="Módulos instalados y accesos de trabajo">
+        <div class="cap"><b>Figura 2.</b> Ocho aplicaciones habilitadas, con su categoría y su acceso directo.</div>
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>Nada se programa a mano.</b> Las tarjetas, el menú lateral y el buscador salen de los manifiestos instalados.</li>
+          <li><b>Cada módulo se identifica.</b> Nombre, categoría, icono y color de acento los declara el propio módulo.</li>
+          <li><b>El rol filtra la vista.</b> Una cuenta de ventas no ve Administración; una de auditoría no ve Facturación.</li>
+          <li><b>Estado real.</b> «8 apps instaladas, 8 habilitadas»: el contador lo calcula la plataforma, no una hoja de cálculo.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">16</span></div>
+  <aside class="notes">Aquí se ve por qué el menú nunca queda desfasado: no hay una lista escrita a mano en el código. Si un módulo se desinstala, desaparece; si el rol no lo autoriza, tampoco aparece. El contador de apps confirma el estado real.</aside>
+</section>
+
+<!-- 17 · CRM -->
+<section class="s">
+  <div class="eyebrow">16 · CRM</div>
+  <h2>Oportunidades comerciales</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split" style="align-items:start">
+      <div class="shot">
+        <img src="../capturas/04-crm-oportunidades.png" alt="Oportunidades en el CRM">
+        <div class="cap"><b>Figura 3.</b> Pipeline con empresa, etapa, importe y probabilidad.</div>
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>La empresa es la raíz.</b> Contactos, oportunidades y actividades cuelgan del mismo registro.</li>
+          <li><b>Etapas visibles.</b> Cada oportunidad avanza por el pipeline con su importe y su probabilidad.</li>
+          <li><b>Nombres, no identificadores.</b> Las listas muestran cliente y folio; nunca un UUID.</li>
+          <li><b>El siguiente paso es cotizar.</b> La cotización hereda cliente, líneas e impuestos.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">17</span></div>
+  <aside class="notes">Aquí empieza el recorrido que se va a seguir. Pedir al público que recuerde una oportunidad concreta de la tabla: al final vamos a ver su factura y su envío.</aside>
+</section>
+
+<!-- 18 · COTIZACIÓN -->
+<section class="s">
+  <div class="eyebrow">17 · Disparador</div>
+  <h2>Aceptación de una cotización</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split" style="align-items:start">
+      <div class="shot">
+        <img src="../capturas/06-crm-cotizaciones.png" alt="Cotizaciones en el CRM">
+        <div class="cap"><b>Figura 4.</b> La cotización conserva líneas, importe y vigencia.</div>
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>El usuario solo cambia el estado</b> a «Aceptada» y confirma.</li>
+          <li><b>El CRM publica un hecho:</b> <span class="mono">crm.quote.accepted</span> con los identificadores necesarios.</li>
+          <li><b>No llama a nadie.</b> No sabe quién escucha ni cuántos módulos reaccionarán.</li>
+          <li><b>El resto ocurre en milisegundos:</b> envío, factura, proyecto y ejecución.</li>
+        </ul>
+        <div class="note" style="margin-top:16px"><b>Un clic, un hecho</b>Ese es el punto de integración: un evento con nombre de negocio, no una escritura cruzada entre tablas.</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">18</span></div>
+  <aside class="notes">Este es el momento clave de la presentación. En el sistema real se acepta la cotización y en segundos aparecen los registros. Si hay demo, hacerlo aquí mismo.</aside>
+</section>
+
+<!-- 19 · APARECE SOLO -->
+<section class="s">
+  <div class="eyebrow">18 · Resultado</div>
+  <h2>Registros generados por eventos</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c3" style="gap:16px">
+      <div class="shot">
+        <img src="../capturas/07-proyectos.png" alt="Proyectos creados por el evento">
+        <div class="cap"><b>Proyecto.</b> Vinculado a la misma oportunidad, con su plan por armar.</div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/09-logistica.png" alt="Envíos creados por el evento">
+        <div class="cap"><b>Envío.</b> Referencia derivada de la cotización: <span class="mono">ENV-COT-…</span>.</div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/12-facturacion.png" alt="Factura emitida por el evento">
+        <div class="cap"><b>Factura.</b> Hereda importe y vencimiento; nace en borrador para revisión.</div>
+      </div>
+    </div>
+    <div class="c2" style="margin-top:22px;gap:40px">
+      <p style="font-size:14.5px;line-height:1.5;margin:0">Los tres registros comparten la misma cotización de origen. Esa coincidencia es la prueba de que el mecanismo funcionó: un hecho, tres consecuencias y cero capturas manuales.</p>
+      <p style="font-size:14.5px;line-height:1.5;margin:0">La referencia no es un número al azar: se deriva del identificador de la cotización para que el enlace sea estable aunque el evento llegue dos veces.</p>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">19</span></div>
+  <aside class="notes">Hacer visible el hilo: el proyecto menciona la oportunidad, el envío lleva ENV-COT y la factura conserva el importe. Nadie escribió esos datos: los puso el listener.</aside>
+</section>
+
+<!-- 20 · AUTOMATIZACIÓN -->
+<section class="s">
+  <div class="eyebrow">19 · Automatización</div>
+  <h2>Ejecución y bitácora</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c2" style="gap:18px;align-items:start">
+      <div class="shot">
+        <img src="../capturas/19-automatizacion-ejecuciones.png" alt="Ejecuciones de automatización">
+        <div class="cap"><b>Ejecuciones.</b> Cada corrida con su estado, inicio y fin.</div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/15-automatizacion-logs.png" alt="Bitácora de una ejecución">
+        <div class="cap"><b>Bitácora.</b> Paso a paso: proceso, nivel, mensaje y hora.</div>
+      </div>
+    </div>
+    <div class="c3" style="margin-top:20px">
+      <div class="tile solid"><h3>Procesos</h3><p>Reglas declaradas: qué evento escuchan y qué pasos ejecutan.</p></div>
+      <div class="tile solid"><h3>Pasos tipados</h3><p>Consultar, obtener un registro, enviar correo o notificar.</p></div>
+      <div class="tile solid"><h3>Trazabilidad</h3><p>Si un paso falla, la corrida se detiene y dice exactamente dónde.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">20</span></div>
+  <aside class="notes">La automatización no es una caja negra: se puede abrir la corrida y ver qué hizo cada paso. Eso es lo que permite depurar un flujo sin leer código.</aside>
+</section>
+
+<!-- 21 · AGENTE -->
+<section class="s">
+  <div class="eyebrow">20 · Inteligencia artificial</div>
+  <h2>Modo Agente</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split" style="grid-template-columns:.98fr 1.02fr;gap:36px;align-items:center">
+      <div>
+        <p class="sub" style="margin-bottom:16px">El panel derecho suma un modo agente: recibe instrucciones en lenguaje natural y trabaja sobre los datos de la organización, con la misma sesión y los mismos permisos.</p>
+        <div class="stack">
+          <div class="tile solid"><div class="tag">Contexto</div><h3>El contexto</h3><p>Expedientes, órdenes, clientes y auditorías del mismo ambiente.</p></div>
+          <div class="tile solid"><div class="tag">Acciones</div><h3>Herramientas</h3><p>Genera documentos y encadena pasos del flujo; no solo responde texto.</p></div>
+          <div class="tile solid"><div class="tag">Control</div><h3>Supervisión</h3><p>Propone y ejecuta; aprobar y firmar sigue siendo una decisión humana.</p></div>
+        </div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/20-modo-agente.png" alt="Modo Agente en el panel derecho de Novvus">
+        <div class="cap"><b>Modo Agente.</b> Pestaña del panel derecho, junto a Notificaciones y Buscar. Los accesos recientes guardan los prompts frecuentes.</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">21</span></div>
+  <aside class="notes">El agente no es un chat aparte: vive en la aplicación, con la sesión del usuario y sus permisos, y eso acota lo que puede ver y hacer. La captura muestra la ventana completa con el panel abierto a la derecha. Señalar que el modelo se elige en la propia interfaz y que la aprobación final sigue siendo humana.</aside>
+</section>
+
+<!-- 22 · EJEMPLO DEL AGENTE -->
+<section class="s">
+  <div class="eyebrow">21 · Caso de uso</div>
+  <h2>Informe NOM-011</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split" style="grid-template-columns:1.16fr .84fr;gap:34px;align-items:start">
+      <div>
+        <p class="sub" style="margin-bottom:14px">Se pide el informe de la NOM-011 y el agente encadena el expediente, el informe preliminar y los avisos. El folio queda ligado al servicio.</p>
+        <div class="agent-steps">
+          <div class="arow"><span class="an">01</span><div><h4>Instrucción</h4><p>«Generar informe NOM-011», escrito en el cuadro de mensaje.</p></div></div>
+          <div class="arow"><span class="an">02</span><div><h4>Expediente</h4><p>«Generando expediente.» Abre el expediente del servicio.</p></div></div>
+          <div class="arow"><span class="an">03</span><div><h4>Informe</h4><p>«Generación de informe preliminar en modo automático.»</p></div></div>
+          <div class="arow"><span class="an">04</span><div><h4>Folio</h4><p><span class="mono">SER/2025/07/048789</span>, ligado al expediente.</p></div></div>
+          <div class="arow"><span class="an">05</span><div><h4>Avisos</h4><p>Notifica al responsable: faltan datos, informe generado, expediente actualizado.</p></div></div>
+          <div class="arow"><span class="an">06</span><div><h4>Revisión</h4><p>La aprobación del informe la firma una persona.</p></div></div>
+        </div>
+      </div>
+      <div class="shot fit">
+        <img src="../capturas/21-agente-panel.png" alt="Conversación del agente con el informe NOM-011">
+        <div class="cap"><b>La conversación.</b> Del prompt al folio, con el detalle de cada paso.</div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:14px"><b>Modo demostración</b>El agente se muestra en modo demostración: la conversación es de ejemplo y no hay un proveedor de modelo conectado. Si se le escribe, responde que todavía no está conectado.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">22</span></div>
+  <aside class="notes">Recorrer los seis pasos en orden y detenerse en el folio SER/2025/07/048789. Aquí está el valor: una instrucción corta produce un expediente trazable y avisa a las personas. Decir de inmediato que es una conversación de ejemplo: en esta entrega no hay proveedor conectado y el agente lo declara si se le escribe.</aside>
+</section>
+
+<!-- 23 · RESTO -->
+<section class="s">
+  <div class="eyebrow">22 · Operación</div>
+  <h2>Reclutamiento, auditorías e inventario</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c3" style="gap:16px">
+      <div class="shot">
+        <img src="../capturas/08-reclutamiento.png" alt="Candidatos en Reclutamiento">
+        <div class="cap"><b>Reclutamiento.</b> Al contratar, crea el contacto en el CRM.</div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/10-auditorias.png" alt="Auditorías y hallazgos">
+        <div class="cap"><b>Auditorías.</b> El hallazgo dispara el plan de acción.</div>
+      </div>
+      <div class="shot">
+        <img src="../capturas/14-inventario-stock.png" alt="Existencias de inventario">
+        <div class="cap"><b>Inventario.</b> El envío entregado descuenta existencias.</div>
+      </div>
+    </div>
+    <p style="font-size:15px;line-height:1.5;margin:22px 0 0;max-width:88ch">Cada módulo repite el mismo patrón: una entidad propia, permisos declarados y eventos que conectan con el resto. Reclutamiento alimenta al CRM; Auditorías avisa al responsable; Inventario reacciona a la logística.</p>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">23</span></div>
+  <aside class="notes">Sirve para mostrar amplitud sin recorrer cada módulo. La idea: no son ocho sistemas distintos, son ocho aplicaciones con el mismo contrato.</aside>
+</section>
+
+<!-- 24 · EVENTOS -->
+<section class="s">
+  <div class="eyebrow">23 · Integración</div>
+  <h2>Eventos entre módulos</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="split" style="align-items:center;grid-template-columns:1.1fr .9fr">
+      <div class="shot dia">
+        <img src="../diagramas/conexiones.svg" alt="Mapa de eventos entre módulos">
+      </div>
+      <div>
+        <ul class="clean">
+          <li><b>Se publica un hecho.</b> El nombre describe el negocio: <span class="mono">crm.quote.accepted</span>, <span class="mono">logistica.shipment.delivered</span>.</li>
+          <li><b>El kernel distribuye.</b> Cada módulo suscrito reacciona por su cuenta, sin que el emisor lo conozca.</li>
+          <li><b>Se pide con permiso.</b> Si un módulo necesita leer datos de otro, usa su API con un permiso de servicio declarado.</li>
+          <li><b>Nadie escribe fuera.</b> Un módulo jamás toca el esquema de otro: esa es la regla que evita el acoplamiento.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">24</span></div>
+  <aside class="notes">Comparar con una radio interna: quien transmite no sabe cuántos escuchan. Eso permite agregar un módulo nuevo sin tocar los existentes: solo se suscribe al evento.</aside>
+</section>
+
+<!-- 25 · IDEMPOTENCIA -->
+<section class="s">
+  <div class="eyebrow">24 · Idempotencia</div>
+  <h2>Eventos repetidos</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="flow four" style="margin-top:2px">
+      <div class="step"><div class="num">1</div><h4>Llega el evento</h4><p><span class="mono">crm.quote.accepted</span> de la cotización <span class="mono">8C7E</span>.</p></div>
+      <div class="step"><div class="num">2</div><h4>Se marca</h4><p>El módulo intenta registrar la clave en <span class="mono">_processed_events</span>.</p></div>
+      <div class="step"><div class="num">3</div><h4>¿Ya existía?</h4><p>Si la clave está, la ejecución termina sin crear nada.</p></div>
+      <div class="step"><div class="num">4</div><h4>Si es nuevo</h4><p>Crea el registro con una clave de negocio estable: <span class="mono">ENV-COT-8C7E</span>.</p></div>
+    </div>
+    <div class="c2" style="margin-top:26px;gap:22px">
+      <div class="tile solid" style="border-left:3px solid #000">
+        <div class="tag">Primera entrega</div>
+        <h3 style="font-size:22px;letter-spacing:0">Factura creada</h3>
+        <p>Una factura, un envío y un proyecto. La cotización queda vinculada a los tres.</p>
+      </div>
+      <div class="tile" style="border-style:dashed">
+        <div class="tag">Segunda entrega</div>
+        <h3 style="font-size:22px;letter-spacing:0">Omitida</h3>
+        <p>El evento se marca como ya procesado y la corrida lo registra. Nada se duplica.</p>
+      </div>
+    </div>
+    <p style="font-size:13px;line-height:1.45;color:#4a4a4a;margin:18px 0 0">Se probó publicando el mismo evento dos veces: la cotización produjo un único envío y el segundo intento quedó como omitido en la bitácora.</p>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">25</span></div>
+  <aside class="notes">Este es el detalle que separa una demo de un sistema: los buses reintentan y los usuarios repiten clics. Sin idempotencia, la factura se duplica. Aquí se probó repitiendo el evento a propósito.</aside>
+</section>
+
+<!-- 26 · ANATOMÍA -->
+<section class="s">
+  <div class="eyebrow">25 · Anatomía</div>
+  <h2>Estructura de un módulo</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c3 code" style="gap:14px;align-items:stretch">
+      <div>
+        <div class="codebar">novvus.toml · manifiesto</div>
+        <pre class="code">[module]
+id = "facturacion"
+name = "Facturación"
+version = "0.1.0"
+
+[dependencies]
+modules = ["crm&gt;=0.1"]
+service_permissions = [
+  "crm.quotes.read",
+]
+
+[events]
+emits   = ["facturacion.invoice.created"]
+listens = ["crm.quote.accepted"]
+
+[runtime]
+port = 8180</pre>
+      </div>
+      <div>
+        <div class="codebar">models.py · datos</div>
+        <pre class="code">class Invoice(NovvusModel):
+    __resource__ = "invoices"
+
+    number: Mapped[str]
+    company_id: Mapped[UUID | None]
+    status: Mapped[InvoiceStatus]
+    total: Mapped[Decimal]
+    paid_amount: Mapped[Decimal]
+
+<span class="c"># tablas, columnas y tipos</span>
+<span class="c"># generan la API y las</span>
+<span class="c"># migraciones del módulo</span></pre>
+      </div>
+      <div>
+        <div class="codebar">module.py · comportamiento</div>
+        <pre class="code">module = NovvusModule("novvus.toml")
+for m in ALL_MODELS:
+    module.model(m)
+
+@module.on("crm.quote.accepted")
+async def on_quote_accepted(event, session):
+    if await ya_procesado(session, event):
+        return          <span class="c"># idempotencia</span>
+
+    inv = Invoice(...)
+    session.add(inv)
+    await module.emit(
+        "facturacion.invoice.created", ...)
+
+app = module.create_app()</pre>
+      </div>
+    </div>
+    <div class="note"><b>Funciones del SDK</b>API REST, validación de permisos, aislamiento por organización, migraciones y cliente del kernel. El módulo solo declara qué tiene y qué hace.</div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">26</span></div>
+  <aside class="notes">Este es el código real de Facturación, resumido. Señalar las tres piezas: el manifiesto dice qué es y qué escucha; los modelos dicen qué guarda; module.py dice qué hace cuando llega el evento. El SDK genera lo demás.</aside>
+</section>
+
+<!-- 27 · AGREGAR MÓDULO -->
+<section class="s">
+  <div class="eyebrow">26 · Extensión</div>
+  <h2>Incorporación de un módulo</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="flow four" style="margin-top:4px">
+      <div class="step"><div class="num">1</div><h4>Publica la imagen</h4><p>El módulo se distribuye como contenedor con su manifiesto y variables.</p></div>
+      <div class="step"><div class="num">2</div><h4>Registra el manifiesto</h4><p>Nombre, versión, recursos, vistas y eventos que publica.</p></div>
+      <div class="step"><div class="num">3</div><h4>Otorga permisos</h4><p>Solo los recursos declarados quedan accesibles para ese módulo.</p></div>
+      <div class="step"><div class="num">4</div><h4>Verifica</h4><p>Salud, migraciones aplicadas y menú visible para los roles autorizados.</p></div>
+    </div>
+    <div class="split" style="margin-top:26px;grid-template-columns:1.05fr .95fr;align-items:stretch">
+      <div>
+        <ul class="clean">
+          <li><b>Sin recompilar.</b> Ni la capa web ni el kernel cambian: el menú y las vistas salen del manifiesto.</li>
+          <li><b>Sin acoplamiento.</b> Si el módulo se retira, sus tablas quedan y el resto sigue operando.</li>
+          <li><b>Mismo contrato.</b> Permisos, eventos y estilo idénticos a los ocho módulos existentes.</li>
+        </ul>
+      </div>
+      <div style="display:flex">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;background:#0b0b0b;border:1px solid #000">
+          <pre class="code" style="font-size:11.5px;border:0"><span class="c"># el módulo se suma al compose</span>
+docker compose up -d
+
+<span class="c"># y responde salud como los demás</span>
+curl :8140/health   <span class="c">200 OK</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">27</span></div>
+  <aside class="notes">Los seis módulos añadidos se construyeron con este procedimiento. Enfatizar que el costo de sumar un área nueva es bajo: no se toca la plataforma, solo se declara el módulo.</aside>
+</section>
+
+<!-- 28 · NÚMEROS -->
+<section class="s">
+  <div class="eyebrow">27 · Alcance</div>
+  <h2>Resultados de la entrega</h2>
+  <div class="rule"></div>
+  <div class="body">
+    <div class="c4" style="gap:22px">
+      <div class="kpi"><span class="n">8</span><span class="l">módulos operativos</span></div>
+      <div class="kpi"><span class="n">11</span><span class="l">contenedores activos</span></div>
+      <div class="kpi"><span class="n">116</span><span class="l">tablas en PostgreSQL</span></div>
+      <div class="kpi"><span class="n">16</span><span class="l">eventos de negocio</span></div>
+    </div>
+    <div class="c4" style="gap:22px;margin-top:26px">
+      <div class="kpi"><span class="n">21</span><span class="l">capturas de pantalla</span></div>
+      <div class="kpi"><span class="n">8</span><span class="l">diagramas vectoriales</span></div>
+      <div class="kpi"><span class="n">2</span><span class="l">documentos PDF</span></div>
+      <div class="kpi"><span class="n">71</span><span class="l">oportunidades demo</span></div>
+    </div>
+    <div class="c2" style="margin-top:30px;gap:40px;align-items:start">
+      <ul class="clean">
+        <li>Los ocho módulos responden <span class="mono">/health</span> con 200.</li>
+        <li>Aceptar una cotización crea envío y factura una sola vez.</li>
+        <li>Repetir el evento no duplica registros.</li>
+      </ul>
+      <ul class="clean">
+        <li>Nueve vistas principales cargan con datos legibles.</li>
+        <li>La exportación descarga las columnas visibles.</li>
+        <li>El aislamiento devuelve cero filas de otra organización.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span class="wm">Novvus</span><span class="pg">28</span></div>
+  <aside class="notes">Cifras para dar dimensión, no para memorizar. Lo importante es la columna de verificaciones: no solo existe, se probó. Si preguntan por rendimiento, remitir al reporte técnico, capítulo 11.</aside>
+</section>
+
+<div class="notes" id="notes"><b>Notas del orador · N para ocultar</b><span id="notesText"></span></div>
+
+</div>
+
+<div class="chrome"><div class="bar" id="bar"></div></div>
+<div class="hint">← → navegar · N notas · F pantalla completa</div>
+
+<script>
+const slides = Array.from(document.querySelectorAll('.s'));
+const notes = document.getElementById('notes');
+const notesText = document.getElementById('notesText');
+const bar = document.getElementById('bar');
+const deck = document.getElementById('deck');
+let i = 0;
+
+function fit() {
+  const s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+  deck.style.setProperty('--s', s);
+}
+window.addEventListener('resize', fit);
+fit();
+
+function show(n, push) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('on', k === i));
+  bar.style.width = ((i + 1) / slides.length * 100) + '%';
+  const note = slides[i].querySelector('aside.notes');
+  notesText.textContent = note ? note.textContent.trim() : '';
+  if (push !== false) history.replaceState(null, '', '#' + (i + 1));
+}
+
+function toggleNotes() { notes.classList.toggle('on'); }
+
+function fullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); show(i + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace') { e.preventDefault(); show(i - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); show(0); }
+  else if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+  else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); toggleNotes(); }
+  else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); fullscreen(); }
+});
+
+document.getElementById('deck').addEventListener('click', (e) => {
+  if (e.target.closest('a, .notes')) return;
+  show(i + (e.clientX > window.innerWidth / 2 ? 1 : -1));
+});
+
+const start = parseInt((location.hash || '').replace('#', ''), 10);
+show(Number.isFinite(start) && start > 0 ? start - 1 : 0, false);
+window.addEventListener('hashchange', () => {
+  const h = parseInt((location.hash || '').replace('#', ''), 10);
+  if (Number.isFinite(h) && h > 0 && h - 1 !== i) show(h - 1, false);
+});
+</script>
+
+</body>
+</html>

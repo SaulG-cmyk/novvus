@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adjuntos, chatter y notificaciones — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav active" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Construir módulos / Adjuntos, chatter y notificaciones</div>
+    <article>
+      <h1>Adjuntos, chatter y notificaciones</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Tres servicios que el kernel presta a <b>todos</b> los registros de <b>todos</b> los módulos:
+      archivos adjuntos, un hilo de colaboración por registro (comentarios, notas internas, seguidores,
+      actividades, cambios rastreados) y un buzón de notificaciones con entrega en vivo por SSE. Tu módulo
+      solo declara dos banderas; el resto es infraestructura.</p>
+
+      <div class="note"><b>Lo que tienes que hacer como autor de módulo.</b> Poner <code>"attachments": True</code>
+      y/o <code>"chatter": True</code> en <code>__novvus_views__</code>, y opcionalmente <code>"track": [...]</code>. Nada
+      más: ni tablas, ni endpoints, ni UI. El resto de esta página explica qué pasa por debajo para que sepas
+      qué esperar y cómo usarlo desde tu código Python cuando lo necesites.</div>
+
+      <h2>1. Adjuntos (servicio de archivos)</h2>
+      <p>Contrato normativo: <code>documents/docs/FILES.md</code>. Implementación: crate <code>novvus-files</code> y
+      <code>kernel/crates/novvus-gateway/src/routes/files.rs</code>.</p>
+<pre class="diagram">Navegador ── multipart ──► Gateway (novvus-files)
+                              │ 1. permiso {módulo}.{modelo}.write (RBAC)
+                              │ 2. módulo habilitado y modelo presente en su meta
+                              │ 3. streaming: sha256 + tamaño al vuelo, cuota de la org
+                              │ 4. MIME por sniffing de los primeros 512 bytes
+                              ▼
+                       object_store (local o S3-compatible)
+                         clave: org/{org_id}/{ab}/{cd}/{sha256}
+                              │
+                              ▼
+                       core.attachments        (un registro por adjunto, borrado lógico)
+                       core.attachment_blobs   (org_id, sha256, refcount)</pre>
+
+      <h3>Modelo de datos y deduplicación</h3>
+      <table>
+        <tr><th>Tabla</th><th>Contenido</th></tr>
+        <tr><td><code>core.attachments</code></td><td><code>id</code> UUIDv7, <code>org_id</code>, <code>module_id</code>, <code>model</code> (resource del meta), <code>record_id</code> (sin FK: el registro vive en <code>mod_*</code>), <code>filename</code>, <code>mime</code> (detectado, no confiado), <code>size_bytes</code>, <code>sha256</code>, <code>created_by</code>, <code>created_at</code>, <code>deleted_at</code>. Índices <code>attachments_record_idx</code> (parcial sobre vivos) y <code>attachments_sha_idx</code>.</td></tr>
+        <tr><td><code>core.attachment_blobs</code></td><td>PK <code>(org_id, sha256)</code>, <code>size_bytes</code>, <code>refcount</code>. Es el contenido físico compartido: el mismo PDF subido diez veces en una organización ocupa el almacenamiento una vez. La dedup es <b>por organización</b>: dos orgs con el mismo archivo tienen dos blobs, así la cuota es justa y nadie infiere la existencia de un archivo ajeno.</td></tr>
+      </table>
+
+      <h3>Límites, MIME y descarga</h3>
+      <table>
+        <tr><th>Regla</th><th>Valor / comportamiento</th></tr>
+        <tr><td>Tamaño por archivo</td><td><code>NOVVUS_FILES_MAX_SIZE_BYTES</code>, default 50 MB → 413 al excederlo.</td></tr>
+        <tr><td>Cuota por organización</td><td><code>NOVVUS_FILES_ORG_QUOTA_BYTES</code>, default 10 GB → 413 con mensaje claro.</td></tr>
+        <tr><td>Backend</td><td><code>NOVVUS_FILES_BACKEND=local|s3</code>; local en <code>NOVVUS_FILES_LOCAL_ROOT</code> (volumen <code>files</code> en producción), S3-compatible con <code>NOVVUS_FILES_S3_*</code>.</td></tr>
+        <tr><td>Tipo MIME</td><td>Sniffing de <i>magic numbers</i> (<code>SNIFF_BYTES = 512</code>); el <code>Content-Type</code> del cliente es solo informativo. Denylist <code>application/x-msdownload</code>, <code>application/x-elf</code> → 422.</td></tr>
+        <tr><td>Descarga</td><td>Siempre <code>Content-Disposition: attachment</code>, salvo imágenes raster verificadas (<code>INLINE_MIMES</code>: png, jpeg, gif, webp), que pueden ir <code>inline</code>. HTML o SVG jamás se sirven inline (XSS).</td></tr>
+        <tr><td>Miniaturas</td><td>Del lado del cliente: el panel descarga la imagen (ya segura) y la muestra pequeña. No hay <code>/thumb</code> en el servidor: decodificar imágenes no confiables dentro del kernel sería superficie de ataque.</td></tr>
+        <tr><td>Borrado y GC</td><td><code>DELETE</code> es lógico. Un job horario del kernel (<code>novvus-gateway/src/main.rs</code>) borra las filas con <code>deleted_at</code> anterior a la retención (<code>NOVVUS_FILES_GC_RETENTION_DAYS</code>, default 30), decrementa el <code>refcount</code> y elimina el objeto físico cuando llega a 0.</td></tr>
+        <tr><td>Aislamiento</td><td>Un id de otra organización responde 404, nunca 403: no se filtra existencia.</td></tr>
+      </table>
+
+      <h3>API <code>/api/core/files</code></h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Permiso</th><th>Detalle</th></tr>
+        <tr><td><code>GET /api/core/files?module_id=&amp;model=&amp;record_id=</code></td><td><code>read</code> del modelo padre</td><td>Adjuntos vivos del registro.</td></tr>
+        <tr><td><code>POST /api/core/files</code></td><td><code>write</code> del modelo padre</td><td>Multipart: campos <code>module_id</code>, <code>model</code>, <code>record_id</code> y el archivo en <code>file</code>. Responde 201 con el registro (sin la clave de storage).</td></tr>
+        <tr><td><code>GET /api/core/files/{id}</code></td><td><code>read</code></td><td>Streaming del contenido.</td></tr>
+        <tr><td><code>DELETE /api/core/files/{id}</code></td><td><code>write</code></td><td>Borrado lógico.</td></tr>
+      </table>
+<pre><code><span class="c"># Subir un contrato a un contacto del CRM</span>
+curl -X POST <span class="s">"http://localhost:8000/api/core/files"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  -F <span class="s">"module_id=crm"</span> -F <span class="s">"model=contacts"</span> -F <span class="s">"record_id=$CONTACT_ID"</span> \
+  -F <span class="s">"file=@contrato.pdf"</span>
+
+<span class="c"># Listar y descargar</span>
+curl <span class="s">"http://localhost:8000/api/core/files?module_id=crm&amp;model=contacts&amp;record_id=$CONTACT_ID"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span>
+curl -OJ <span class="s">"http://localhost:8000/api/core/files/$ATTACHMENT_ID"</span> -H <span class="s">"Authorization: Bearer $ACCESS"</span></code></pre>
+
+      <h3>Desde el SDK: <code>module.files</code></h3>
+      <p><code>FilesHelper</code> (<code>sdk/src/novvus_sdk/files.py</code>) envuelve las mismas rutas del kernel con el
+      token de servicio y la org del contexto. Un módulo <b>solo</b> puede manejar adjuntos de sus propios modelos y
+      <b>jamás</b> toca el almacenamiento directamente. En modo offline (tests) lanza <code>RuntimeError</code>.</p>
+<pre><code><span class="k">from</span> novvus_sdk <span class="k">import</span> current_context, requires
+
+@module.router.post(<span class="s">"/opportunities/{opportunity_id}/quote"</span>, status_code=<span class="n">201</span>)
+@requires(<span class="s">"crm.opportunities.write"</span>)
+<span class="k">async def</span> <span class="f">generate_quote</span>(opportunity_id: UUID, session: SessionDep) -&gt; dict:
+    pdf_bytes = render_quote_pdf(...)               <span class="c"># tu lógica</span>
+    attachment = <span class="k">await</span> module.files.attach(
+        model=<span class="s">"opportunities"</span>, record_id=opportunity_id,
+        filename=<span class="s">"cotizacion.pdf"</span>, content=pdf_bytes,
+    )
+    listed = <span class="k">await</span> module.files.list(model=<span class="s">"opportunities"</span>, record_id=opportunity_id)
+    <span class="c"># module.files.download(attachment_id) y module.files.delete(attachment_id) completan la API</span>
+    <span class="k">return</span> {<span class="s">"attachment_id"</span>: attachment[<span class="s">"id"</span>], <span class="s">"total"</span>: len(listed)}</code></pre>
+      <p>Los cuatro métodos aceptan <code>org_id=</code> opcional para usarlos fuera de una petición de usuario
+      (por ejemplo dentro de un handler de evento o cron, donde el contexto lo pone el kernel).</p>
+
+      <h3>Qué ve el usuario</h3>
+      <p><code>&lt;AttachmentPanel moduleId model recordId&gt;</code> (<code>components/generic/attachment-panel.tsx</code>) se
+      monta solo en <code>GenericFormView</code> cuando el meta dice <code>capabilities.attachments</code> y el registro ya
+      existe. Ofrece zona de arrastre con barra de progreso (la subida usa <code>XMLHttpRequest</code> para tener eventos
+      de progreso reales), icono por tipo, miniatura para imágenes, tamaño y fecha, descarga y borrado con
+      confirmación. Está exportado para que lo uses en tus páginas a medida.</p>
+
+      <h2>2. Chatter (colaboración sobre registros)</h2>
+      <p>Contrato: <code>documents/docs/CHATTER.md</code>. Implementación: <code>routes/chatter.rs</code>. Es el equivalente
+      de <code>mail.thread</code> de Odoo, pero con cuatro tablas separadas en <code>core</code> y sin que el módulo escriba
+      una línea.</p>
+<pre class="diagram">Shell &lt;ChatterPanel/&gt;         Gateway (kernel)                     Postgres
+   │ GET/POST /api/core/chatter/…  │                                  │
+   ├──────────────────────────────►│ permiso read del modelo padre    │
+   │                               │ (resuelto vía meta, como files)  │
+   │                               │ INSERT message ─────────────────►│ core.messages
+   │                               │ fan-out síncrono (misma tx) ────►│ core.notifications
+   │                               │ pg_notify('novvus_notify', …)    │
+   │  GET /api/core/stream (SSE) ◄─┤ LISTEN compartido, filtra por    │
+   │◄── evento "notification" ─────┤ org y usuario destinatario       │</pre>
+
+      <h3>Las cuatro tablas</h3>
+      <table>
+        <tr><th>Tabla</th><th>Qué guarda</th></tr>
+        <tr><td><code>core.messages</code></td><td>Hilo por registro (<code>org_id, module_id, model, record_id</code>). <code>kind</code> ∈ <code>comment</code> (visible a quien lee el registro) · <code>note</code> (interna) · <code>system</code> (cambio de campo rastreado o mensaje programático, con <code>meta = {field, old, new}</code>). <code>author_id</code> NULL = sistema/módulo. Adjuntos por ids. Edición solo del autor durante 15 minutos (<code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code>); borrado lógico.</td></tr>
+        <tr><td><code>core.followers</code></td><td>PK <code>(org, module, model, record, user)</code>. Auto-follow: quien comenta se suscribe.</td></tr>
+        <tr><td><code>core.activities</code></td><td>Pendientes con dueño: <code>activity_type</code> ∈ <code>call | meeting | email | todo</code>, <code>summary</code>, <code>due_date</code>, <code>assigned_to</code>, <code>state</code> ∈ <code>open | done | canceled</code>, <code>done_by/done_at</code>, <code>note</code>.</td></tr>
+        <tr><td><code>core.notifications</code></td><td>Buzón por usuario: <code>kind</code> ∈ <code>mention | follower_message | activity_due | activity_assigned</code>, <code>payload</code> (módulo, modelo, registro, id de mensaje, actor, extracto), <code>read_at</code>.</td></tr>
+      </table>
+      <p>Diferencia con <code>core.audit_log</code>: el audit log registra acciones administrativas del kernel (login,
+      habilitar módulos, roles) y es <i>append-only</i>; el chatter registra conversación y cambios de negocio que el
+      módulo <b>declaró</b> con <code>track</code>. Nunca se copian entradas de un plano al otro.</p>
+
+      <h3>Permisos, menciones y fan-out</h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Permiso heredado.</b> Leer el hilo, comentar, seguir y listar
+        actividades exigen el permiso <code>read</code> del modelo padre, que el kernel resuelve desde el meta del módulo
+        (igual que los adjuntos). Editar o borrar un mensaje: solo el autor. Cerrar una actividad: el asignado o
+        quien tenga <code>write</code>.</div></div>
+        <div class="step"><span class="num">2</span><div><b>Menciones.</b> Viajan en el cuerpo como <code>@[user_id]</code>
+        (<code>parse_mentions</code>, <code>chatter.rs:32</code>). El kernel valida que cada usuario es miembro de la org y
+        genera una notificación <code>mention</code> por usuario, sin duplicados. El compositor de la shell inserta
+        <code>@[uuid] (Nombre)</code> para que la persona vea a quién mencionó.</div></div>
+        <div class="step"><span class="num">3</span><div><b>Fan-out síncrono.</b> En la <b>misma transacción</b> del INSERT
+        del mensaje se insertan notificaciones <code>follower_message</code> para cada seguidor (menos el autor y los ya
+        mencionados) y se emite <code>pg_notify('novvus_notify', …)</code>. No pasa por el bus de eventos de módulos: ese
+        bus exige un emisor con <code>emits</code> declarados y el chatter es plano del kernel.</div></div>
+        <div class="step"><span class="num">4</span><div><b>Actividades vencidas.</b> La pasada horaria del kernel
+        (<code>notify_due_activities</code>) crea <code>activity_due</code> para actividades <code>open</code> con
+        <code>due_date</code> pasada, una vez al día por actividad.</div></div>
+      </div>
+
+      <h3>API <code>/api/core/chatter</code></h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Efecto</th></tr>
+        <tr><td><code>GET /chatter/{módulo}/{modelo}/{registro}/messages?cursor=</code></td><td>Hilo con cursor keyset, más nuevo primero → <code>{items, next_cursor}</code>.</td></tr>
+        <tr><td><code>POST …/messages</code> <code>{kind, body, attachment_ids?, mentions?}</code></td><td>Comentario o nota; auto-follow del autor; fan-out. Con token de servicio y <code>x-novvus-org</code>, el módulo dueño puede publicar <code>kind = system</code> sobre sus propios modelos.</td></tr>
+        <tr><td><code>PATCH /chatter/messages/{id}</code> · <code>DELETE</code></td><td>Editar (autor, ≤ 15 min) · borrado lógico (autor).</td></tr>
+        <tr><td><code>GET …/followers</code> · <code>PUT|DELETE …/followers/me</code></td><td>Listar · seguir / dejar de seguir.</td></tr>
+        <tr><td><code>GET|POST …/activities</code></td><td>Pendientes del registro · crear (notifica <code>activity_assigned</code> al asignado).</td></tr>
+        <tr><td><code>POST /chatter/activities/{id}/done</code> · <code>/cancel</code></td><td>Cierra la actividad.</td></tr>
+      </table>
+<pre><code><span class="c"># Comentar mencionando a un compañero</span>
+curl -X POST <span class="s">"http://localhost:8000/api/core/chatter/crm/opportunities/$OPP_ID/messages"</span> \
+  -H <span class="s">"Authorization: Bearer $ACCESS"</span> -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"kind":"comment","body":"@[6f1c…-uuid] ¿revisas la propuesta antes del viernes?"}'</span>
+
+<span class="c"># Nota interna (no genera notificación a seguidores externos al equipo: es kind=note)</span>
+curl -X POST <span class="s">"…/chatter/crm/opportunities/$OPP_ID/messages"</span> -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> -d <span class="s">'{"kind":"note","body":"Cliente sensible al precio."}'</span>
+
+<span class="c"># Planificar una llamada</span>
+curl -X POST <span class="s">"…/chatter/crm/opportunities/$OPP_ID/activities"</span> -H <span class="s">"Authorization: Bearer $ACCESS"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"activity_type":"call","summary":"Llamar para cerrar","due_date":"2026-09-10","assigned_to":"'$USER_ID'"}'</span></code></pre>
+
+      <h3>Tracking de campos y mensajes programáticos desde el SDK</h3>
+      <p>Dos mecanismos, ambos en <code>sdk/src/novvus_sdk/chatter.py</code> (<code>ChatterHelper</code>), ambos
+      <i>best-effort</i>: una caída del chatter nunca rompe la operación de negocio (se registra un <code>warning</code>
+      y se devuelve <code>None</code>).</p>
+<pre><code><span class="c"># 1) Tracking declarativo: la auto-API compara antes/después en cada PATCH</span>
+<span class="k">class</span> Opportunity(NovvusModel):
+    ...
+    __novvus_views__ = {<span class="s">"label"</span>: <span class="s">"Oportunidades"</span>, <span class="s">"chatter"</span>: <span class="k">True</span>, <span class="s">"track"</span>: [<span class="s">"amount"</span>, <span class="s">"stage_id"</span>]}
+<span class="c"># → por cada campo track que cambie, un mensaje system con body "amount: '1000' → '1500'"</span>
+<span class="c">#   y meta {"field": "amount", "old": "1000", "new": "1500"}   (autoapi.py:536-548)</span>
+
+<span class="c"># 2) Mensaje programático desde tu lógica de negocio</span>
+<span class="k">await</span> module.chatter.post(
+    model=<span class="s">"opportunities"</span>, record_id=opportunity.id,
+    body=module._(<span class="s">"Cotización enviada al cliente"</span>),
+    meta={<span class="s">"quote_id"</span>: str(quote.id)},     <span class="c"># kind="system" por defecto</span>
+)</code></pre>
+      <div class="warn"><b>Solo en la auto-API.</b> El tracking automático lo hace <code>update_item</code> de
+      <code>autoapi.py</code>. Si cambias un campo rastreado desde un endpoint custom (por ejemplo
+      <code>/opportunities/{id}/move</code> del CRM), publica tú el mensaje con <code>module.chatter.post</code> o llama a
+      <code>module.chatter.track_changes(resource, record_id, [(campo, viejo, nuevo)])</code>.</div>
+
+      <h3>Qué ve el usuario</h3>
+      <p><code>&lt;ChatterPanel moduleId model recordId&gt;</code> (<code>components/generic/chatter-panel.tsx</code>) aparece
+      bajo el formulario cuando <code>capabilities.chatter</code> es verdadero: cabecera con contador de seguidores y
+      botón Seguir / Dejar de seguir; filtros Todo · Conversación · Cambios; compositor con botón
+      <kbd>@ Mencionar</kbd> (lista de miembros de la org) y casilla "Nota interna" (fondo ámbar); planificador de
+      actividades (tipo, resumen, fecha; las vencidas en rojo; botón ✓ para cerrarlas); línea de tiempo donde los
+      mensajes <code>system</code> se ven punteados con la etiqueta "sistema". El cuerpo se renderiza como texto plano
+      (el render markdown sanitizado está en BACKLOG; nunca HTML crudo). El hilo se refresca cada 30 s como
+      respaldo del SSE.</p>
+
+      <h2>3. Notificaciones y tiempo real</h2>
+      <h3>El buzón</h3>
+      <table>
+        <tr><th>Ruta</th><th>Efecto</th></tr>
+        <tr><td><code>GET /api/core/notifications?unread=1&amp;cursor=</code></td><td><code>{items, next_cursor, unread_count}</code> del usuario autenticado.</td></tr>
+        <tr><td><code>POST /api/core/notifications/read</code> <code>{ids}</code></td><td>Marca leídas.</td></tr>
+        <tr><td><code>POST /api/core/notifications/read-all</code></td><td>Marca todo leído.</td></tr>
+      </table>
+      <p>Retención: las notificaciones <b>leídas</b> con más de 90 días se purgan en la pasada horaria del kernel
+      (<code>main.rs:60-73</code>). Las no leídas se conservan.</p>
+
+      <h3>SSE: <code>GET /api/core/stream?token=</code></h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Autenticación por query param.</b> <code>EventSource</code> no
+        puede enviar cabeceras, así que el JWT de acceso viaja en <code>?token=</code> y se valida exactamente igual que un
+        Bearer (<code>routes/stream.rs:33</code>). Es el mismo token corto de 15 minutos: al rotar, la shell reabre la
+        conexión.</div></div>
+        <div class="step"><span class="num">2</span><div><b>Un LISTEN por proceso.</b> El gateway mantiene una única
+        conexión <code>LISTEN novvus_notify</code> (<code>spawn_notify_listener</code>) y reparte en memoria a las conexiones
+        SSE cuyo <code>org_id</code> y <code>user_id</code> coincidan con el payload <code>{org_id, user_ids, kind, …}</code>.</div></div>
+        <div class="step"><span class="num">3</span><div><b>Heartbeat y reconexión.</b> <code>: ping</code> cada 25 s mantiene
+        vivo el canal a través de proxies; el navegador reconecta solo. Un receptor rezagado simplemente pierde
+        avisos y se reconcilia por polling.</div></div>
+        <div class="step"><span class="num">4</span><div><b>Fallback.</b> La campana consulta
+        <code>/api/core/notifications</code> cada 60 s aunque el SSE funcione (<code>notifications-bell.tsx:44</code>), y el
+        hilo del chatter cada 30 s. Si el SSE cae, nada deja de funcionar: solo tarda más.</div></div>
+      </div>
+<pre><code><span class="c"># Observar el stream desde la terminal (el token es el access JWT)</span>
+curl -N <span class="s">"http://localhost:8000/api/core/stream?token=$ACCESS"</span>
+: ping
+event: notification
+data: {"org_id":"…","user_ids":["…"],"kind":"notification","payload":{…}}</code></pre>
+      <p>En la shell, <code>subscribeNotifications()</code> (<code>lib/chatter.ts:121</code>) mantiene un
+      <code>EventSource</code> singleton compartido por todos los suscriptores, que solo se reemplaza cuando cambia el token
+      de acceso, y escucha el evento <code>notification</code>. <code>NotificationsBell</code> invalida la consulta del buzón
+      al recibirlo; al hacer clic en una notificación la marca leída y navega a
+      <code>/m/{module_id}/{model}/{record_id}</code>.</p>
+      <div class="note"><b>Un detalle de implementación.</b> El contrato prevé también eventos <code>chatter</code> para
+      refrescar hilos abiertos; el kernel reenvía el <code>kind</code> que llegue por <code>pg_notify</code>, pero en v0.1.6 la
+      shell solo se suscribe a <code>notification</code> y refresca los hilos por polling.</div>
+
+      <h3>Qué ve el usuario</h3>
+      <p>Una campana en la barra superior (tanto en la shell de plataforma como dentro de cada
+      <code>ModuleShell</code>) con el contador de no leídas (<code>9+</code> a partir de diez), un panel con las diez más
+      recientes y etiquetas humanas por tipo: "Te mencionaron", "Nuevo mensaje", "Actividad vencida",
+      "Actividad asignada". Enlace "Marcar todo leído".</p>
+
+      <h2>Resumen: cómo se conectan las tres piezas</h2>
+      <table>
+        <tr><th>Quiero…</th><th>Hago…</th></tr>
+        <tr><td>Que un modelo acepte archivos</td><td><code>"attachments": True</code> en <code>__novvus_views__</code>. El panel aparece en el formulario genérico y en cualquier página donde montes <code>AttachmentPanel</code>.</td></tr>
+        <tr><td>Adjuntar desde código</td><td><code>await module.files.attach(model, record_id, filename, content)</code>.</td></tr>
+        <tr><td>Conversación en un registro</td><td><code>"chatter": True</code>. Comentarios, notas, seguidores y actividades vienen de serie.</td></tr>
+        <tr><td>Que los cambios de etapa/importe queden en el hilo</td><td><code>"track": ["stage_id", "amount"]</code> (auto-API) o <code>module.chatter.post()</code> en endpoints custom.</td></tr>
+        <tr><td>Avisar a alguien</td><td>Mencionarlo con <code>@[uuid]</code> en un mensaje o asignarle una actividad: el kernel crea la notificación y la empuja por SSE.</td></tr>
+        <tr><td>Reaccionar desde otro módulo a un comentario</td><td>No es posible por diseño: el chatter no emite eventos al bus de módulos. Usa los eventos de negocio (<code>emits</code>) del módulo dueño.</td></tr>
+      </table>
+
+      <details class="fold"><summary>Ver más: fuera de alcance en v0.1.6</summary>
+        <p>Antivirus, versionado de archivos, URLs presignadas públicas, vista previa de PDF/Office, correo
+        saliente/entrante como canal del chatter, mensajes directos y canales, reacciones, hilos anidados, web
+        push, purga dura de mensajes borrados y limpieza automática de adjuntos huérfanos al borrar el registro
+        padre. Todo documentado en <code>BACKLOG.md</code>; si duele, se prioriza.</p>
+      </details>
+
+      <nav class="page-nav">
+        <a href="vistas-genericas.html"><span class="dir">← Anterior</span>Vistas genéricas y metadatos</a>
+        <a class="next" href="extensibilidad.html"><span class="dir">Siguiente →</span>Extensiones, campos, config y cron</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

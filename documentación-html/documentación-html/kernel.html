@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El kernel por dentro — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav active" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / El kernel por dentro</div>
+    <article>
+      <h1>El kernel por dentro</h1>
+      <span class="level avanzado">Nivel avanzado</span>
+      <p class="lead">El kernel es un workspace de Cargo con siete crates. Esta página lo recorre
+      crate por crate a partir del código real de <code>kernel/crates/</code>: qué expone cada uno,
+      qué reglas valida, qué constantes gobiernan su comportamiento y qué variables de entorno lo
+      configuran. Está pensada para quien ya construyó un módulo y quiere entender qué pasa del otro
+      lado de los headers <code>X-Novvus-*</code>.</p>
+
+      <h2>El workspace y sus dependencias</h2>
+      <p><code>kernel/Cargo.toml</code> declara los siete miembros con <code>resolver = "2"</code>,
+      versión de workspace <code>0.1.0</code> y dependencias compartidas (axum 0.8 con
+      <code>multipart</code>, sqlx 0.8 con <code>runtime-tokio</code>/<code>postgres</code>/<code>migrate</code>,
+      tokio, tower-http con <code>trace</code>+<code>cors</code>, jsonwebtoken 9, argon2 0.5,
+      ed25519-dalek 2, object_store 0.11 con <code>aws</code>, semver, toml 0.8, uuid con
+      <code>v7</code>).</p>
+<pre class="diagram">
+                        ┌──────────────────┐
+                        │  novvus-gateway  │  binario (main.rs) + lib (build_router)
+                        └───┬──┬──┬──┬──┬──┘
+        ┌───────────────────┘  │  │  │  └───────────────────┐
+        ▼                      ▼  │  ▼                      ▼
+┌───────────────┐  ┌───────────┐ │ ┌───────────────┐  ┌──────────────┐
+│novvus-identity│  │novvus-rbac│ │ │novvus-registry│  │ novvus-files │
+│ argon2        │  │           │ │ │ ed25519-dalek │  │ object_store │
+│ jsonwebtoken  │  │           │ │ │ semver · toml │  │              │
+└───────┬───────┘  └─────┬─────┘ │ └───────┬───────┘  └──────┬───────┘
+        │                │       ▼         │                 │
+        │                │ ┌─────────────┐ │                 │
+        │                │ │novvus-events│ │                 │
+        │                │ │ reqwest     │ │                 │
+        │                │ └──────┬──────┘ │                 │
+        └────────────────┴────────┴────────┴─────────────────┘
+                                  ▼
+                         ┌────────────────┐
+                         │  novvus-common │  config · error · ids · internal · audit · telemetry
+                         │  axum · hmac   │  (todos los demás dependen de él)
+                         └────────────────┘
+</pre>
+      <p>Solo el gateway depende de los seis restantes; ninguno de los crates de dominio depende de
+      otro crate de dominio (todos bajan a <code>novvus-common</code>). El gateway también reexporta
+      <code>MIGRATOR</code>, las migraciones de <code>kernel/migrations</code> embebidas en tiempo de
+      compilación con <code>sqlx::migrate!</code>, y las aplica en <code>init()</code> antes de construir
+      el estado.</p>
+
+      <h2>novvus-common</h2>
+      <p>Módulos: <code>audit</code>, <code>config</code>, <code>error</code>, <code>ids</code>,
+      <code>internal</code>, <code>telemetry</code>.</p>
+      <h3>Configuración (<code>config.rs</code>)</h3>
+      <p><code>Config::from_env()</code> lee variables con defaults de desarrollo. La tabla completa está
+      al final de la página; tres detalles de diseño:</p>
+      <ul>
+        <li>Las listas (<code>NOVVUS_CORS_ORIGINS</code>, <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code>) se parten por coma, se recortan y se descartan vacíos; lista vacía = función deshabilitada.</li>
+        <li><code>NOVVUS_BOOTSTRAP_TOKEN</code> deliberadamente <strong>no tiene default</strong>: <code>None</code> desactiva el modo bootstrap (fail-closed).</li>
+        <li>Un TTL no numérico cae al default (<code>parse().unwrap_or(...)</code>): 900 s access, 1 209 600 s (14 días) refresh.</li>
+      </ul>
+      <h3>Errores (<code>error.rs</code>)</h3>
+      <p>Todo handler devuelve <code>AppResult&lt;T&gt;</code>. <code>AppError</code> se serializa como
+      <code>{"error": {"code", "message"}}</code>; los internos (<code>Database</code>, <code>Internal</code>)
+      se loguean y responden "internal error" sin filtrar detalle.</p>
+      <table>
+        <tr><th>Variante</th><th>Código</th><th>HTTP</th></tr>
+        <tr><td><code>Validation</code></td><td><code>validation_error</code></td><td>422</td></tr>
+        <tr><td><code>Unauthorized</code></td><td><code>unauthorized</code></td><td>401</td></tr>
+        <tr><td><code>Forbidden</code></td><td><code>forbidden</code></td><td>403</td></tr>
+        <tr><td><code>NotFound</code></td><td><code>not_found</code></td><td>404</td></tr>
+        <tr><td><code>Conflict</code></td><td><code>conflict</code></td><td>409</td></tr>
+        <tr><td><code>PayloadTooLarge</code></td><td><code>payload_too_large</code></td><td>413</td></tr>
+        <tr><td><code>ServiceUnavailable</code></td><td><code>service_unavailable</code></td><td>503</td></tr>
+        <tr><td><code>RateLimited</code></td><td><code>rate_limited</code></td><td>429</td></tr>
+        <tr><td><code>Database</code> / <code>Internal</code></td><td><code>internal_error</code></td><td>500</td></tr>
+      </table>
+      <h3>Identificadores, firma interna y auditoría</h3>
+      <ul>
+        <li><code>ids::new_id()</code> → <code>Uuid::now_v7()</code>: UUIDv7 generado por la aplicación, ordenable por tiempo.</li>
+        <li><code>internal.rs</code> define los headers <code>x-novvus-user/org/perms/timestamp/signature</code> y <code>x-novvus-locale</code> (informativo), <code>DEFAULT_LOCALE = "es-MX"</code>, <code>MAX_SKEW_SECONDS = 60</code>, y las funciones <code>sign</code>/<code>verify</code> sobre la cadena canónica <code>user\norg\nperms\ntimestamp\nmethod\npath</code> (HMAC-SHA256 hex, verificación en tiempo constante).</li>
+        <li><code>audit::record</code> inserta en <code>core.audit_log</code> de forma best-effort: un fallo de auditoría se loguea pero jamás rompe la acción principal.</li>
+      </ul>
+
+      <h2>novvus-identity</h2>
+      <p>Módulos: <code>jwt</code>, <code>password</code>, <code>service</code>, <code>orgs</code>.</p>
+      <table>
+        <tr><th>Flujo</th><th>Qué hace el código (<code>service.rs</code>)</th></tr>
+        <tr><td><code>register</code></td><td>Normaliza el email (trim + minúsculas; debe contener <code>@</code> y medir 5–254), exige contraseña ≥ 8 y <code>display_name</code>; hashea con Argon2id; email duplicado → 409. Audita <code>auth.register</code>.</td></tr>
+        <tr><td><code>login</code></td><td>Busca <code>id, password_hash</code> por email con <code>is_active</code>. Si no existe ejecuta <code>dummy_verify()</code> (quema el mismo CPU) y responde el mismo 401 "invalid credentials". Resuelve la org: la pedida (debe existir membresía) o la de la membresía más antigua, o <code>None</code>. Emite el par y audita <code>auth.login</code>.</td></tr>
+        <tr><td><code>issue_pair</code></td><td>Access con <code>roles</code> informativos y refresh sin roles, ambos con <code>jti</code> UUIDv7. Persiste <code>sha256(refresh)</code> en <code>core.refresh_tokens</code> con <code>id = jti</code>.</td></tr>
+        <tr><td><code>refresh</code></td><td>Decodifica con <code>typ=refresh</code>, busca el hash. Si <code>revoked_at</code> o <code>replaced_by</code> no son nulos: <strong>detección de reuso</strong> → revoca todos los refresh vivos del usuario, audita <code>auth.refresh_reuse</code> y responde 401. Si expiró → 401. Si es válido: emite par nuevo (permite cambiar de org si hay membresía) y marca el presentado como rotado con <code>replaced_by</code>.</td></tr>
+        <tr><td><code>logout</code></td><td>Acepta refresh expirados (<code>decode_token_allow_expired</code>: firma y <code>typ</code> siguen verificándose) y marca <code>revoked_at</code>.</td></tr>
+      </table>
+      <ul>
+        <li><strong>JWT</strong> (<code>jwt.rs</code>): HS256, claims <code>sub, org_id?, roles, typ, jti, iat, exp</code>; <code>decode_token</code> valida <code>exp</code> con leeway de 5 s y siempre compara <code>typ</code>.</li>
+        <li><strong>Argon2id</strong> (<code>password.rs</code>): 19 456 KiB, t=2, p=1, tag 32 bytes, versión 0x13, salt aleatorio de <code>OsRng</code>; el hash almacenado es una cadena PHC que empieza por <code>$argon2id$</code>.</li>
+        <li><strong>Orgs</strong>: crear una organización crea también el rol de sistema <code>Owner</code> con <code>*</code> y lo asigna al creador; <code>GET /api/core/me</code> devuelve identidad, org activa, roles y permisos efectivos.</li>
+      </ul>
+
+      <h2>novvus-rbac</h2>
+      <p>Módulos: <code>cache</code>, <code>service</code>; funciones públicas <code>grant_matches</code> e
+      <code>is_allowed</code>.</p>
+<pre><code><span class="c">// lib.rs — un grant satisface una key requerida si:</span>
+granted == <span class="s">"*"</span> || granted == required
+|| (granted termina en <span class="s">".*"</span> &amp;&amp; required empieza por ese prefijo <span class="k">seguido de '.'</span>)</code></pre>
+      <p>Por eso <code>crm.*</code> cubre <code>crm.contacts.read</code> pero <code>crm.con.*</code> no: el
+      comodín corta por segmento completo. Los endpoints siempre piden keys concretas.</p>
+      <p><code>RbacCache</code> guarda <code>(user_id, org_id) → Arc&lt;HashSet&lt;String&gt;&gt;</code> con TTL
+      de 30 s. La consulta une <code>memberships → membership_roles → role_permissions → permissions</code>.
+      <code>service.rs</code> llama <code>invalidate_org</code> al mutar roles/permisos e
+      <code>invalidate_user</code> al mutar membresías, así la revocación es efectiva en la siguiente
+      petición. El gateway expone <code>require_perm</code>, <code>has_perm</code> (gating campo a
+      campo) y <code>perms_header_value</code> (lista ordenada y separada por comas para
+      <code>X-Novvus-Perms</code>).</p>
+      <p>Catálogo sembrado por el kernel en <code>0001_core.sql</code> y <code>0010_custom_fields.sql</code>:
+      <code>*</code>, <code>core.orgs.read/manage</code>, <code>core.members.manage</code>,
+      <code>core.roles.read/manage</code>, <code>core.modules.read/manage</code>, <code>core.audit.read</code>,
+      <code>core.custom_fields.manage</code>.</p>
+
+      <h2>novvus-registry</h2>
+      <p>Módulos: <code>manifest</code>, <code>lifecycle</code>, <code>migrations</code>, <code>meta</code>,
+      <code>org_lifecycle</code>, <code>resolver</code>, <code>config</code>, <code>catalog</code>,
+      <code>package</code>.</p>
+      <h3>Parseo y validación del manifiesto (<code>manifest.rs</code>)</h3>
+      <p><code>Manifest::parse(toml)</code> deserializa con serde (secciones opcionales con
+      <code>#[serde(default)]</code>) y luego <code>validate()</code> aplica estas reglas; cualquier
+      fallo rechaza el manifiesto completo con 422:</p>
+      <table>
+        <tr><th>Elemento</th><th>Regla real</th></tr>
+        <tr><td><code>module.id</code></td><td><code>^[a-z][a-z0-9_]{1,31}$</code> (2–32 caracteres) y no reservado: <code>core</code>, <code>api</code>, <code>internal</code>, <code>novvus</code>.</td></tr>
+        <tr><td><code>module.name</code> / <code>version</code></td><td>Nombre no vacío; versión SemVer válida.</td></tr>
+        <tr><td><code>[[permissions]] key</code></td><td>Tres segmentos no vacíos y el primero igual al id del módulo.</td></tr>
+        <tr><td><code>[events] emits</code></td><td><code>{id}.{entity}.{action}</code> con segmentos <code>[a-z0-9_]</code>; <code>listens</code> solo exige tres segmentos no vacíos (puede ser de otro módulo).</td></tr>
+        <tr><td><code>[dependencies] modules</code></td><td><code>"crm"</code> o <code>"crm&gt;=1.0"</code> (semver <code>VersionReq</code>); un módulo no puede depender de sí mismo.</td></tr>
+        <tr><td><code>[dependencies] service_permissions</code></td><td>Tres segmentos y jamás <code>core.*</code>.</td></tr>
+        <tr><td><code>[presentation]</code></td><td><code>icon</code> es slug <code>[a-z0-9-]</code> (≤ 48); <code>website</code> debe ser <code>http(s)://</code>.</td></tr>
+        <tr><td><code>[ui]</code></td><td>Toda <code>path</code> (<code>entry</code>, <code>nav</code>, <code>dashboard</code>, <code>settings</code>) es <code>/{id}</code> o empieza por <code>/{id}/</code> (<code>valid_ui_path</code>); iconos slug; <code>permission</code> en el namespace <code>{id}.*</code>.</td></tr>
+        <tr><td><code>[[config]]</code></td><td><code>key</code> = <code>{id}.{…}</code> sin duplicados; tipo ∈ <code>string|number|boolean|select</code>; <code>select</code> exige <code>options</code>; el <code>default</code> debe coincidir con el tipo (y estar entre las opciones); <code>permission</code> del namespace del módulo o exactamente <code>core.modules.manage</code>.</td></tr>
+        <tr><td><code>[[cron]]</code></td><td><code>name</code> = <code>{id}.{…}</code> (≥ 2 segmentos, sin duplicados); <code>interval_seconds ≥ 1</code>.</td></tr>
+        <tr><td><code>[extensions]</code></td><td>Máximo 32 campos (<code>MAX_EXT_FIELDS</code>); <code>target</code> = <code>{módulo}.{modelo}</code> de un módulo declarado en <code>dependencies</code> y distinto del propio; nombre <code>^[a-z][a-z0-9_]{0,63}$</code>; tipo ∈ <code>string|text|integer|decimal|boolean|date|datetime</code>; <code>label</code> obligatorio; <code>ui.target</code> termina en <code>.form</code>, referencia solo campos declarados, <code>slot</code> = <code>after:{campo}</code> o <code>section:end</code>.</td></tr>
+      </table>
+      <h3>Ciclo de vida (<code>lifecycle.rs</code>)</h3>
+      <table>
+        <tr><th>Función</th><th>Detalle del código</th></tr>
+        <tr><td><code>register</code></td><td>Valida manifiesto y versiones de migración (<code>NNNN_snake_case</code>, 6–128 chars). En una transacción: upsert en <code>core.modules</code> (estado <code>registered</code> solo en inserción; el re-registro conserva el estado), compara checksum de cada fuente contra <code>core.module_migrations</code> (cambio en una aplicada → 409), upsert en <code>module_migration_sources</code>, y reemplaza las filas de <code>core.model_extensions</code> del extensor comprobando el tope de 16 extensores por modelo (<code>MAX_EXTENDERS_PER_MODEL</code>).</td></tr>
+        <tr><td><code>install</code></td><td>Solo desde <code>registered</code>. <code>ensure_module_role</code> crea o ajusta <code>novvus_module</code> (<code>LOGIN PASSWORD … NOBYPASSRLS</code>, tolerando carreras) y hace <code>GRANT novvus_module TO CURRENT_USER</code>; <code>CREATE SCHEMA IF NOT EXISTS mod_{id}</code> + <code>GRANT USAGE, CREATE</code>; aplica migraciones; registra permisos y jobs de cron; genera el token de servicio <code>nvk_</code> + 64 hex (32 bytes de <code>OsRng</code>) y guarda solo su SHA-256. El token en claro se devuelve <strong>una sola vez</strong>.</td></tr>
+        <tr><td><code>migrate</code></td><td>Cualquier estado salvo <code>registered</code>; aplica pendientes y audita si aplicó algo.</td></tr>
+        <tr><td><code>enable</code></td><td>Desde <code>installed</code> o <code>disabled</code>. Cada dependencia debe estar registrada, <code>enabled</code> y satisfacer el <code>VersionReq</code>.</td></tr>
+        <tr><td><code>disable</code></td><td>Solo desde <code>enabled</code>.</td></tr>
+        <tr><td><code>uninstall</code></td><td>Exige <code>confirm=true</code> (body JSON <code>{"confirm": true}</code> en la ruta); permitido desde <code>disabled</code> y también desde <code>registered</code>. <code>DROP SCHEMA IF EXISTS mod_{id} CASCADE</code>, borra permisos y la fila de <code>core.modules</code> (cascada a migraciones, fuentes, deliveries, extensiones, cron).</td></tr>
+        <tr><td><code>handshake</code></td><td>Compara el hash del token de servicio; exige estado <code>installed</code> o <code>enabled</code>; <code>base_url</code> debe ser http(s); si viene <code>meta</code> lo valida (un meta inválido rechaza todo el handshake; sin meta conserva el anterior). Guarda <code>base_url</code> sin barra final y responde <code>internal_hmac_secret</code>, el DSN reescrito para <code>novvus_module</code> (<code>module_dsn</code>) y <code>schema</code>.</td></tr>
+      </table>
+      <h3>Corredor de migraciones (<code>migrations.rs</code>)</h3>
+<pre><code><span class="c">-- por cada migración pendiente, en su propia transacción:</span>
+<span class="k">SET LOCAL ROLE</span> novvus_module;
+<span class="k">SET LOCAL</span> search_path = mod_{id};
+<span class="c">-- … el SQL del módulo (raw_sql, puede tener varias sentencias) …</span>
+<span class="k">RESET ROLE</span>;
+<span class="k">INSERT INTO</span> core.module_migrations (module_id, version, checksum) <span class="k">VALUES</span> ($1, $2, $3);
+<span class="k">COMMIT</span>;</code></pre>
+      <p>Antes de aplicar, <code>apply_pending</code> busca <em>drift</em>: cualquier migración ya
+      aplicada cuya fuente tenga otro checksum aborta con 409 ("applied migrations were modified").
+      Aplicación y registro comparten transacción: o ambas ocurren o ninguna. El checksum es
+      SHA-256 hex del SQL.</p>
+      <h3>Meta, ciclo por organización, resolver y catálogo</h3>
+      <ul>
+        <li><code>meta.rs</code>: tipos serde con <code>deny_unknown_fields</code>; <code>MAX_META_BYTES = 512 KiB</code> (inclusive); los permisos del meta se validan contra el namespace del módulo.</li>
+        <li><code>org_lifecycle.rs</code>: filas de <code>core.org_modules</code> (<code>installed</code>/<code>enabled</code>/<code>disabled</code>); <code>enable</code> exige dependencias habilitadas para la misma org; <code>disable</code>/<code>uninstall</code> se bloquean si otro módulo habilitado de la org lo requiere; <code>uninstall</code> borra la fila y nada más.</li>
+        <li><code>resolver.rs</code>: función pura sobre un mapa de nodos; DFS con marcas <code>Visiting/Done</code> que produce <code>enable_order</code> (post-orden, solo módulos <code>instance_ready</code>), <code>satisfied</code> y <code>problems</code> (<code>missing</code>, <code>unavailable</code>, <code>version_conflict</code>, <code>cycle</code> con miembros a partir del inicio del ciclo).</li>
+        <li><code>package.rs</code>: <code>ModulePackage {format_version, manifest_toml, migrations, assets}</code> con bytes canónicos (migraciones y assets ordenados); <code>SignedPackage::verify</code> exige que la clave pública esté en el allowlist <em>y</em> que la firma Ed25519 (64 bytes) valide. Lista vacía rechaza todo.</li>
+        <li><code>config.rs</code>: esquema + valores efectivos por org con gating de permiso por campo y enmascarado de <code>secret</code>.</li>
+      </ul>
+
+      <h2>novvus-events</h2>
+      <p>Módulos: <code>publish</code>, <code>dispatcher</code>, <code>cron</code>, <code>backoff</code>.
+      Constantes: <code>CHANNEL = "novvus_events"</code>, <code>DELIVERY_PATH = "/_novvus/events"</code>,
+      <code>CRON_PATH = "/_novvus/cron"</code>.</p>
+      <table>
+        <tr><th>Pieza</th><th>Comportamiento</th></tr>
+        <tr><td><code>publish</code></td><td>Comprueba con <code>manifest-&gt;'events'-&gt;'emits' ? $2</code> que el emisor declara el tipo (404 si no está registrado, 403 si no lo declara). En una transacción inserta el evento, una delivery por módulo <code>enabled</code> <em>o</em> <code>disabled</code> que lo tenga en <code>listens</code>, y <code>pg_notify</code>; org inexistente → 404.</td></tr>
+        <tr><td><code>Dispatcher</code></td><td>Abre un <code>PgListener</code> sobre <code>novvus_events</code>. Bucle: drena lotes de 20 deliveries vencidas (<code>FOR UPDATE OF d SKIP LOCKED</code>, solo módulos <code>enabled</code> con <code>base_url</code>) y luego espera NOTIFY o 5 s. POST firmado con <code>user=""</code>, <code>perms=""</code>, timeout HTTP 10 s. Éxito → <code>delivered</code>; fallo → <code>attempts+1</code>, <code>next_retry_at = now() + backoff</code>, y <code>failed</code> al llegar a 25 intentos.</td></tr>
+        <tr><td><code>backoff_seconds</code></td><td><code>base^min(attempts,4)</code> acotado a [1, 300] s; base por defecto 4 (los tests usan 1).</td></tr>
+        <tr><td><code>CronScheduler</code></td><td>Cada 5 s: <code>provision()</code> inserta una fila en <code>core.cron_runs</code> por job × org con el módulo <code>enabled</code> (<code>ON CONFLICT DO NOTHING</code>, vencimiento inmediato) y procesa lotes de 20 filas vencidas (<code>status='pending'</code>, módulo <code>enabled</code> en instancia y en la org, con <code>base_url</code>). POST <code>{name, org_id}</code> a <code>/_novvus/cron</code> firmado con el tenant. Éxito → <code>next_run_at = now() + interval</code>, <code>attempts = 0</code>, <code>last_status='ok'</code>; fallo → mismo backoff, <code>last_status='error'</code>.</td></tr>
+      </table>
+      <p>Los <strong>hooks de ciclo de vida</strong> viven en el gateway (<code>hooks.rs</code>), no en este
+      crate: <code>hooks::fire</code> hace <code>POST /_novvus/hooks/{on_install|on_enable|on_disable|on_uninstall}</code>
+      con la misma firma y es best-effort (loguea y nunca revierte la transición).</p>
+
+      <h2>novvus-files</h2>
+      <p>Módulos: <code>config</code>, <code>storage</code>. Un <code>FileStorage</code> envuelve un
+      <code>Arc&lt;dyn ObjectStore&gt;</code>: <code>LocalFileSystem</code> con prefijo o
+      <code>AmazonS3Builder</code> (bucket, región default <code>us-east-1</code>, endpoint opcional con
+      <code>allow_http</code> si empieza por <code>http://</code>, credenciales opcionales).</p>
+<pre class="diagram">
+Layout de objetos:
+  org/{org_id}/{sha[0..2]}/{sha[2..4]}/{sha256}   contenido definitivo
+  org/{org_id}/tmp/{uuidv7}                       staging de subida
+
+Subida (orquestada por routes/files.rs):
+  stash()  ─ stream al staging, SHA-256 y tamaño al vuelo; supera max → borra y 413
+  BEGIN
+    attach_blob()  ─ upsert core.attachment_blobs (org, sha256) refcount+1 → ¿nuevo?
+    cuota          ─ SUM(size_bytes) de blobs de la org &gt; quota → rollback y 413
+    INSERT core.attachments
+  COMMIT
+  promote_or_discard() ─ copia tmp → clave definitiva si es nuevo; borra tmp siempre
+</pre>
+      <p><code>gc(retention_days)</code> recorre en lotes de 500 los adjuntos con
+      <code>deleted_at &lt; now() − retención</code>, borra la fila y llama <code>release_blob</code>
+      (refcount−1; al llegar a 0 borra la fila del blob y el objeto físico). Es idempotente; un
+      objeto que no se pudo borrar solo deja un warning.</p>
+
+      <h2>novvus-gateway</h2>
+      <p>Módulos: <code>extract</code>, <code>hooks</code>, <code>proxy</code>, <code>rate_limit</code>,
+      <code>routes</code> (auth, orgs, roles, modules, meta, files, extensions, custom_fields, chatter,
+      stream, catalog, events, health), <code>state</code>.</p>
+      <h3>Arranque (<code>main.rs</code>)</h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><code>dotenvy</code> + <code>telemetry::init("info")</code>; <code>Config::from_env()</code>.</div></div>
+        <div class="step"><span class="num">2</span><div><code>init()</code>: pool de <strong>10 conexiones</strong>, <code>MIGRATOR.run</code> (migraciones core), <code>AppState::new</code> (caché RBAC, cliente reqwest con timeout 30 s, rate limiter, <code>FileStorage</code>, canal broadcast de 256 para SSE).</div></div>
+        <div class="step"><span class="num">3</span><div>Tareas de fondo: <code>Dispatcher</code>, listener de <code>novvus_notify</code> para SSE, <code>CronScheduler</code>, y un ticker <strong>horario</strong> que ejecuta GC de adjuntos, purga de definiciones de campos custom borradas hace &gt; 30 días, notificaciones <code>activity_due</code> (una por día por actividad) y purga de notificaciones leídas hace &gt; 90 días.</div></div>
+        <div class="step"><span class="num">4</span><div><code>axum::serve</code> en <code>NOVVUS_BIND_ADDR</code> con <code>ConnectInfo&lt;SocketAddr&gt;</code> (necesario para el rate limit por IP) y apagado gracioso con Ctrl+C / SIGTERM.</div></div>
+      </div>
+      <h3>Router por grupos (<code>lib.rs::build_router</code>)</h3>
+      <table>
+        <tr><th>Grupo</th><th>Rutas</th><th>Actor</th></tr>
+        <tr><td>Salud</td><td><code>GET /health</code>, <code>GET /metrics</code> (texto: requests totales, 4xx, 5xx, uptime)</td><td>público</td></tr>
+        <tr><td>Auth</td><td><code>POST /api/core/auth/{register,login,refresh,logout}</code> (con <code>rate_limit_middleware</code>), <code>GET /api/core/me</code></td><td>público / <code>AuthUser</code></td></tr>
+        <tr><td>Orgs y RBAC</td><td><code>/orgs</code>, <code>/orgs/{org}/members</code>, <code>/roles</code>, <code>/roles/{id}/permissions</code>, <code>/roles/{id}/assign</code>, <code>/permissions</code></td><td><code>AuthUser</code> + <code>core.members.manage</code> / <code>core.roles.*</code></td></tr>
+        <tr><td>Ciclo por org</td><td><code>/orgs/{org}/modules/{id}/{plan,install,enable,disable,uninstall,config}</code>; <code>GET/PUT /config</code> (servicio)</td><td><code>AuthUser</code> con <code>auth.org == org</code> / <code>ServiceModule</code></td></tr>
+        <tr><td>Ciclo de instancia</td><td><code>GET/POST /modules</code>, <code>/modules/{id}/{install,migrate,enable,disable,uninstall}</code>, <code>/modules/handshake</code>, <code>/modules/status</code></td><td><code>PlatformActor</code> (usuario con <code>core.modules.manage</code> o bootstrap); handshake/status con <code>ServiceModule</code></td></tr>
+        <tr><td>Meta</td><td><code>GET /meta</code>, <code>GET /meta/{module}</code> (ETag, <code>private, max-age=60</code>)</td><td><code>AuthUser</code></td></tr>
+        <tr><td>Archivos</td><td><code>GET/POST /files</code>, <code>GET/DELETE /files/{id}</code></td><td><code>OrgActor</code></td></tr>
+        <tr><td>Extensiones y campos</td><td><code>GET /extensions</code>; <code>GET/POST /custom-fields</code>, <code>GET /custom-fields/service</code>, <code>PATCH/DELETE /custom-fields/{id}</code></td><td>servicio / <code>AuthUser</code> (+ <code>core.custom_fields.manage</code>)</td></tr>
+        <tr><td>Chatter y tiempo real</td><td><code>/chatter/{module}/{model}/{record}/{messages,followers,followers/me,activities}</code>, <code>/chatter/messages/{id}</code>, <code>/chatter/activities/{id}/{action}</code>, <code>/notifications</code>, <code>/notifications/{read,read-all}</code>, <code>GET /stream</code></td><td><code>OrgActor</code> / <code>AuthUser</code>; <code>/stream</code> con <code>?token=</code></td></tr>
+        <tr><td>Catálogo y bus</td><td><code>GET/POST /catalog</code>, <code>POST /catalog/{id}/register</code>, <code>POST /events</code></td><td><code>core.modules.read</code> / <code>core.modules.manage</code>; eventos con <code>ServiceModule</code></td></tr>
+        <tr><td>Proxy</td><td><code>ANY /api/{module_id}</code> y <code>/api/{module_id}/{*rest}</code></td><td>JWT o token de servicio (ver <code>proxy.rs</code>)</td></tr>
+      </table>
+      <p>Capas globales: <code>metrics_middleware</code> y <code>TraceLayer</code>; <code>CorsLayer</code>
+      solo si <code>NOVVUS_CORS_ORIGINS</code> no está vacío (orígenes explícitos, métodos y headers
+      <code>Any</code>). El inventario ruta por ruta está en <a href="api.html">La API</a>.</p>
+      <h3>Rate limit de <code>/auth</code> (<code>rate_limit.rs</code>)</h3>
+      <p>Ventana fija de 60 s por IP, en memoria (<code>Mutex&lt;HashMap&lt;IpAddr, (u32, Instant)&gt;&gt;</code>),
+      límite <code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE</code> (default <strong>30</strong>). Al superar 10 000
+      entradas se limpian las ventanas vencidas. Se reinicia con el proceso: es un freno básico contra
+      fuerza bruta, no un contador distribuido. Sin <code>ConnectInfo</code> la IP cae a <code>0.0.0.0</code>.</p>
+      <h3>Extractores de actor (<code>extract.rs</code>)</h3>
+      <table>
+        <tr><th>Extractor</th><th>Fuente</th><th>Uso</th></tr>
+        <tr><td><code>AuthUser</code></td><td><code>Authorization: Bearer</code> con <code>typ=access</code>; <code>org()</code> falla con 403 si el token no tiene org activa.</td><td>Todo endpoint tenant de usuario.</td></tr>
+        <tr><td><code>PlatformActor</code></td><td>Si viene <code>x-novvus-bootstrap-token</code>: exige <code>NOVVUS_BOOTSTRAP_TOKEN</code> configurado y comparación en tiempo constante de los SHA-256 de ambos; si no viene, cae a <code>AuthUser</code>. <code>require_modules_manage</code> pasa RBAC al usuario y acepta al bootstrap sin más.</td><td>Solo los seis endpoints de ciclo de instancia; <code>actor_id()</code> es <code>None</code> para bootstrap en auditoría.</td></tr>
+        <tr><td><code>ServiceModule</code></td><td><code>x-novvus-service-token</code> → SHA-256 → <code>core.modules.service_token_hash</code>.</td><td>Handshake, status, emisión de eventos, config de servicio, extensiones, campos custom de servicio.</td></tr>
+        <tr><td><code>OrgActor</code></td><td><code>User(AuthUser)</code> o <code>Service{module_id, org}</code> (token + <code>x-novvus-org</code>). <code>allow(module, perm)</code>: usuarios pasan RBAC; un módulo solo puede actuar sobre <em>sus propios</em> modelos.</td><td>Archivos y chatter.</td></tr>
+      </table>
+      <h3>Proxy (<code>proxy.rs</code>)</h3>
+      <p><code>resolve_caller</code> distingue módulo llamante (token de servicio + <code>x-novvus-org</code>
+      obligatorio; permisos = <code>service_permissions</code> del manifiesto; usuario vacío) de usuario
+      final (JWT + permisos vivos de la caché). <code>resolve_locale</code> toma <code>x-novvus-locale</code>
+      si es una etiqueta BCP-47 bien formada (segmentos de 2–8 alfanuméricos unidos por <code>-</code>),
+      si no el primer tag de <code>Accept-Language</code>, y si no <code>es-MX</code>. Comprobaciones de
+      módulo <code>enabled</code> + <code>base_url</code> ocurren <em>antes</em> de validar credenciales.
+      Un runtime inalcanzable responde 503; el cuerpo de la respuesta se lee completo antes de
+      reenviarlo (sin streaming).</p>
+      <h3>SSE (<code>routes/stream.rs</code>)</h3>
+      <p><code>GET /api/core/stream?token=</code> decodifica el access token, exige org activa y se
+      suscribe al canal broadcast. Cada conexión filtra en memoria por <code>org_id == org &amp;&amp;
+      user_ids.contains(user)</code>; los receptores rezagados descartan (la shell reconcilia con
+      polling). Keep-alive <code>: ping</code> cada 25 s. <code>spawn_notify_listener</code> mantiene una
+      sola conexión <code>LISTEN novvus_notify</code> por proceso, parsea <code>{org_id, user_ids, kind}</code>
+      y reconecta con espera de 5 s si se cae.</p>
+
+      <h2>Variables de entorno del kernel</h2>
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>Dónde se lee / efecto</th></tr>
+        <tr><td><code>DATABASE_URL</code></td><td><code>postgres://novvus:…@localhost:5432/novvus</code></td><td><code>Config</code>; también base del DSN que reciben los módulos (<code>module_dsn</code> sustituye credenciales por <code>novvus_module</code>).</td></tr>
+        <tr><td><code>NOVVUS_BIND_ADDR</code></td><td><code>0.0.0.0:8000</code></td><td>Dirección de escucha del gateway.</td></tr>
+        <tr><td><code>NOVVUS_JWT_ACCESS_SECRET</code></td><td>valor de desarrollo</td><td>Firma HS256 de access tokens. Cambiar en producción.</td></tr>
+        <tr><td><code>NOVVUS_JWT_REFRESH_SECRET</code></td><td>valor de desarrollo</td><td>Firma HS256 de refresh tokens. Distinto del anterior.</td></tr>
+        <tr><td><code>NOVVUS_ACCESS_TOKEN_TTL_SECONDS</code></td><td><code>900</code></td><td>15 minutos.</td></tr>
+        <tr><td><code>NOVVUS_REFRESH_TOKEN_TTL_SECONDS</code></td><td><code>1209600</code></td><td>14 días.</td></tr>
+        <tr><td><code>NOVVUS_INTERNAL_HMAC_SECRET</code></td><td>valor de desarrollo</td><td>Firma de headers internos; entregado a los módulos en el handshake.</td></tr>
+        <tr><td><code>NOVVUS_MODULE_DB_PASSWORD</code></td><td><code>novvus_module_dev_password</code></td><td>Contraseña del rol <code>novvus_module</code> (creado/ajustado en <code>install</code>).</td></tr>
+        <tr><td><code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE</code></td><td><code>30</code></td><td>Peticiones por IP y minuto en <code>/api/core/auth/*</code>.</td></tr>
+        <tr><td><code>NOVVUS_CORS_ORIGINS</code></td><td>vacío (CORS deshabilitado)</td><td>Lista separada por comas.</td></tr>
+        <tr><td><code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code></td><td>vacío (publicar deshabilitado)</td><td>Claves públicas Ed25519 en base64, separadas por comas.</td></tr>
+        <tr><td><code>NOVVUS_BOOTSTRAP_TOKEN</code></td><td><em>sin default</em></td><td>Habilita <code>PlatformActor::Bootstrap</code>; vacío = deshabilitado.</td></tr>
+        <tr><td><code>NOVVUS_FILES_BACKEND</code></td><td><code>local</code></td><td><code>FilesConfig</code>: <code>local</code> | <code>s3</code>.</td></tr>
+        <tr><td><code>NOVVUS_FILES_LOCAL_ROOT</code></td><td><code>./data/files</code></td><td>Raíz del backend local (se crea si no existe).</td></tr>
+        <tr><td><code>NOVVUS_FILES_S3_BUCKET</code> / <code>_ENDPOINT</code> / <code>_REGION</code> / <code>_ACCESS_KEY</code> / <code>_SECRET_KEY</code></td><td>—</td><td>Backend S3-compatible (MinIO/R2); el bucket es obligatorio con <code>s3</code>.</td></tr>
+        <tr><td><code>NOVVUS_FILES_MAX_SIZE_BYTES</code></td><td><code>52428800</code> (50 MB)</td><td>Límite por archivo; se corta el stream al superarlo.</td></tr>
+        <tr><td><code>NOVVUS_FILES_ORG_QUOTA_BYTES</code></td><td><code>10737418240</code> (10 GB)</td><td>Cuota por organización, medida sobre blobs (tras dedup).</td></tr>
+        <tr><td><code>NOVVUS_FILES_GC_RETENTION_DAYS</code></td><td><code>30</code></td><td>Retención de borrados lógicos antes del GC horario.</td></tr>
+        <tr><td><code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code></td><td><code>15</code></td><td>Ventana de edición de mensajes propios (<code>routes/chatter.rs</code>).</td></tr>
+      </table>
+      <div class="warn"><b>Producción.</b> Los cuatro secretos (<code>NOVVUS_JWT_ACCESS_SECRET</code>,
+      <code>NOVVUS_JWT_REFRESH_SECRET</code>, <code>NOVVUS_INTERNAL_HMAC_SECRET</code>,
+      <code>NOVVUS_BOOTSTRAP_TOKEN</code>) y <code>NOVVUS_MODULE_DB_PASSWORD</code> los genera
+      <code>novvus install</code> en <code>/opt/novvus/.env</code> con permisos 600. Los defaults de
+      desarrollo son públicos en el repositorio.</div>
+
+      <h2>Compilar y probar</h2>
+<pre><code><span class="c"># desde la raíz del repo; Postgres arriba en :5432 (docker compose up -d)</span>
+cd kernel
+cargo build                       <span class="c"># perfil dev: opt-level 0 salvo argon2/blake2/digest/sha2 en 3</span>
+cargo test --workspace            <span class="c"># unitarios + integración de gateway contra Postgres</span>
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --check
+cargo run -p novvus-gateway       <span class="c"># o `make kernel-test` / targets del Makefile</span></code></pre>
+      <ul>
+        <li>Los tests de integración levantan la app en proceso y hablan con Postgres real; por eso <code>kernel-test</code> del <code>Makefile</code> exige la base arriba.</li>
+        <li><strong>No quites</strong> los <code>opt-level = 3</code> de los crates criptográficos en <code>kernel/Cargo.toml</code>: Argon2id de 19 MiB sin optimizar tarda minutos por hash y cuelga la suite (<code>DECISIONS.md</code>, 2026-07-12).</li>
+        <li>La máquina de desarrollo usa el toolchain <code>stable-x86_64-pc-windows-gnu</code> (sin Visual Studio Build Tools; <code>DECISIONS.md</code>, 2026-07-11). Trampas conocidas: WinLibs en el PATH puede hacer fallar <code>dlltool</code>, y la cobertura Rust (<code>cargo llvm-cov</code>) no se puede medir de forma nativa en Windows GNU (<code>QA.md</code>); el CI usa Linux y exige <code>--fail-under-lines 85</code>.</li>
+        <li>El binario del gateway no se puede recompilar mientras corre en Windows: detén el proceso (<code>off.bat</code>) antes de <code>cargo build</code>/<code>cargo test</code>.</li>
+      </ul>
+
+      <h2>Documentos relacionados</h2>
+      <ul>
+        <li><a href="arquitectura.html">Arquitectura</a>: los planos y los flujos de petición y evento.</li>
+        <li><a href="base-de-datos.html">Base de datos</a>: DDL de <code>core</code> y RLS.</li>
+        <li><a href="seguridad.html">Seguridad</a>: JWT, HMAC, bootstrap, archivos, paquetes.</li>
+        <li><code>documents/docs/MODULE_CONTRACT.md</code>, <code>EVENTS.md</code>, <code>FILES.md</code>, <code>CHATTER.md</code>, <code>VIEWS.md</code>.</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="arquitectura.html"><span class="dir">← Anterior</span>Arquitectura</a>
+        <a class="next" href="sdk.html"><span class="dir">Siguiente →</span>El SDK por dentro</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

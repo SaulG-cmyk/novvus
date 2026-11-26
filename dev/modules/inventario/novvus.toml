@@ -1,0 +1,52 @@
+[module]
+id = "inventario"
+name = "Inventario"
+version = "0.1.0"
+description = "Control de inventario: productos, stock por almacén, movimientos y alertas de reposición."
+
+[presentation]
+display_name = "Inventario"
+summary = "Controla el stock de tus productos, registra movimientos y recibe alertas de reposición."
+category = "Operaciones"
+icon = "package"
+accent = "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1", "logistica>=0.1"]
+service_permissions = [
+  "crm.products.read",
+  "logistica.warehouses.read",
+]
+
+[[permissions]]
+key = "inventario.products.read"
+description = "Ver productos"
+
+[[permissions]]
+key = "inventario.products.write"
+description = "Crear y editar productos"
+
+[[permissions]]
+key = "inventario.stock.read"
+description = "Ver stock"
+
+[[permissions]]
+key = "inventario.stock.write"
+description = "Ajustar stock"
+
+[events]
+emits = ["inventario.stock.low", "inventario.movement.created"]
+listens = ["crm.quote.accepted", "logistica.shipment.delivered"]
+
+[runtime]
+port = 8190
+
+[[config]]
+key = "inventario.low_stock_threshold"
+type = "number"
+label = "Umbral de stock bajo (unidades)"
+description = "Cantidad mínima antes de generar alerta de reposición."
+default = 5
+permission = "inventario.stock.write"

@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de usuario · Novvus</title>
+<link rel="stylesheet" href="assets/doc.css">
+</head>
+<body>
+
+<!-- ============================================================ PORTADA -->
+<section class="cover">
+  <div class="cover-band">
+    <img src="assets/novvus-white.svg" alt="Novvus">
+    <span class="suite">Business Suite</span>
+  </div>
+
+  <div class="cover-body">
+    <div class="cover-kicker">Manual de usuario</div>
+    <h1>Opere su negocio en un solo lugar</h1>
+    <p class="lede">Guía práctica de la plataforma Novvus: acceso, módulos de trabajo y los flujos que conectan ventas, proyectos, logística, finanzas y talento.</p>
+
+    <div class="rule"></div>
+
+    <dl class="cover-meta">
+      <div><dt>Producto</dt><dd>Novvus Core 0.3.72</dd></div>
+      <div><dt>Versión</dt><dd>1.0</dd></div>
+      <div><dt>Fecha</dt><dd>18 de noviembre de 2026</dd></div>
+      <div><dt>Audiencia</dt><dd>Usuarios y administradores</dd></div>
+      <div><dt>Idioma</dt><dd>Español</dd></div>
+      <div><dt>Ambiente</dt><dd>http://localhost:8077</dd></div>
+    </dl>
+  </div>
+
+  <img class="cover-mark" src="assets/novvus-black.svg" alt="">
+
+  <div class="cover-foot">
+    <span>Novvus · Documentación de usuario</span>
+    <span>Uso interno</span>
+  </div>
+</section>
+
+<!-- ============================================================== ÍNDICE -->
+<section>
+  <div class="chapter-head">
+    <span class="chapter-num">CONTENIDO</span>
+    <div>
+      <h1 class="chapter-title">Índice</h1>
+      <p class="chapter-sub">Nueve capítulos, diecinueve capturas de pantalla y ocho diagramas.</p>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-group">
+      <h3>1. Presentación</h3>
+      <ol>
+        <li><span class="n">1.1</span>¿Qué es Novvus?</li>
+        <li><span class="n">1.2</span>A quién está dirigido</li>
+        <li><span class="n">1.3</span>Mapa de módulos</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>2. Primeros pasos</h3>
+      <ol>
+        <li><span class="n">2.1</span>Requisitos y dirección de acceso</li>
+        <li><span class="n">2.2</span>Iniciar sesión</li>
+        <li><span class="n">2.3</span>Cuentas de demostración</li>
+        <li><span class="n">2.4</span>La pantalla de inicio</li>
+        <li><span class="n">2.5</span>Sus módulos</li>
+        <li><span class="n">2.6</span>Navegación y atajos de interfaz</li>
+        <li><span class="n">2.7</span>Términos de la interfaz</li>
+        <li><span class="n">2.8</span>Búsqueda, notificaciones y perfil</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>3. Aplicaciones y administración</h3>
+      <ol>
+        <li><span class="n">3.1</span>Catálogo de aplicaciones</li>
+        <li><span class="n">3.2</span>Miembros, roles y permisos</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>4. Los módulos de trabajo</h3>
+      <ol>
+        <li><span class="n">4.1</span>CRM</li>
+        <li><span class="n">4.2</span>Proyectos</li>
+        <li><span class="n">4.3</span>Reclutamiento</li>
+        <li><span class="n">4.4</span>Logística</li>
+        <li><span class="n">4.5</span>Auditorías</li>
+        <li><span class="n">4.6</span>Facturación</li>
+        <li><span class="n">4.7</span>Inventario</li>
+        <li><span class="n">4.8</span>Automatización</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>5. Flujos de trabajo guiados</h3>
+      <ol>
+        <li><span class="n">5.1</span>De la oportunidad a la entrega</li>
+        <li><span class="n">5.2</span>De la contratación al proyecto</li>
+        <li><span class="n">5.3</span>Entrega de un envío y stock</li>
+        <li><span class="n">5.4</span>Automatización de procesos</li>
+        <li><span class="n">5.5</span>Ciclo de vida de una factura</li>
+        <li><span class="n">5.6</span>Casos de uso por rol</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>6. Buenas prácticas</h3>
+      <ol>
+        <li><span class="n">6.1</span>Higiene de datos</li>
+        <li><span class="n">6.2</span>Trabajo en equipo</li>
+        <li><span class="n">6.3</span>Rendimiento de la interfaz</li>
+        <li><span class="n">6.4</span>Seguridad y respaldo</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>7. Preguntas frecuentes</h3>
+      <ol>
+        <li><span class="n">7.1</span>Acceso y sesión</li>
+        <li><span class="n">7.2</span>Datos y módulos</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>8. Glosario</h3>
+      <ol>
+        <li><span class="n">8.1</span>Términos del sistema</li>
+      </ol>
+    </div>
+    <div class="toc-group">
+      <h3>9. Anexos</h3>
+      <ol>
+        <li><span class="n">9.1</span>Arquitectura en una página</li>
+        <li><span class="n">9.2</span>Diagrama de despliegue</li>
+        <li><span class="n">9.3</span>Modelo de datos</li>
+        <li><span class="n">9.4</span>Contenido del paquete</li>
+        <li><span class="n">9.5</span>Verificación rápida del paquete</li>
+        <li><span class="n">9.6</span>Para continuar</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="howto">
+    <h3>Cómo leer este manual</h3>
+    <div class="grid-2">
+      <div>
+        <p>El manual avanza de lo general a lo particular. Los capítulos <strong>2</strong> y <strong>3</strong> explican cómo entrar y cómo se administra la plataforma. El capítulo <strong>4</strong> recorre cada módulo con su captura de pantalla y las tareas que permite realizar. El capítulo <strong>5</strong> reconstruye los flujos completos de negocio con diagramas: es la parte más útil para entender cómo se conecta todo. Los capítulos <strong>6 a 9</strong> concentran buenas prácticas, preguntas frecuentes, glosario y anexos técnicos.</p>
+        <p>Si es su primer contacto con el sistema, lea el capítulo 2 y luego el 4.1. Si ya lo conoce y necesita resolver una duda concreta, el índice y las preguntas frecuentes bastan.</p>
+      </div>
+      <div>
+        <p><strong>Convenciones del documento</strong></p>
+        <ul>
+          <li><strong>Negritas</strong> para el nombre exacto de un botón, campo o vista.</li>
+          <li><code>Texto monoespaciado</code> para direcciones, correos y nombres técnicos.</li>
+          <li>Los recuadros de borde negro amplían un concepto; los de fondo gris advierten un riesgo; la marca ✓ señala un consejo.</li>
+          <li>Las capturas corresponden al ambiente de demostración con datos de ejemplo; los diagramas con fondo claro se pueden ampliar sin perder nitidez.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 1 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">01</span>
+    <div>
+      <h1 class="chapter-title">Presentación</h1>
+      <p class="chapter-sub">Qué resuelve Novvus y cómo leer este manual.</p>
+    </div>
+  </div>
+
+  <h2 id="s1-1">1.1 ¿Qué es Novvus?</h2>
+  <p class="lead">Novvus es una suite empresarial modular. Reúne en una sola aplicación el trabajo comercial, la ejecución de proyectos, la operación logística, el control de calidad, la facturación, el inventario y el talento humano.</p>
+  <p>Cada área de negocio funciona como un <strong>módulo independiente</strong> con su propia interfaz, sus datos y sus permisos, pero todos comparten la misma sesión, el mismo buscador y el mismo panel de inicio. Cuando algo ocurre en un módulo —una cotización se acepta, una oportunidad se gana, un candidato se contrata— los demás módulos se enteran y actúan en consecuencia sin que nadie tenga que capturar la información dos veces.</p>
+  <p>El resultado es una operación donde el dato viaja solo: la cotización aceptada genera el proyecto, el envío y la factura; el envío entregado deja la actividad en el CRM y descuenta inventario; la contratación de un candidato crea el contacto y el proyecto de integración.</p>
+
+  <div class="cards">
+    <div class="card">
+      <span class="tag">Una sola entrada</span>
+      <h4>Sesión única</h4>
+      <p>Un usuario, una contraseña y un conmutador de módulos. Sin ventanas separadas ni accesos distintos por área.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Datos conectados</span>
+      <h4>Información que fluye</h4>
+      <p>Los módulos se comunican mediante eventos de negocio, no mediante captura manual duplicada.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Por roles</span>
+      <h4>Permisos granulares</h4>
+      <p>Cada persona ve los módulos y registros que le corresponden según su rol en la organización.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Escalable</span>
+      <h4>Se instala lo que se usa</h4>
+      <p>El catálogo de aplicaciones permite activar nuevos módulos sin reinstalar la plataforma.</p>
+    </div>
+  </div>
+
+  <h2 id="s1-2">1.2 A quién está dirigido</h2>
+  <table class="compact">
+    <thead><tr><th style="width:26%">Perfil</th><th>Uso principal del sistema</th><th style="width:22%">Capítulos sugeridos</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Dirección y administración</strong></td><td>Panel general, usuarios, roles, catálogo de aplicaciones y seguimiento global.</td><td>2, 3 y 6</td></tr>
+      <tr><td><strong>Equipo comercial</strong></td><td>Empresas, contactos, oportunidades, cotizaciones y seguimiento de actividades.</td><td>4.1 y 5.1</td></tr>
+      <tr><td><strong>Project management</strong></td><td>Portafolio, fases, tareas, hitos, riesgos y avance de cada proyecto.</td><td>4.2 y 5.2</td></tr>
+      <tr><td><strong>Operaciones y logística</strong></td><td>Almacenes, transportistas, envíos y entregas.</td><td>4.4 y 5.3</td></tr>
+      <tr><td><strong>Calidad</strong></td><td>Auditorías, listas de verificación, hallazgos e informes.</td><td>4.5</td></tr>
+      <tr><td><strong>Finanzas</strong></td><td>Facturas, pagos y saldos pendientes.</td><td>4.6 y 5.5</td></tr>
+      <tr><td><strong>Almacén e inventario</strong></td><td>Productos, existencias y movimientos.</td><td>4.7 y 5.3</td></tr>
+      <tr><td><strong>Recursos Humanos</strong></td><td>Vacantes, candidatos, entrevistas y ofertas.</td><td>4.3 y 5.2</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s1-3">1.3 Mapa de módulos</h2>
+  <p>La siguiente figura resume cómo se relacionan los ocho módulos. Cada flecha es un evento de negocio: el módulo de origen lo publica y el de destino reacciona de forma automática.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/conexiones.svg" alt="Mapa de eventos entre módulos">
+    <figcaption><b>Figura 1.</b> Mapa de integración entre módulos. Las etiquetas indican el evento que dispara la acción.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead><tr><th style="width:20%">Módulo</th><th style="width:16%">Categoría</th><th>Qué controla</th><th style="width:24%">Se conecta con</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CRM</strong></td><td>Ventas</td><td>Empresas, contactos, prospectos, oportunidades, actividades, productos y cotizaciones.</td><td>Proyectos, Logística, Facturación, Automatización</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td>Operaciones</td><td>Portafolio, fases, procesos, tareas, hitos, entregables, riesgos y plantillas.</td><td>CRM, Automatización</td></tr>
+      <tr><td><strong>Reclutamiento</strong></td><td>Recursos Humanos</td><td>Puestos, candidatos, postulaciones, entrevistas y ofertas.</td><td>CRM, Proyectos</td></tr>
+      <tr><td><strong>Logística</strong></td><td>Operaciones</td><td>Almacenes, transportistas, vehículos, envíos y órdenes de entrega.</td><td>CRM, Inventario</td></tr>
+      <tr><td><strong>Auditorías</strong></td><td>Calidad</td><td>Auditorías internas y externas, listas de verificación, hallazgos e informes.</td><td>Automatización, CRM</td></tr>
+      <tr><td><strong>Facturación</strong></td><td>Finanzas</td><td>Facturas, líneas de factura, pagos y control de saldos.</td><td>CRM, Automatización</td></tr>
+      <tr><td><strong>Inventario</strong></td><td>Operaciones</td><td>Productos, existencias por almacén y movimientos de entrada y salida.</td><td>Logística, CRM</td></tr>
+      <tr><td><strong>Automatización</strong></td><td>Operaciones</td><td>Procesos, pasos, ejecuciones, registros y notificaciones.</td><td>Todos</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================================================== CAPÍTULO 2 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">02</span>
+    <div>
+      <h1 class="chapter-title">Primeros pasos</h1>
+      <p class="chapter-sub">Del navegador a su primer registro en cinco minutos.</p>
+    </div>
+  </div>
+
+  <h2 id="s2-1">2.1 Requisitos y dirección de acceso</h2>
+  <p>Novvus se usa desde el navegador; no requiere instalar nada en el equipo del usuario. El ambiente documentado se ejecuta en el mismo equipo mediante contenedores y queda disponible en la dirección:</p>
+  <p class="center" style="margin:8px 0 12px"><code style="font-size:12pt;padding:6px 14px">http://localhost:8077</code></p>
+  <ul>
+    <li><strong>Navegador recomendado:</strong> Chrome, Brave o Microsoft Edge en su versión reciente. También funciona en Firefox y Safari actuales.</li>
+    <li><strong>Resolución mínima:</strong> 1280 × 720 px. La interfaz aprovecha pantallas de 1920 px en adelante para mostrar tablas más anchas.</li>
+    <li><strong>Conectividad:</strong> la aplicación se sirve en la red local; no necesita Internet salvo que se configure un despliegue remoto.</li>
+  </ul>
+
+  <h2 id="s2-2">2.2 Iniciar sesión</h2>
+  <p>Al abrir la dirección aparece la pantalla de acceso. Escriba su correo (o nombre de usuario) y su contraseña, y pulse <strong>Entrar</strong>.</p>
+
+  <figure class="shot">
+    <img src="../capturas/01-login.png" alt="Pantalla de inicio de sesión de Novvus">
+    <figcaption><b>Figura 2.</b> Pantalla de inicio de sesión. El conmutador superior derecho cambia entre tema claro y oscuro.</figcaption>
+  </figure>
+
+  <ol class="steps">
+    <li>Escriba el <strong>correo o nombre de usuario</strong>. El campo no distingue mayúsculas de minúsculas.</li>
+    <li>Escriba la <strong>contraseña</strong>. Use el botón <em>Mostrar en claro</em> si necesita verificarla antes de continuar.</li>
+    <li>Marque <strong>Recordar correo o usuario en este dispositivo</strong> si trabaja siempre desde el mismo equipo; la contraseña nunca se guarda.</li>
+    <li>Pulse <strong>Entrar</strong>. La sesión queda activa y se abre el panel de inicio.</li>
+  </ol>
+
+  <div class="callout warn"><span class="ico">!</span><div><b>Si el acceso falla</b> Verifique que el servicio esté en ejecución. Un error de credenciales vuelve a mostrar el formulario sin borrar el correo; un error de red muestra un mensaje de servicio no disponible.</div></div>
+
+  <h2 id="s2-3">2.3 Cuentas de demostración</h2>
+  <p>El ambiente incluye una cuenta administradora y seis cuentas de equipo para probar el comportamiento por rol.</p>
+
+  <table>
+    <thead><tr><th style="width:30%">Cuenta</th><th style="width:26%">Nombre</th><th>Uso sugerido</th></tr></thead>
+    <tbody>
+      <tr><td><code>saulgutierrez143@gmail.com</code></td><td>Administrador de Novvus</td><td>Acceso total: administración, todos los módulos y configuración.</td></tr>
+      <tr><td><code>ventas@novvus.demo</code></td><td>Equipo Ventas</td><td>Recorrido comercial: empresas, oportunidades y cotizaciones.</td></tr>
+      <tr><td><code>proyectos@novvus.demo</code></td><td>Equipo Proyectos</td><td>Portafolio, tareas e hitos.</td></tr>
+      <tr><td><code>logistica@novvus.demo</code></td><td>Equipo Logística</td><td>Almacenes, transportistas y envíos.</td></tr>
+      <tr><td><code>rrhh@novvus.demo</code></td><td>Equipo Reclutamiento</td><td>Vacantes, candidatos y entrevistas.</td></tr>
+      <tr><td><code>auditoria@novvus.demo</code></td><td>Equipo Auditoría</td><td>Auditorías, hallazgos y planes de acción.</td></tr>
+      <tr><td><code>automatizacion@novvus.demo</code></td><td>Equipo Automatización</td><td>Procesos, pasos y ejecuciones.</td></tr>
+    </tbody>
+  </table>
+  <p class="table-note">Contraseña común para las cuentas de demostración: <code>Demo2026!</code>. La cuenta administradora usa su propia contraseña.</p>
+
+  <h2 id="s2-4">2.4 La pantalla de inicio</h2>
+  <p>El inicio es un <strong>panel de mando</strong>: reúne el estado de todos los módulos que la organización tiene instalados. Cada tarjeta muestra sus indicadores clave, la hora de la última actualización y un botón para refrescar solo ese bloque.</p>
+
+  <figure class="shot">
+    <img src="../capturas/02-home.png" alt="Panel de inicio con tarjetas por módulo">
+    <figcaption><b>Figura 3.</b> Panel de inicio. Arriba, el saludo y el resumen del día; debajo, una tarjeta por módulo con sus indicadores.</figcaption>
+  </figure>
+
+  <p>Los elementos de la pantalla son:</p>
+  <dl class="kv">
+    <dt>Saludo y fecha</dt><dd>Contexto de la sesión; el saludo cambia según la hora del día.</dd>
+    <dt>Tarjeta CRM</dt><dd>Valor del pipeline, ventas cerradas, oportunidades vencidas y las cinco oportunidades próximas a cerrar.</dd>
+    <dt>Tarjetas del resto</dt><dd>Auditorías en curso, facturas vencidas y pagadas, productos bajo mínimo, envíos recientes y candidatos en entrevista.</dd>
+    <dt>Actualizar</dt><dd>Cada tarjeta se actualiza de forma independiente cada 30 segundos o al pulsar su botón.</dd>
+    <dt>Tus módulos</dt><dd>Accesos directos a cada aplicación, con su categoría.</dd>
+  </dl>
+
+  <h2 id="s2-5">2.5 Sus módulos</h2>
+  <figure class="shot">
+    <img src="../capturas/03-home-modulos.png" alt="Sección Tus módulos del panel de inicio">
+    <figcaption><b>Figura 4.</b> Bloque «Tus módulos»: un acceso por aplicación instalada, ordenado por categoría.</figcaption>
+  </figure>
+  <p>Pulse cualquier tarjeta para abrir el módulo. El menú lateral izquierdo cambia entonces a las vistas de ese módulo y el encabezado indica en todo momento dónde está.</p>
+
+  <h2 id="s2-6">2.6 Navegación y atajos de interfaz</h2>
+  <p>La misma gramática visual se repite en todos los módulos. Estos son los elementos que encontrará una y otra vez, sin importar en cuál esté trabajando.</p>
+  <div class="cards">
+    <div class="card">
+      <h4>Barra lateral y vistas</h4>
+      <p>La barra de iconos cambia de módulo; el panel contiguo lista sus vistas y se colapsa con la flecha superior. El icono resaltado marca dónde está.</p>
+    </div>
+    <div class="card">
+      <h4>Encabezado superior</h4>
+      <p>Usuario, estado de conexión, fecha y hora, y accesos a aplicaciones, notificaciones y configuración.</p>
+    </div>
+    <div class="card">
+      <h4>Exportar y Nuevo</h4>
+      <p>Exportar descarga la vista actual; Nuevo crea un registro del tipo que se está viendo.</p>
+    </div>
+    <div class="card">
+      <h4>Kanban · Lista · Calendario</h4>
+      <p>Cambian la forma de presentar los mismos datos, según lo que soporte cada módulo.</p>
+    </div>
+    <div class="card">
+      <h4>Buscar y Filtros</h4>
+      <p>Búsqueda de texto sobre la vista y filtros por campo, con agrupación opcional.</p>
+    </div>
+    <div class="card">
+      <h4>Panel derecho y ficha</h4>
+      <p>El icono superior derecho abre el modo agente, las notificaciones y la búsqueda global. Un clic en un nombre abre su ficha.</p>
+    </div>
+  </div>
+
+  <h2 id="s2-7">2.7 Términos de la interfaz</h2>
+  <p>Estas palabras aparecen en botones, encabezados y mensajes. Conviene fijar su significado desde el principio para que las instrucciones de este manual se lean sin ambigüedad.</p>
+
+  <table class="compact">
+    <thead><tr><th style="width:22%">Término</th><th>Qué significa en pantalla</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Vista</strong></td><td>La presentación de un conjunto de registros: lista, tablero, calendario o cronograma.</td></tr>
+      <tr><td><strong>Registro</strong></td><td>Una fila o tarjeta concreta: una empresa, una oportunidad, una factura.</td></tr>
+      <tr><td><strong>Ficha</strong></td><td>La pantalla de detalle de un registro, con campos, adjuntos, historial y acciones.</td></tr>
+      <tr><td><strong>Alcance</strong></td><td>El subconjunto de módulos que un usuario puede abrir dentro de su organización.</td></tr>
+      <tr><td><strong>Filtro</strong></td><td>Una condición sobre un campo que reduce lo que muestra la vista; puede combinarse con otras.</td></tr>
+      <tr><td><strong>Exportar</strong></td><td>Descargar en hoja de cálculo exactamente lo que la vista está mostrando, incluidos sus filtros.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s2-8">2.8 Búsqueda, notificaciones y perfil</h2>
+  <p>El encabezado superior concentra tres accesos que se usan a diario y que conviene conocer desde la primera sesión.</p>
+  <ul>
+    <li><strong>Búsqueda global.</strong> El icono de lupa busca en los registros de los módulos a los que tiene acceso: empresas, contactos, oportunidades, cotizaciones y facturas. Respeta los permisos, de modo que nunca muestra un resultado que la vista correspondiente ocultaría.</li>
+    <li><strong>Notificaciones.</strong> La campana abre la bandeja de avisos: tareas vencidas, automatizaciones ejecutadas y menciones. Los avisos se marcan como leídos al abrirlos y dejan de contar en el indicador.</li>
+    <li><strong>Perfil y sesión.</strong> El nombre del usuario abre su cuenta, el conmutador de tema claro u oscuro y la opción de cerrar sesión en el dispositivo.</li>
+  </ul>
+
+  <div class="callout info"><span class="ico">i</span><div><b>La campana no reemplaza el panel</b> El panel de inicio resume el estado del negocio; la bandeja de notificaciones avisa de lo que requiere una acción concreta. Si una alerta se repite cada día, probablemente sea un proceso que necesita un responsable, no una notificación más.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 3 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">03</span>
+    <div>
+      <h1 class="chapter-title">Aplicaciones y administración</h1>
+      <p class="chapter-sub">Qué hay instalado, quién entra y con qué alcance.</p>
+    </div>
+  </div>
+
+  <h2 id="s3-1">3.1 Catálogo de aplicaciones</h2>
+  <p>La pantalla <strong>Aplicaciones</strong> es el catálogo de módulos de la organización. Arriba, los contadores separan lo instalado de lo disponible en el marketplace; las pestañas permiten filtrar por origen de la licencia.</p>
+
+  <figure class="shot">
+    <img src="../capturas/17-aplicaciones.png" alt="Catálogo de aplicaciones de Novvus">
+    <figcaption><b>Figura 5.</b> Catálogo de aplicaciones. Cada tarjeta indica versión, descripción, licencia y accesos directos.</figcaption>
+  </figure>
+
+  <ul>
+    <li><strong>Abrir</strong> entra al módulo. Es equivalente a pulsar su icono en la barra lateral.</li>
+    <li>El <strong>menú de tres puntos</strong> concentra las acciones de la aplicación: configuración, permisos y desinstalación cuando la licencia lo permite.</li>
+    <li>La etiqueta <em>Incluido en Novvus Core</em> identifica los módulos base; <em>Enterprise</em> identifica los módulos de negocio añadidos.</li>
+    <li>El buscador filtra por nombre en todo el catálogo, no solo entre las aplicaciones instaladas.</li>
+  </ul>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Consejo</b> Use el catálogo, no la barra lateral, cuando necesite consultar la versión instalada de un módulo o revisar su descripción funcional antes de asignarlo a un equipo.</div></div>
+
+  <h2 id="s3-2">3.2 Miembros, roles y permisos</h2>
+  <p>La pantalla <strong>Administración</strong> concentra la gestión de personas. La pestaña <em>Miembros</em> lista a todos los usuarios de la organización con su estado, su alcance y las acciones disponibles.</p>
+
+  <div class="callout info"><span class="ico">i</span><div><b>Tres decisiones, en este orden</b> Primero <strong>membresía</strong>: si la persona pertenece o no a la organización. Después <strong>rol</strong>: qué puede hacer. Al final <strong>alcance</strong>: sobre qué módulos. Cambiar el alcance nunca amplía lo que el rol prohíbe.</div></div>
+
+  <figure class="shot">
+    <img src="../capturas/18-administracion.png" alt="Pantalla de administración de miembros">
+    <figcaption><b>Figura 6.</b> Administración de miembros: estado, roles y accesos, nombre, correo y alcance de cada usuario.</figcaption>
+  </figure>
+
+  <h3>Invitar y dar de alta</h3>
+  <ol class="steps">
+    <li>Pulse <strong>Invitar persona</strong> para enviar una invitación por correo, o <strong>Agregar cuenta existente</strong> si la persona ya pertenece a otra organización de la plataforma.</li>
+    <li>Asigne uno o varios <strong>roles</strong>. Los roles determinan los módulos visibles y las operaciones permitidas sobre cada tipo de registro.</li>
+    <li>Defina el <strong>alcance</strong>: todos los módulos o un subconjunto concreto.</li>
+    <li>Guarde. El usuario recibe el acceso de inmediato y aparece como <em>Activo</em> en la lista.</li>
+  </ol>
+
+  <h3>Roles y accesos</h3>
+  <p>El botón <strong>Roles y accesos</strong> de cada fila abre el detalle de permisos. Los permisos se expresan por módulo y por recurso, con operaciones de lectura, escritura y administración; un permiso ausente oculta la vista correspondiente en lugar de mostrar un error.</p>
+
+  <table class="compact">
+    <thead><tr><th style="width:24%">Acción</th><th>Efecto</th><th style="width:22%">Reversible</th></tr></thead>
+    <tbody>
+      <tr><td>Invitar persona</td><td>Crea la cuenta y envía el correo de activación.</td><td>Sí, cancelando la invitación</td></tr>
+      <tr><td>Cambiar rol</td><td>Modifica módulos y operaciones visibles en la siguiente carga.</td><td>Sí</td></tr>
+      <tr><td>Desactivar acceso</td><td>Impide el inicio de sesión sin borrar los registros del usuario.</td><td>Sí</td></tr>
+      <tr><td>Eliminar miembro</td><td>Retira al usuario de la organización y libera su licencia.</td><td>No</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn"><span class="ico">!</span><div><b>Antes de eliminar</b> Reasigne los registros del usuario (oportunidades, proyectos, envíos) a otra persona. Los registros no se borran, pero quedan sin responsable visible.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 4 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">04</span>
+    <div>
+      <h1 class="chapter-title">Los módulos de trabajo</h1>
+      <p class="chapter-sub">Qué hace cada aplicación y cómo se usa en el día a día.</p>
+    </div>
+  </div>
+
+  <p class="lead">Todos los módulos comparten la misma gramática de interfaz: un panel de vistas a la izquierda, una barra de acciones arriba, un conmutador de presentación y una tabla paginada. Aprender un módulo es, en la práctica, aprender todos.</p>
+
+  <div class="callout info"><span class="ico">i</span><div><b>Patrón común</b> <strong>Exportar</strong> descarga la vista, <strong>Nuevo</strong> crea un registro, <strong>Buscar</strong> filtra por texto y <strong>Filtros</strong> permite combinar condiciones por campo. Los registros se abren con un clic sobre su nombre.</div></div>
+
+  <h2 id="s4-1">4.1 CRM</h2>
+  <p>El CRM es el punto de partida comercial. Organiza empresas y contactos, convierte prospectos en oportunidades, hace seguimiento con actividades y formaliza la venta con cotizaciones.</p>
+
+  <figure class="shot">
+    <img src="../capturas/04-crm-oportunidades.png" alt="Lista de oportunidades del CRM">
+    <figcaption><b>Figura 7.</b> Oportunidades en vista de lista: nombre, empresa, etapa, importe, probabilidad y fecha estimada de cierre.</figcaption>
+  </figure>
+
+  <h3>Qué puede hacer</h3>
+  <ul>
+    <li>Registrar <strong>empresas</strong> con datos fiscales, industria, teléfono, correo y dirección.</li>
+    <li>Administrar <strong>contactos</strong> vinculados a una o varias empresas.</li>
+    <li>Gestionar <strong>oportunidades</strong> en un pipeline por etapas, con importe, probabilidad y fecha de cierre estimada.</li>
+    <li>Programar <strong>actividades</strong> (llamadas, reuniones, tareas) y consultar las vencidas desde el inicio.</li>
+    <li>Emitir <strong>cotizaciones</strong> con líneas, impuestos y vigencia.</li>
+    <li>Exportar cualquier vista y filtrar por estado, propietario o prioridad.</li>
+  </ul>
+
+  <figure class="shot">
+    <img src="../capturas/05-crm-empresas.png" alt="Lista de empresas del CRM">
+    <figcaption><b>Figura 8.</b> Empresas: nombre, industria, estado comercial, tipo y datos de contacto.</figcaption>
+  </figure>
+
+  <div class="grid-2">
+    <figure class="shot">
+      <img src="../capturas/06-crm-cotizaciones.png" alt="Cotizaciones del CRM">
+      <figcaption><b>Figura 9.</b> Cotizaciones con folio, cliente, total y estado.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="../capturas/07-proyectos.png" alt="Tablero de actividades de proyecto">
+      <figcaption><b>Figura 10.</b> Actividades de proyecto en tablero, agrupadas por estado.</figcaption>
+    </figure>
+  </div>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Regla práctica</b> Una oportunidad solo avanza de etapa cuando hay evidencia: una reunión realizada, una cotización enviada o una fecha de cierre confirmada. El tablero es un reflejo de la realidad, no un lugar para maquillar el pronóstico.</div></div>
+
+  <h2 id="s4-2">4.2 Proyectos</h2>
+  <p>Proyectos convierte el trabajo vendido en ejecución medible. El módulo organiza el portafolio en fases, procesos con etapas, tareas con subtareas, hitos, entregables, dependencias y riesgos.</p>
+  <ul>
+    <li><strong>Portafolio:</strong> todos los proyectos con su estado, avance y responsable.</li>
+    <li><strong>Tablero:</strong> las actividades del proyecto en columnas por estado, para las reuniones de seguimiento.</li>
+    <li><strong>Plan:</strong> fases, procesos y tareas con fechas y dependencias.</li>
+    <li><strong>Control:</strong> hitos, entregables, riesgos, aprobaciones y líneas de trabajo.</li>
+    <li><strong>Plantillas:</strong> estructuras reutilizables para tipos de proyecto recurrentes.</li>
+  </ul>
+  <p>Cuando una oportunidad del CRM se marca como ganada, el módulo crea automáticamente el proyecto correspondiente y lo deja listo para planificar.</p>
+
+  <h2 id="s4-3">4.3 Reclutamiento</h2>
+  <figure class="shot">
+    <img src="../capturas/08-reclutamiento.png" alt="Lista de candidatos de Reclutamiento">
+    <figcaption><b>Figura 11.</b> Candidatos con estado del proceso, fuente de origen y datos de contacto.</figcaption>
+  </figure>
+  <p>El módulo cubre el ciclo completo de selección: publicación de la vacante, registro de candidatos, postulaciones, entrevistas y oferta. Al marcar un candidato como <strong>contratado</strong>, se crea el contacto en el CRM y el proyecto de integración en Proyectos.</p>
+  <ul>
+    <li><strong>Puestos:</strong> título, departamento, ubicación, rango salarial y requisitos.</li>
+    <li><strong>Candidatos:</strong> datos de contacto, fuente (LinkedIn, referido, bolsa) y estado.</li>
+    <li><strong>Postulaciones y entrevistas:</strong> relación candidato–puesto con evaluación y resultado.</li>
+    <li><strong>Ofertas:</strong> condiciones económicas y seguimiento de aceptación.</li>
+  </ul>
+
+  <h2 id="s4-4">4.4 Logística</h2>
+  <figure class="shot">
+    <img src="../capturas/09-logistica.png" alt="Lista de envíos de Logística">
+    <figcaption><b>Figura 12.</b> Envíos con referencia, estado, transportista y número de guía.</figcaption>
+  </figure>
+  <p>Logística administra almacenes, transportistas, vehículos y envíos. Cada envío se puede seguir hasta su entrega; al marcarlo como <strong>entregado</strong> se registra la actividad correspondiente en el CRM y se actualiza el inventario.</p>
+  <ul>
+    <li><strong>Almacenes:</strong> origen de cada despacho.</li>
+    <li><strong>Transportistas y vehículos:</strong> capacidad, placas y disponibilidad.</li>
+    <li><strong>Envíos:</strong> referencia, destino, peso, bultos, guía y estado.</li>
+    <li><strong>Órdenes de entrega:</strong> detalle de productos por envío.</li>
+  </ul>
+
+  <h2 id="s4-5">4.5 Auditorías</h2>
+  <figure class="shot">
+    <img src="../capturas/10-auditorias.png" alt="Lista de auditorías">
+    <figcaption><b>Figura 13.</b> Auditorías con nombre, tipo, estado y responsable.</figcaption>
+  </figure>
+  <p>El módulo de calidad permite planificar auditorías internas y externas, ejecutarlas con listas de verificación y registrar hallazgos con severidad. Cada hallazgo alimenta el plan de acción y puede disparar una automatización de seguimiento.</p>
+  <ul>
+    <li><strong>Auditorías:</strong> alcance, tipo, fechas y estado (planificada, en curso, finalizada).</li>
+    <li><strong>Listas de verificación:</strong> puntos de control con resultado por ítem.</li>
+    <li><strong>Hallazgos:</strong> descripción, severidad, responsable y estado del plan de acción.</li>
+    <li><strong>Informes:</strong> consolidado de resultados por auditoría.</li>
+  </ul>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Un hallazgo no se cierra solo</b> Cada hallazgo necesita responsable, fecha compromiso y evidencia de cierre. Si el plan de acción se queda sin dueño, la automatización lo recuerda, pero no lo resuelve.</div></div>
+
+  <h2 id="s4-6">4.6 Facturación</h2>
+  <figure class="shot">
+    <img src="../capturas/12-facturacion.png" alt="Lista de facturas">
+    <figcaption><b>Figura 14.</b> Facturas con folio, cliente, estado, total, moneda y vencimiento.</figcaption>
+  </figure>
+  <p>Facturación emite documentos, registra pagos y controla saldos. Una factura recorre cinco estados posibles: borrador, enviada, pagada, vencida y cancelada.</p>
+  <ul>
+    <li><strong>Facturas:</strong> folio, cliente, fechas de emisión y vencimiento, subtotal, impuestos, total y saldo.</li>
+    <li><strong>Líneas:</strong> descripción, cantidad, precio unitario, tasa de impuesto e importe.</li>
+    <li><strong>Pagos:</strong> monto, fecha, método y referencia; actualizan el saldo de la factura.</li>
+    <li><strong>Cobranza:</strong> filtro de vencidas para priorizar la gestión de cobro.</li>
+  </ul>
+
+  <h2 id="s4-7">4.7 Inventario</h2>
+  <figure class="shot">
+    <img src="../capturas/13-inventario-productos.png" alt="Catálogo de productos">
+    <figcaption><b>Figura 15.</b> Productos con SKU, nombre, unidad, precio y estado.</figcaption>
+  </figure>
+  <p>El inventario mantiene el catálogo de productos y las existencias por almacén. Cada entrada, salida o ajuste queda registrado como movimiento, con referencia y fecha, lo que permite reconstruir la historia de cualquier artículo.</p>
+
+  <figure class="shot">
+    <img src="../capturas/14-inventario-stock.png" alt="Existencias por producto">
+    <figcaption><b>Figura 16.</b> Existencias: cantidad disponible, mínimo configurado y ubicación física.</figcaption>
+  </figure>
+  <p>Cuando la cantidad de un producto cae por debajo de su mínimo, el módulo emite una alerta de reposición que aparece en el panel de inicio y puede disparar una notificación automática.</p>
+
+  <h2 id="s4-8">4.8 Automatización</h2>
+  <p>Automatización es el orquestador de la suite. Escucha los eventos de los demás módulos y ejecuta procesos compuestos por pasos: consultar datos, obtener un registro, enviar un correo o generar una notificación.</p>
+
+  <figure class="shot">
+    <img src="../capturas/11-automatizacion-pasos.png" alt="Pasos de los procesos automatizados">
+    <figcaption><b>Figura 17.</b> Pasos: cada fila indica el proceso al que pertenece, su posición y el tipo de acción.</figcaption>
+  </figure>
+
+  <h3>Ejecuciones</h3>
+  <p>La vista de ejecuciones muestra cada corrida de un proceso con su estado (en ejecución, completada, fallida o cancelada) y sus marcas de inicio y fin. Es la forma más rápida de comprobar que una automatización está funcionando.</p>
+
+  <figure class="shot">
+    <img src="../capturas/19-automatizacion-ejecuciones.png" alt="Ejecuciones de procesos">
+    <figcaption><b>Figura 18.</b> Ejecuciones en vista de lista, ordenadas por fecha de inicio.</figcaption>
+  </figure>
+
+  <h3>Registros</h3>
+  <p>El registro de actividad conserva el detalle de cada ejecución: nivel (info, warn, error), mensaje y fecha. Sirve para diagnosticar por qué un proceso no hizo lo esperado.</p>
+
+  <figure class="shot">
+    <img src="../capturas/15-automatizacion-logs.png" alt="Registro de actividad de automatizaciones">
+    <figcaption><b>Figura 19.</b> Registro de actividad: proceso, nivel, mensaje y fecha de cada evento.</figcaption>
+  </figure>
+
+  <p>Cada paso puede además generar una <strong>notificación</strong> legible para el equipo responsable. Las notificaciones se consultan en su propia vista y se marcan como leídas al revisarlas; el capítulo 5.4 muestra esa vista dentro del flujo de una automatización completa.</p>
+</section>
+
+<!-- =========================================================== CAPÍTULO 5 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">05</span>
+    <div>
+      <h1 class="chapter-title">Flujos de trabajo guiados</h1>
+      <p class="chapter-sub">Cómo viaja el dato entre módulos, paso a paso.</p>
+    </div>
+  </div>
+
+  <p class="lead">Este capítulo es el corazón del manual. Cada flujo describe una secuencia real de negocio, indica en qué módulo se inicia, qué ocurre automáticamente y qué debe revisar la persona responsable.</p>
+
+  <h2 id="s5-1">5.1 De la oportunidad a la entrega</h2>
+  <p>Es el flujo principal de la suite y conecta CRM, Proyectos, Logística, Facturación e Inventario.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/flujo-comercial.svg" alt="Flujo comercial de punta a punta">
+    <figcaption><b>Figura 20.</b> Flujo comercial: del prospecto a la cobranza. Las etiquetas indican el evento que dispara el paso siguiente.</figcaption>
+  </figure>
+
+  <ol class="steps">
+    <li><strong>Registre el prospecto.</strong> En CRM cree la empresa y el contacto, y genere un lead o directamente una oportunidad.</li>
+    <li><strong>Trabaje la oportunidad.</strong> Muévala por las etapas del pipeline conforme avanza la conversación. Cada cambio queda en el historial.</li>
+    <li><strong>Cotice.</strong> Genere la cotización con sus líneas y envíela. La cotización nace en estado borrador y pasa a enviada al compartirla.</li>
+    <li><strong>Marque la aceptación.</strong> Al aceptar la cotización se disparan tres acciones en paralelo: se crea el proyecto, se prepara el envío y se emite la factura.</li>
+    <li><strong>Ejecute el proyecto.</strong> En Proyectos ajuste el plan, asigne responsables y dé seguimiento al avance.</li>
+    <li><strong>Entregue.</strong> En Logística asigne transportista y vehículo, y marque el envío como entregado al confirmar la recepción.</li>
+    <li><strong>Registre el pago.</strong> En Facturación aplique el pago recibido; la factura pasa a pagada y el saldo queda en cero.</li>
+  </ol>
+
+  <div class="callout info"><span class="ico">i</span><div><b>Qué revisar después</b> Si la cotización se aceptó pero no aparece el proyecto, compruebe en Automatización → Registros el resultado de la ejecución. El registro indica el paso exacto y el error, si lo hubo.</div></div>
+
+  <h2 id="s5-2">5.2 De la contratación al proyecto</h2>
+  <p>El flujo de talento cierra el círculo entre Recursos Humanos, CRM y Proyectos.</p>
+  <ol class="steps">
+    <li><strong>Publique la vacante</strong> en Reclutamiento con departamento, ubicación y rango salarial.</li>
+    <li><strong>Registre candidatos</strong> y vincúlelos al puesto mediante una postulación.</li>
+    <li><strong>Entreviste y evalúe.</strong> Cada entrevista deja resultado y calificación.</li>
+    <li><strong>Emita la oferta</strong> y marque al candidato como contratado.</li>
+    <li><strong>Revise el resultado automático:</strong> el candidato aparece como contacto en el CRM y se crea el proyecto de integración con las tareas iniciales.</li>
+  </ol>
+
+  <h2 id="s5-3">5.3 Entrega de un envío y actualización de stock</h2>
+  <ol class="steps">
+    <li>Confirme que el producto existe en Inventario y que hay existencia suficiente.</li>
+    <li>Genere el envío en Logística, asigne almacén de origen, transportista y vehículo.</li>
+    <li>Actualice el estado del envío conforme avanza: preparación, en tránsito, entregado.</li>
+    <li>Al marcar <strong>entregado</strong>, se registra la actividad de entrega en el CRM y se genera el movimiento de salida en Inventario.</li>
+    <li>Verifique en Inventario que la existencia disminuyó y que el movimiento aparece con su referencia.</li>
+  </ol>
+
+  <h2 id="s5-4">5.4 Automatización de procesos</h2>
+  <p>Una automatización se compone de un <strong>disparador</strong>, uno o varios <strong>pasos</strong> y un <strong>resultado</strong> registrado. El orquestador traduce cada evento de negocio en una ejecución con su bitácora.</p>
+
+  <figure class="shot">
+    <img src="../capturas/16-automatizacion-notificaciones.png" alt="Notificaciones generadas por automatizaciones">
+    <figcaption><b>Figura 21.</b> Notificaciones: resultado legible de las automatizaciones, con tipo y estado de lectura.</figcaption>
+  </figure>
+
+  <h3>Ejemplo de una corrida</h3>
+  <p>El proceso <em>Notificación de oportunidad ganada</em> se dispara con <code>crm.opportunity.won</code>. En la vista de registros se lee de abajo hacia arriba, del inicio al cierre:</p>
+  <ol class="steps">
+    <li><strong>Ejecución manual iniciada:</strong> alguien del equipo lanzó el proceso desde su ficha, sin esperar el evento.</li>
+    <li><strong>Paso 1 · Obtener contacto:</strong> consulta el contacto del CRM asociado a la oportunidad ganada.</li>
+    <li><strong>Paso 2 · Enviar email:</strong> envía la plantilla de bienvenida al correo del contacto.</li>
+    <li><strong>Paso 3 · Notificar responsable:</strong> avisa al propietario de la oportunidad y deja la notificación en su bandeja.</li>
+    <li><strong>Proceso completado:</strong> la ejecución queda como completada con el número de pasos ejecutados.</li>
+  </ol>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Una corrida, tres rastros</b> Cada ejecución deja huella en tres lugares: el estado de la ejecución, sus registros de actividad y las notificaciones enviadas. Si algo no ocurrió, alguno de los tres lo explica.</div></div>
+
+  <table class="compact">
+    <thead><tr><th style="width:18%">Tipo</th><th style="width:40%">Cuándo se genera</th><th>Ejemplo en la bandeja</th></tr></thead>
+    <tbody>
+      <tr><td><strong>success</strong></td><td>Un proceso terminó bien o una entrega se confirmó.</td><td>Proceso completado · Envío entregado</td></tr>
+      <tr><td><strong>info</strong></td><td>Aviso o recordatorio que no exige acción inmediata.</td><td>Recordatorio de tareas vencidas</td></tr>
+      <tr><td><strong>warn</strong></td><td>Un paso se omitió o faltó un dato para continuar.</td><td>Proceso sin pasos configurados</td></tr>
+    </tbody>
+  </table>
+
+  <div class="figrow mid">
+    <figure class="diagram">
+      <img src="../diagramas/automatizacion.svg" alt="Anatomía de una automatización">
+      <figcaption><b>Figura 22.</b> Anatomía de una automatización: evento, proceso, pasos, ejecución y registro.</figcaption>
+    </figure>
+    <div class="side">
+      <h4>Cómo se lee</h4>
+      <ul>
+        <li><strong>Evento:</strong> cualquier módulo publica un hecho de negocio; Automatización solo escucha.</li>
+        <li><strong>Orquestador:</strong> recibe el evento y busca los procesos activos que lo declaran como disparador.</li>
+        <li><strong>Proceso:</strong> tiene nombre, disparador y estado; si está inactivo, el evento se ignora.</li>
+        <li><strong>Pasos:</strong> se ejecutan en orden de posición y cada uno declara un tipo de acción.</li>
+        <li><strong>Ejecución:</strong> guarda estado, resultado y error de la corrida completa.</li>
+        <li><strong>Registro y notificación:</strong> dejan la trazabilidad técnica y el aviso para las personas.</li>
+      </ul>
+      <p>Los pasos se ejecutan en secuencia. Si uno falla, la ejecución queda con error y el registro señala el paso exacto.</p>
+      <h4>Tipos de paso</h4>
+      <ul class="small">
+        <li><strong>Consultar (query):</strong> filtra registros por una condición.</li>
+        <li><strong>Obtener (get_record):</strong> trae un registro concreto por identificador o referencia.</li>
+        <li><strong>Correo (send_email):</strong> envía una plantilla con los datos del evento.</li>
+        <li><strong>Notificar (notify):</strong> crea un aviso en la bandeja del usuario.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout warn"><span class="ico">!</span><div><b>Idempotencia: el mismo evento dos veces</b> Si una oportunidad se marca como ganada dos veces, el proceso comprueba si el proyecto ya existe antes de crearlo y reporta el segundo intento como omitido. Nunca se duplican proyectos, facturas ni envíos por repetir un evento.</div></div>
+
+  <table class="compact">
+    <thead><tr><th style="width:38%">Proceso</th><th>Disparador</th><th>Acción principal</th></tr></thead>
+    <tbody>
+      <tr><td>Procesar cotización aceptada</td><td><code>crm.quote.accepted</code></td><td>Crea proyecto, envío y factura; notifica al responsable.</td></tr>
+      <tr><td>Onboarding de oportunidad ganada</td><td><code>crm.opportunity.won</code></td><td>Crea el proyecto y sus tareas iniciales.</td></tr>
+      <tr><td>Notificación de oportunidad ganada</td><td><code>crm.opportunity.won</code></td><td>Obtiene el contacto y envía un correo de bienvenida.</td></tr>
+      <tr><td>Seguimiento de nuevo lead</td><td><code>crm.lead.created</code></td><td>Programa la primera actividad de contacto.</td></tr>
+      <tr><td>Confirmación de entrega</td><td><code>logistica.shipment.delivered</code></td><td>Registra la actividad de entrega en el CRM.</td></tr>
+      <tr><td>Seguimiento de hallazgo</td><td><code>auditorias.finding.created</code></td><td>Notifica al responsable del plan de acción.</td></tr>
+      <tr><td>Onboarding de candidato contratado</td><td><code>reclutamiento.candidate.hired</code></td><td>Crea contacto y proyecto de integración.</td></tr>
+      <tr><td>Notificación de nuevo proyecto</td><td><code>projects.project.created</code></td><td>Avisa al equipo de entrega.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s5-5">5.5 Ciclo de vida de una factura</h2>
+  <p>La factura es el documento donde convergen la venta y la cobranza. Su estado determina las acciones disponibles.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/estados-factura.svg" alt="Estados de una factura">
+    <figcaption><b>Figura 23.</b> Estados de una factura y transiciones permitidas.</figcaption>
+  </figure>
+
+  <table class="compact">
+    <thead><tr><th style="width:20%">Estado</th><th>Significado</th><th style="width:30%">Acción típica</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Borrador</strong></td><td>Documento en preparación; puede editarse por completo.</td><td>Completar líneas y datos del cliente.</td></tr>
+      <tr><td><strong>Enviada</strong></td><td>Entregada al cliente; inicia el plazo de pago.</td><td>Dar seguimiento a la fecha de vencimiento.</td></tr>
+      <tr><td><strong>Pagada</strong></td><td>Saldo cubierto total o parcialmente con pagos registrados.</td><td>Conciliar el pago con el estado de cuenta.</td></tr>
+      <tr><td><strong>Vencida</strong></td><td>El plazo expiró sin pago completo.</td><td>Gestionar cobranza y registrar el pago recibido.</td></tr>
+      <tr><td><strong>Cancelada</strong></td><td>Documento anulado; no afecta la cobranza.</td><td>Emitir una nueva factura si corresponde.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s5-6">5.6 Casos de uso por rol</h2>
+  <p>Cada rol de la organización tiene un conjunto reducido de tareas frecuentes. Este mapa sirve para explicar a una persona nueva qué le corresponde y qué módulos necesita.</p>
+
+  <table class="compact">
+    <thead><tr><th style="width:27%">Rol</th><th>Responsabilidad principal</th><th style="width:28%">Módulos que usa</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Administrador</strong></td><td>Altas de personas, roles, alcance y configuración de la organización.</td><td>Administración, Aplicaciones</td></tr>
+      <tr><td><strong>Ventas</strong></td><td>Empresas, contactos, oportunidades, actividades y cotizaciones.</td><td>CRM</td></tr>
+      <tr><td><strong>Proyectos</strong></td><td>Plan del proyecto, tareas, hitos, dependencias y avance.</td><td>Proyectos</td></tr>
+      <tr><td><strong>Logística</strong></td><td>Almacenes, transportistas, envíos y confirmación de entrega.</td><td>Logística, Inventario</td></tr>
+      <tr><td><strong>Recursos Humanos</strong></td><td>Vacantes, candidatos, entrevistas y ofertas.</td><td>Reclutamiento</td></tr>
+      <tr><td><strong>Calidad</strong></td><td>Auditorías, listas de verificación y hallazgos con plan de acción.</td><td>Auditorías</td></tr>
+      <tr><td><strong>Finanzas</strong></td><td>Facturación, registro de pagos y cobranza.</td><td>Facturación</td></tr>
+      <tr><td><strong>Almacén</strong></td><td>Catálogo de productos, existencias y movimientos.</td><td>Inventario</td></tr>
+      <tr><td><strong>Operaciones</strong></td><td>Diseño de procesos, pasos y monitoreo de ejecuciones.</td><td>Automatización</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info"><span class="ico">i</span><div><b>El rol no es el organigrama</b> Los roles agrupan permisos por función, no por puesto. Varias personas pueden compartir un rol y una persona puede acumular dos; lo que nunca debe ocurrir es que un rol quede sin nadie que lo ejerza.</div></div>
+
+  <h3>Señales de un alcance mal definido</h3>
+  <ul>
+    <li>Una persona ve módulos que no abre nunca y recibe notificaciones que no le corresponden.</li>
+    <li>Un módulo tiene registros activos pero ningún dueño identificable en la lista de miembros.</li>
+    <li>Los permisos cambian sin que quede rastro de quién los autorizó ni por qué.</li>
+    <li>Alguien usa la cuenta de un compañero porque «su rol no lo deja» hacer una tarea propia.</li>
+  </ul>
+
+  <div class="figrow narrow">
+    <figure class="diagram">
+      <img src="../diagramas/casos-uso.svg" alt="Casos de uso por rol">
+      <figcaption><b>Figura 24.</b> Casos de uso principales por rol.</figcaption>
+    </figure>
+    <div class="side">
+      <h4>Cómo usar este mapa</h4>
+      <ul>
+        <li><strong>Incorporación:</strong> entregue a la persona nueva solo los módulos de su rol y las tareas del diagrama.</li>
+        <li><strong>Alcance:</strong> si alguien necesita un módulo que no aparece en su rol, revise primero los permisos antes de ampliarlos.</li>
+        <li><strong>Auditoría:</strong> un usuario con acceso a más módulos de los que su rol exige es un hallazgo de control interno.</li>
+        <li><strong>Cobertura:</strong> cada tarea del mapa debe tener un responsable; las tareas sin dueño son las que se vencen.</li>
+      </ul>
+      <p class="small">El diagrama agrupa las tareas por rol operativo, no por persona: una misma persona puede acumular dos roles en organizaciones pequeñas.</p>
+    </div>
+  </div>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Formación en cuatro pasos</b> Muestre el mapa al nuevo integrante, abran juntos el módulo de su rol, cree un registro de prueba y revíselo con su responsable antes de tocar datos reales.</div></div>
+</section>
+
+<!-- =========================================================== CAPÍTULO 6 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">06</span>
+    <div>
+      <h1 class="chapter-title">Buenas prácticas</h1>
+      <p class="chapter-sub">Recomendaciones para que el sistema siga siendo útil con el paso del tiempo.</p>
+    </div>
+  </div>
+
+  <h2 id="s6-1">6.1 Higiene de datos</h2>
+  <ul>
+    <li><strong>Una empresa, un registro.</strong> Antes de crear una empresa, búsquela por nombre o por identificador fiscal; los duplicados contaminan los reportes y el pipeline.</li>
+    <li><strong>Nombres legibles.</strong> Use el nombre comercial en el campo de nombre y la razón social completa en el campo legal.</li>
+    <li><strong>Fechas reales.</strong> La fecha de cierre estimada debe reflejar la expectativa actual, no la fecha de creación de la oportunidad.</li>
+    <li><strong>Estados honestos.</strong> Un envío es «entregado» cuando el cliente lo recibió, no cuando salió del almacén.</li>
+    <li><strong>Notas breves y fechadas.</strong> Registre el contexto en las notas del registro, no en correos externos.</li>
+  </ul>
+
+  <h2 id="s6-2">6.2 Trabajo en equipo</h2>
+  <ul>
+    <li><strong>Asigne responsable</strong> a toda oportunidad, proyecto y envío. Un registro sin dueño no se trabaja.</li>
+    <li><strong>Use actividades</strong> para acordar el siguiente paso con fecha; el panel de inicio le recordará las vencidas.</li>
+    <li><strong>Revise el panel general</strong> al inicio de la jornada: concentra lo vencido y lo que está por cerrar.</li>
+    <li><strong>No comparta credenciales.</strong> Cada persona debe entrar con su propia cuenta para que la bitácora sea confiable.</li>
+  </ul>
+
+  <h2 id="s6-3">6.3 Rendimiento de la interfaz</h2>
+  <ul>
+    <li>Las listas grandes se paginan; use el buscador y los filtros antes de recorrer páginas.</li>
+    <li>El panel de inicio refresca cada 30 segundos; si acaba de modificar algo, use el botón <strong>Actualizar</strong> de la tarjeta correspondiente.</li>
+    <li>Si una vista tarda en pintar, espere a que aparezca la primera fila antes de interactuar: la carga es asíncrona.</li>
+    <li>Exporte a hoja de cálculo cuando necesite analizar más de unas decenas de registros.</li>
+  </ul>
+
+  <h2 id="s6-4">6.4 Seguridad y respaldo</h2>
+  <ul>
+    <li><strong>Una cuenta por persona.</strong> Las cuentas compartidas rompen la trazabilidad: la bitácora deja de decir quién hizo qué.</li>
+    <li><strong>Retire el acceso el mismo día.</strong> Cuando alguien deja el equipo, desactive su membresía; los registros que eran suyos se reasignan, no se borran.</li>
+    <li><strong>Respalde antes de migrar.</strong> Genere un respaldo <code>pg_dump</code> de la base y consérvelo fuera del contenedor antes de aplicar cambios de esquema.</li>
+    <li><strong>Pruebe la restauración.</strong> Un respaldo que nunca se ha restaurado es una suposición, no una garantía.</li>
+    <li><strong>Revise la auditoría.</strong> Los cambios de permisos y las eliminaciones quedan registrados; revíselos con la misma frecuencia con que revisa los reportes.</li>
+  </ul>
+</section>
+
+<!-- =========================================================== CAPÍTULO 7 -->
+<section class="chapter faq">
+  <div class="chapter-head">
+    <span class="chapter-num">07</span>
+    <div>
+      <h1 class="chapter-title">Preguntas frecuentes</h1>
+      <p class="chapter-sub">Respuestas a las dudas más habituales de operación.</p>
+    </div>
+  </div>
+
+  <h2 id="s7-1">7.1 Acceso y sesión</h2>
+
+  <h3>¿Qué hago si olvidé mi contraseña?</h3>
+  <p>Solicite el restablecimiento a un administrador de la organización. En el ambiente de demostración, la contraseña de las cuentas de equipo es <code>Demo2026!</code>.</p>
+
+  <h3>¿Por qué no veo un módulo que mi compañero sí ve?</h3>
+  <p>Los módulos visibles dependen del rol y del alcance asignados. Pida a un administrador que revise sus <em>Roles y accesos</em>.</p>
+
+  <h3>¿La sesión caduca?</h3>
+  <p>El token de acceso es de corta duración y se renueva automáticamente mientras la pestaña permanezca abierta. Al cerrar el navegador se requiere un nuevo inicio de sesión, salvo que se haya marcado «Recordar correo».</p>
+
+  <h3>¿Puedo usar dos organizaciones con el mismo usuario?</h3>
+  <p>Sí. Un mismo correo puede pertenecer a varias organizaciones; el conmutador de organización cambia el contexto sin cerrar la sesión.</p>
+
+  <h2 id="s7-2">7.2 Datos y módulos</h2>
+
+  <h3>Una cotización se aceptó y no se creó el proyecto. ¿Qué reviso?</h3>
+  <p>Abra <em>Automatización → Registros</em> y localice la ejecución más reciente del proceso «Procesar cotización aceptada». El mensaje indica el paso que falló. Si el proyecto ya existía, la ejecución lo reporta como omitido para no duplicar.</p>
+
+  <h3>¿Por qué una factura aparece vencida si el cliente ya pagó?</h3>
+  <p>Porque el pago no se ha registrado. Registre el pago en Facturación; el estado pasa a pagada cuando el saldo queda cubierto.</p>
+
+  <h3>¿Puedo eliminar un registro?</h3>
+  <p>Sí, siempre que su rol lo permita. La eliminación es lógica: el registro deja de aparecer en las vistas pero se conserva para auditoría.</p>
+
+  <h3>¿Cómo exporto un reporte?</h3>
+  <p>Use el botón <strong>Exportar</strong> de la vista. Se exporta exactamente lo que está viendo, incluidos los filtros activos.</p>
+
+  <h3>¿El tablero kanban funciona en todos los módulos?</h3>
+  <p>Los módulos base (CRM y Proyectos) ofrecen kanban completo. En los módulos añadidos, la vista de lista es la más completa; si el tablero aparece vacío, use la lista.</p>
+
+  <h3>¿Dónde se guardan los archivos adjuntos?</h3>
+  <p>En el almacenamiento de la plataforma, asociados al registro correspondiente. El límite de tamaño lo define el administrador.</p>
+</section>
+
+<!-- =========================================================== CAPÍTULO 8 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">08</span>
+    <div>
+      <h1 class="chapter-title">Glosario</h1>
+      <p class="chapter-sub">Vocabulario común para hablar del sistema sin ambigüedades.</p>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:26%">Término</th><th>Definición</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Actividad</strong></td><td>Tarea, llamada o reunión asociada a un registro del CRM con fecha y responsable.</td></tr>
+      <tr><td><strong>Alcance</strong></td><td>Conjunto de módulos a los que un usuario tiene acceso dentro de su organización.</td></tr>
+      <tr><td><strong>API</strong></td><td>Interfaz por la que dos programas se comunican; el kernel la usa para llamar a cada módulo.</td></tr>
+      <tr><td><strong>Bitácora</strong></td><td>Registro cronológico de lo que hizo el sistema o un usuario, con nivel y mensaje.</td></tr>
+      <tr><td><strong>Cliente</strong></td><td>Empresa o persona que compra; en el sistema siempre es un registro de CRM.</td></tr>
+      <tr><td><strong>Contenedor</strong></td><td>Unidad aislada donde corre un servicio del sistema, con sus propias dependencias.</td></tr>
+      <tr><td><strong>Cotización</strong></td><td>Documento comercial con líneas, impuestos y vigencia que formaliza una oferta.</td></tr>
+      <tr><td><strong>Disparador</strong></td><td>Evento o condición que inicia un proceso automatizado.</td></tr>
+      <tr><td><strong>Ejecución</strong></td><td>Una corrida concreta de un proceso automatizado, con estado y bitácora.</td></tr>
+      <tr><td><strong>Esquema</strong></td><td>Conjunto de tablas de un módulo dentro de la base; cada uno lleva el prefijo <code>mod_</code>.</td></tr>
+      <tr><td><strong>Evento</strong></td><td>Hecho de negocio publicado por un módulo (<code>crm.quote.accepted</code>) que otros pueden escuchar.</td></tr>
+      <tr><td><strong>Hallazgo</strong></td><td>Desviación detectada en una auditoría, con severidad y plan de acción.</td></tr>
+      <tr><td><strong>Idempotencia</strong></td><td>Propiedad por la cual repetir un evento no duplica registros: el segundo intento se omite.</td></tr>
+      <tr><td><strong>Indicador</strong></td><td>Cifra resumida de una vista o del panel: total vendido, facturas pendientes, envíos activos.</td></tr>
+      <tr><td><strong>Módulo</strong></td><td>Aplicación independiente con sus datos, vistas y permisos que se integra al resto.</td></tr>
+      <tr><td><strong>Notificación</strong></td><td>Aviso dirigido a un usuario que requiere una acción o informa de un resultado.</td></tr>
+      <tr><td><strong>Oportunidad</strong></td><td>Venta potencial con importe, probabilidad y etapa dentro del pipeline.</td></tr>
+      <tr><td><strong>Organización</strong></td><td>Espacio aislado donde viven usuarios, módulos y registros de una empresa.</td></tr>
+      <tr><td><strong>Paso</strong></td><td>Acción concreta dentro de un proceso: consultar, obtener un registro, enviar correo o notificar.</td></tr>
+      <tr><td><strong>Pipeline</strong></td><td>Secuencia de etapas por las que avanza una oportunidad hasta cerrarse.</td></tr>
+      <tr><td><strong>Registro</strong></td><td>Unidad de información del sistema: una empresa, un proyecto, una factura.</td></tr>
+      <tr><td><strong>Rol</strong></td><td>Conjunto de permisos que determina qué puede ver y hacer un usuario.</td></tr>
+      <tr><td><strong>Token de acceso</strong></td><td>Credencial de sesión de vida corta que el navegador envía en cada petición.</td></tr>
+      <tr><td><strong>Vencimiento</strong></td><td>Fecha límite de cobro de una factura; se calcula al emitir según las condiciones pactadas.</td></tr>
+      <tr><td><strong>Vista</strong></td><td>Presentación de un conjunto de registros: lista, tablero o calendario.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================================================== CAPÍTULO 9 -->
+<section class="chapter">
+  <div class="chapter-head">
+    <span class="chapter-num">09</span>
+    <div>
+      <h1 class="chapter-title">Anexos</h1>
+      <p class="chapter-sub">Referencia visual para administradores y soporte.</p>
+    </div>
+  </div>
+
+  <h2 id="s9-1">9.1 Arquitectura en una página</h2>
+  <p>Novvus se compone de una capa web, un kernel que concentra autenticación y enrutamiento, los módulos de negocio y una base de datos PostgreSQL compartida con aislamiento por organización.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/arquitectura.svg" alt="Arquitectura de Novvus">
+    <figcaption><b>Figura 25.</b> Arquitectura por capas. El kernel es el único punto de entrada a los módulos.</figcaption>
+  </figure>
+
+  <h2 id="s9-2">9.2 Diagrama de despliegue</h2>
+  <p>Todo el sistema se ejecuta en contenedores sobre WSL2. Solo el puerto 8077 se publica en el equipo del usuario; el kernel y la base de datos permanecen en la red interna.</p>
+
+  <figure class="diagram">
+    <img src="../diagramas/despliegue.svg" alt="Diagrama de despliegue">
+    <figcaption><b>Figura 26.</b> Despliegue: navegador, capa web, kernel, módulos y base de datos.</figcaption>
+  </figure>
+
+  <h2 id="s9-3">9.3 Modelo de datos</h2>
+  <p>El modelo siguiente muestra las entidades principales y sus relaciones. Cada módulo añade su propio esquema; el detalle completo está en el reporte técnico.</p>
+
+  <ul>
+    <li><strong>Una empresa concentra el resto:</strong> contactos, oportunidades y proyectos cuelgan de ella; por eso el CRM es la puerta de entrada natural.</li>
+    <li><strong>La oportunidad se parte en dos:</strong> al cotizar nace la cotización y al ganar nace el proyecto, ambos enlazados a la misma oportunidad.</li>
+    <li><strong>La cotización termina en cobro:</strong> una cotización aceptada emite la factura, la factura tiene líneas y recibe uno o varios pagos.</li>
+    <li><strong>Todas las tablas comparten convenciones:</strong> identificador UUID, <code>org_id</code> para el aislamiento, marcas de creación y actualización, y borrado lógico con <code>deleted_at</code>.</li>
+  </ul>
+
+  <div class="figrow mid">
+    <figure class="diagram">
+      <img src="../diagramas/modelo-datos.svg" alt="Modelo de datos principal">
+      <figcaption><b>Figura 27.</b> Entidades principales: empresa, contacto, oportunidad, cotización, proyecto, factura y pago.</figcaption>
+    </figure>
+    <div class="side">
+      <h4>Reglas que sostienen el modelo</h4>
+      <ul>
+        <li><strong>Integridad:</strong> las relaciones usan llaves foráneas; no quedan facturas sin cotización ni pagos sin factura.</li>
+        <li><strong>Aislamiento:</strong> cada consulta filtra por organización, de modo que dos empresas comparten base sin verse entre sí.</li>
+        <li><strong>Historia:</strong> el borrado es lógico y los cambios relevantes se registran en la bitácora del registro.</li>
+        <li><strong>Importes:</strong> se guardan como <code>numeric(14,2)</code> con moneda explícita; nunca como texto ni coma flotante.</li>
+        <li><strong>Fechas:</strong> las de negocio son <code>date</code> y las de sistema <code>timestamptz</code>, para no perder la zona horaria.</li>
+        <li><strong>Extensiones:</strong> cada tabla reserva <code>ext</code> y <code>custom</code> para datos de módulos, sin alterar el esquema base.</li>
+      </ul>
+      <p class="small">El modelo completo, con las 116 tablas de la instalación de demostración, se detalla en el reporte técnico.</p>
+    </div>
+  </div>
+
+  <h2 id="s9-4">9.4 Contenido del paquete</h2>
+  <table class="compact">
+    <thead><tr><th style="width:34%">Ruta</th><th>Contenido</th></tr></thead>
+    <tbody>
+      <tr><td><code>Manual-Usuario-Novvus.pdf</code></td><td>Este documento en formato PDF.</td></tr>
+      <tr><td><code>Reporte-Tecnico-Novvus.pdf</code></td><td>Especificaciones, arquitectura y proceso de construcción.</td></tr>
+      <tr><td><code>documentacion/</code></td><td>Fuentes HTML de ambos documentos y hoja de estilo.</td></tr>
+      <tr><td><code>capturas/</code></td><td>Las 19 capturas de pantalla en PNG.</td></tr>
+      <tr><td><code>diagramas/</code></td><td>Los 8 diagramas en SVG vectorial.</td></tr>
+      <tr><td><code>codigo/</code></td><td>Código fuente del SDK y de los módulos personalizados.</td></tr>
+      <tr><td><code>docker/</code></td><td>Configuración de despliegue y respaldos de base de datos.</td></tr>
+      <tr><td><code>LEEME.md</code></td><td>Instrucciones de instalación y puesta en marcha.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s9-5">9.5 Verificación rápida del paquete</h2>
+  <p>Antes de dar por recibida la entrega, conviene comprobar que todo abrió correctamente. Son cinco minutos y evitan descubrir un archivo faltante cuando ya se necesita:</p>
+  <table class="compact">
+    <thead><tr><th style="width:30%">Comprobación</th><th>Cómo hacerla</th></tr></thead>
+    <tbody>
+      <tr><td>Documentos legibles</td><td>Abra los dos PDF y recorra el índice: las páginas deben coincidir y las figuras verse completas.</td></tr>
+      <tr><td>Capturas presentes</td><td>La carpeta <code>capturas/</code> debe contener 19 archivos PNG con nombres numerados del 01 al 19.</td></tr>
+      <tr><td>Diagramas vectoriales</td><td>Los 8 SVG de <code>diagramas/</code> se abren en el navegador y conservan nitidez al ampliarlos.</td></tr>
+      <tr><td>Código fuente</td><td><code>codigo/</code> incluye el SDK y los módulos; cada módulo trae su manifiesto y sus migraciones.</td></tr>
+      <tr><td>Despliegue</td><td><code>docker/</code> contiene el archivo de composición y el respaldo <code>.dump</code> de la base.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip"><span class="ico">✓</span><div><b>Si algo no abre</b> Copie la carpeta completa antes de extraer los archivos: algunos visores de PDF pierden las rutas relativas de las figuras si el documento se abre desde dentro del ZIP.</div></div>
+
+  <h2 id="s9-6">9.6 Para continuar</h2>
+  <p>Este manual cubre la operación diaria. Los temas que quedan fuera se resuelven en el reporte técnico o con el responsable de la plataforma:</p>
+  <ul>
+    <li><strong>Detalle de arquitectura y decisiones:</strong> reporte técnico, capítulos 2 y 3.</li>
+    <li><strong>Esquema completo de las 116 tablas:</strong> reporte técnico, capítulo 5, y las migraciones de cada módulo.</li>
+    <li><strong>Resultados de las pruebas:</strong> reporte técnico, capítulo 11.</li>
+    <li><strong>Alta de usuarios, roles y permisos:</strong> capítulo 3 de este manual.</li>
+  </ul>
+  <p>Con el ambiente levantado y las cuentas de demostración, cualquier persona puede recorrer el flujo comercial completo en menos de media hora y comprobar por sí misma lo que describen estas páginas.</p>
+
+  <hr class="soft">
+  <p class="small center">Novvus · Manual de usuario · Versión 1.0 · Noviembre de 2026</p>
+</section>
+
+</body>
+</html>

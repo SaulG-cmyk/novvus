@@ -1,0 +1,33 @@
+# Artefactos de trabajo
+
+# Proyecto ajeno a Novvus
+Lictus-Odoo/
+
+# Entorno virtual de desarrollo
+dev/venv/
+
+# Copia descomprimida y paquete generado
+entrega/Novvus-Sistema/
+entrega/Novvus-Sistema.zip
+entrega.zip
+documentación-html.zip
+
+# Construcción: solo se conserva lo necesario para desplegar
+entrega/_build/*
+!entrega/_build/docker/
+
+# Secretos de despliegue: se mantienen en local, nunca en el repo
+entrega/_build/docker/.env
+
+# La imagen de evidencia se obtiene del registro público; no se versiona
+entrega/evidencia/crm-0.2.20.tar.gz
+
+# Respaldos de base de datos sueltos en la raíz
+/novvus_*.dump
+
+# Varios
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+*.log

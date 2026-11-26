@@ -1,0 +1,137 @@
+# NOVVUS CORE — manifiesto de despliegue escrito por `novvus install`.
+# Gemelo de docker-compose.prod.yml del repo, sin las secciones `build:`
+# (el servidor del cliente no tiene el código fuente; todo llega de imágenes
+# ya publicadas). cli/tests/template_sync.rs vigila que no se desincronicen.
+# NOVVUS_REGISTRY viene del .env que genera el instalador (default GHCR).
+# Solo la plataforma: los módulos van en modules.compose.yml (Fase D).
+
+name: novvus-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      platform: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+    # Sin `ports`: solo los servicios internos hablan con la base.
+
+  kernel:
+    image: ${NOVVUS_REGISTRY:-ghcr.io/novvus}/core:${NOVVUS_VERSION:?Define NOVVUS_VERSION en .env (p.ej. 0.1.0)}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      NOVVUS_BIND_ADDR: 0.0.0.0:8000
+      NOVVUS_JWT_ACCESS_SECRET: "${NOVVUS_JWT_ACCESS_SECRET:?Genera con: openssl rand -hex 32}"
+      NOVVUS_JWT_REFRESH_SECRET: "${NOVVUS_JWT_REFRESH_SECRET:?Genera con: openssl rand -hex 32}"
+      NOVVUS_INTERNAL_HMAC_SECRET: "${NOVVUS_INTERNAL_HMAC_SECRET:?Genera con: openssl rand -hex 32}"
+      NOVVUS_MODULE_DB_PASSWORD: "${NOVVUS_MODULE_DB_PASSWORD:?Genera con: openssl rand -hex 32}"
+      NOVVUS_BOOTSTRAP_TOKEN: "${NOVVUS_BOOTSTRAP_TOKEN:?Genera con: openssl rand -hex 32}"
+      NOVVUS_LOG_LEVEL: ${NOVVUS_LOG_LEVEL:-info}
+      # Tamaño máximo por archivo subido a Files (bytes; vacío = 50 MB, docs/FILES.md §3). La web lo
+      # lee del kernel (GET /api/core/files/limits); el reverse proxy debe admitir al menos ese cuerpo.
+      NOVVUS_FILES_MAX_SIZE_BYTES: "${NOVVUS_FILES_MAX_SIZE_BYTES:-}"
+      # Closed registration (NOVVUS_REGISTRATION_OPEN=false in .env) only admits the very
+      # first account; without this line the kernel never saw the variable.
+      NOVVUS_REGISTRATION_OPEN: ${NOVVUS_REGISTRATION_OPEN:-true}
+      # Invitation delivery configuration; secrets remain in the installation .env.
+      NOVVUS_PUBLIC_URL: "${NOVVUS_PUBLIC_URL:-http://localhost:3000}"
+      NOVVUS_MAIL_TRANSPORT: "${NOVVUS_MAIL_TRANSPORT:-microsoft_graph}"
+      NOVVUS_MAIL_FROM: "${NOVVUS_MAIL_FROM:-}"
+      NOVVUS_SMTP_HOST: "${NOVVUS_SMTP_HOST:-smtp.office365.com}"
+      NOVVUS_SMTP_PORT: "${NOVVUS_SMTP_PORT:-587}"
+      NOVVUS_SMTP_FROM: "${NOVVUS_SMTP_FROM:-}"
+      NOVVUS_SMTP_USERNAME: "${NOVVUS_SMTP_USERNAME:-}"
+      NOVVUS_SMTP_AUTH: "${NOVVUS_SMTP_AUTH:-microsoft_oauth}"
+      NOVVUS_SMTP_PASSWORD: "${NOVVUS_SMTP_PASSWORD:-}"
+      NOVVUS_MICROSOFT_TENANT_ID: "${NOVVUS_MICROSOFT_TENANT_ID:-}"
+      NOVVUS_MICROSOFT_CLIENT_ID: "${NOVVUS_MICROSOFT_CLIENT_ID:-}"
+      NOVVUS_MICROSOFT_CLIENT_SECRET: "${NOVVUS_MICROSOFT_CLIENT_SECRET:-}"
+    volumes:
+      - files:/data/files
+      # Licencia (ADR-001 Fase G4): solo material público que escribe el CLI;
+      # el kernel lo verifica por sí mismo. Nunca se monta license/ (clave privada).
+      - ./entitlement:/run/novvus-entitlement:ro
+    networks:
+      platform: {}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    # Sin `ports`: el navegador entra por la web (proxy same-origin).
+
+  # Se ejecuta una vez por arranque y termina: registra/instala/habilita los
+  # módulos a nivel instancia (aplicando sus migraciones) con el token de
+  # bootstrap de plataforma y publica los tokens de servicio en el volumen
+  # compartido. NO crea usuarios ni organizaciones: la cuenta administradora y
+  # la organización se crean desde la web en el primer acceso (first-run).
+  # Idempotente: re-ejecutarlo sobre una base existente es seguro.
+  bootstrap:
+    image: ${NOVVUS_REGISTRY:-ghcr.io/novvus}/bootstrap:${NOVVUS_VERSION}
+    restart: "no"
+    environment:
+      NOVVUS_KERNEL_URL: http://kernel:8000
+      NOVVUS_BOOTSTRAP_TOKEN: "${NOVVUS_BOOTSTRAP_TOKEN}"
+    volumes:
+      - tokens:/run/novvus
+    networks:
+      platform: {}
+    depends_on:
+      kernel:
+        condition: service_healthy
+    logging: *default-logging
+
+  # Los módulos (CRM, Projects, ...) NO viven aquí desde la Fase D de
+  # ADR-001: los resuelve `novvus install`/`novvus update` a partir del
+  # snapshot del release y los describe modules.compose.yml, que se aplica
+  # junto con este archivo:
+  #   docker compose -f docker-compose.yml -f modules.compose.yml up -d
+  # Cada módulo corre en su propia red (mod_<id>); kernel y postgres se unen a
+  # todas ellas; los módulos no se ven entre sí (cross-module solo vía kernel).
+
+  web:
+    image: ${NOVVUS_REGISTRY:-ghcr.io/novvus}/web:${NOVVUS_VERSION}
+    restart: unless-stopped
+    environment:
+      NOVVUS_KERNEL_URL: http://kernel:8000
+      # Acento de marca de la instalación (#rrggbb); vacío = tema neutral.
+      NOVVUS_BRAND_ACCENT: "${NOVVUS_BRAND_ACCENT:-}"
+      # Teselas del mapa (docs/DEPLOYMENT.md §7.3); vacío = OpenStreetMap público (solo desarrollo).
+      NOVVUS_MAP_TILES_URL: "${NOVVUS_MAP_TILES_URL:-}"
+      NOVVUS_MAP_TILES_URL_DARK: "${NOVVUS_MAP_TILES_URL_DARK:-}"
+      NOVVUS_MAP_ATTRIBUTION: "${NOVVUS_MAP_ATTRIBUTION:-}"
+      NOVVUS_MAP_MAX_ZOOM: "${NOVVUS_MAP_MAX_ZOOM:-}"
+    ports:
+      - "${NOVVUS_WEB_PORT:-8077}:3000"
+    networks:
+      platform: {}
+    depends_on:
+      kernel:
+        condition: service_healthy
+    logging: *default-logging
+
+volumes:
+  pgdata:
+  files:
+  tokens:
+
+networks:
+  platform: {}

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contribuir y calidad — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav active" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Equipo / Contribuir y calidad</div>
+    <article>
+      <h1>Contribuir y calidad</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Las reglas del juego para trabajar en el repositorio: contratos antes que código, convenciones
+      de nombres y de idioma, cómo correr cada una de las suites, qué bloquea el CI, dónde están las trampas del
+      entorno, cómo se propone un módulo nuevo y cómo se publica una versión.</p>
+
+      <h2>La regla de oro: contratos primero</h2>
+      <p>Los 19 documentos de <code>documents/docs/</code> son <strong>la ley del proyecto</strong> (índice completo en
+      <a href="referencia.html">Referencia técnica</a>). Si tu cambio toca un contrato — un endpoint del kernel, una sección
+      del manifiesto, una tabla de <code>core</code>, una garantía del bus, una regla del meta — <strong>edita primero el
+      documento y después el código</strong>. Las decisiones que no ameritan contrato se anotan en una línea con fecha en
+      <code>DECISIONS.md</code> (<code>AAAA-MM-DD — [área] decisión — motivo</code>); lo que pertenece al futuro va a
+      <code>BACKLOG.md</code> y no se implementa hasta su fase.</p>
+      <div class="warn"><b>No adelantes fases ni «mejores» el stack.</b> Rust/axum/sqlx, FastAPI/Pydantic v2/SQLAlchemy 2,
+      Postgres 16 y Next.js son fijos. Si detectas que algo se necesitará más adelante, documéntalo en <code>BACKLOG.md</code>
+      y sigue. Un umbral de CI puede subirse editando el número; bajarlo exige una entrada en <code>DECISIONS.md</code>.</div>
+      <div class="note"><b>La carpeta <code>documents/</code> está gitignorada.</b> Los contratos y esta documentación HTML viven
+      en local; el <code>README.md</code> del repo todavía enlaza <code>docs/*.md</code> (enlaces rotos conocidos).</div>
+
+      <h2>Mapa del monorepo</h2>
+<pre class="diagram">
+04_novuus-core/
+├── VERSION                    # 0.1.6 — fuente única de la versión de plataforma
+├── CHANGELOG.md · README.md · Makefile
+├── kernel/                    # workspace Rust: 7 crates + migrations/ (0001…0011) + Dockerfile
+│   └── crates/novvus-{common,identity,rbac,registry,events,files,gateway}
+├── sdk/                       # novvus-sdk (Python): src/novvus_sdk/, tests/, pyproject.toml
+├── modules/{crm,projects,salesmx}/
+├── apps/web/                  # Next.js 16: src/app, src/components, src/lib, e2e/smoke.spec.ts
+├── cli/                       # CLI administrativo en Rust (install/update/status/version)
+├── distribution/              # install.sh + tests/run.sh (bootstrap del CLI)
+├── docker/                    # bootstrap.Dockerfile, module.Dockerfile (MODULE=crm|projects)
+├── scripts/bootstrap.py       # aprovisionamiento: modo plataforma (token) o demo
+├── docker-compose.yml         # solo Postgres (dev)
+├── docker-compose.full.yml    # plataforma completa construida localmente (demo)
+├── docker-compose.prod.yml    # producción con imágenes GHCR (plantilla embebida en el CLI)
+├── install.py · install.bat · install.sh   # instalador demo local
+├── start.bat · off.bat        # arranque/parada en Windows (gitignorados)
+├── .github/workflows/{ci.yml,release.yml}
+└── documents/                 # gitignorado: docs/ (19 contratos) y documentación-html/
+</pre>
+
+      <h2>Flujo de trabajo</h2>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>Rama desde <code>main</code>. Commits pequeños con prefijo convencional: <code>feat:</code>, <code>fix:</code>, <code>docs:</code>, <code>test:</code>, <code>chore:</code>.</div></div>
+        <div class="step"><span class="num">2</span><div>Contrato → código → tests. Nada se considera terminado sin tests que pasen; si un módulo necesita algo del SDK, se hace <em>en el SDK con sus tests</em>, nunca como parche dentro del módulo.</div></div>
+        <div class="step"><span class="num">3</span><div>Corre localmente la suite que tocaste (abajo) y <code>make lint</code>. Recuerda que <code>next build</code> ya no ejecuta ESLint.</div></div>
+        <div class="step"><span class="num">4</span><div>PR hacia <code>main</code>; los 8 jobs del CI deben quedar en verde. Un PR no se mezcla con CI rojo.</div></div>
+      </div>
+
+      <h2>Convenciones</h2>
+      <h3>Idioma</h3>
+      <ul>
+        <li><strong>Código, identificadores y comentarios en inglés.</strong> Comenta solo lo que el código no puede decir: restricciones, decisiones de contrato, porqués — nunca «qué hace la siguiente línea».</li>
+        <li><strong>UI, textos de negocio, catálogos i18n y documentación en español.</strong> El idioma fuente es <code>es-MX</code>: la cadena en español <em>es</em> la clave de traducción; jamás claves artificiales tipo <code>page.title</code>. Los labels de campos personalizados son dato del usuario y no pasan por i18n.</li>
+      </ul>
+      <h3>Nombres (los valida el kernel y el SDK)</h3>
+      <table>
+        <tr><th>Cosa</th><th>Forma</th><th>Regla</th></tr>
+        <tr><td>Id de módulo</td><td><code>^[a-z][a-z0-9_]{1,31}$</code></td><td>Reservados: <code>core</code>, <code>api</code>, <code>internal</code>, <code>novvus</code>. Define esquema <code>mod_{id}</code> y namespace <code>/api/{id}</code>.</td></tr>
+        <tr><td>Permiso</td><td><code>{módulo}.{recurso}.{acción}</code></td><td>Solo dentro del propio namespace. Los <em>requisitos</em> son concretos; los <em>otorgamientos</em> pueden usar comodines. Owner = <code>*</code>.</td></tr>
+        <tr><td>Evento</td><td><code>{módulo}.{entidad}.{acción}</code></td><td><code>emits</code> solo del propio namespace; <code>listens</code> de cualquiera. Emitir algo no declarado es error.</td></tr>
+        <tr><td>Clave de config · cron</td><td><code>{módulo}.{nombre}</code></td><td>Únicas por módulo; <code>interval_seconds ≥ 1</code>; permiso de config del propio namespace o <code>core.modules.manage</code>.</td></tr>
+        <tr><td>Migración</td><td><code>NNNN_nombre.sql</code></td><td>Orden lexicográfico; <strong>inmutable</strong> una vez aplicada (checksum). Solo el esquema <code>mod_{id}</code>. Alembic solo genera; el SQL es el artefacto canónico.</td></tr>
+        <tr><td>Campo de extensión</td><td><code>^[a-z][a-z0-9_]{0,63}$</code></td><td>Máx. 32 campos por extensor y 16 extensores por modelo; el target debe estar en <code>[dependencies] modules</code>.</td></tr>
+        <tr><td>Campo personalizado</td><td><code>^[a-z][a-z0-9_]{0,29}$</code></td><td><code>name</code> y <code>type</code> inmutables; 50 por modelo por defecto.</td></tr>
+        <tr><td>Ruta de <code>[ui]</code></td><td><code>/{id}</code> o <code>/{id}/…</code></td><td>Nunca hacia otro módulo, la shell ni <code>/m/…</code>; iconos como slug <code>[a-z0-9-]</code>.</td></tr>
+      </table>
+      <h3>Frontend</h3>
+      <ul>
+        <li><strong>Next.js 16 no es el que conoces.</strong> Antes de escribir código lee la guía correspondiente en <code>apps/web/node_modules/next/dist/docs/</code> (es la instrucción de <code>apps/web/AGENTS.md</code>) y respeta los avisos de deprecación.</li>
+        <li>Los componentes shadcn están construidos sobre <strong>Base UI</strong>: los triggers usan <code>render={…}</code>, no <code>asChild</code>.</li>
+        <li>La shell de plataforma es <em>solo</em> administrador de módulos (launcher, <code>/apps</code>, <code>/settings</code>, <code>/admin</code>). Toda UI de negocio vive bajo el chrome del módulo (<code>ModuleShell</code>) o en las vistas genéricas <code>/m/{módulo}/{modelo}</code>; el manifiesto gana sobre <code>MODULE_REGISTRY</code>, que es solo respaldo offline.</li>
+        <li>Lint con <code>eslint src</code> (ESLint 9 + <code>eslint-config-next</code>); tests con Vitest 4 + Testing Library en jsdom; E2E con Playwright.</li>
+      </ul>
+      <h3>Python y Rust</h3>
+      <ul>
+        <li>ruff con <code>line-length = 100</code>, reglas <code>E F I UP B SIM RUF</code> (se ignora <code>B008</code> por <code>Depends()</code>); mypy <strong>estricto</strong> con el plugin de Pydantic sobre <code>src/novvus_sdk</code>.</li>
+        <li><code>autoapi.py</code> no puede usar <code>from __future__ import annotations</code>: FastAPI necesita evaluar los esquemas Pydantic generados dinámicamente.</li>
+        <li>Rust: <code>cargo fmt --check</code> y <code>clippy --all-targets -- -D warnings</code> con cero tolerancia, en <code>kernel/</code> y en <code>cli/</code>.</li>
+      </ul>
+
+      <h2>Preparar el entorno de desarrollo</h2>
+      <p>Requisitos: Docker con Compose v2, Rust stable (<code>cargo</code>), Python ≥ 3.12 y Node 22. El flujo manual completo
+      (equivalente a lo que automatiza <code>start.bat</code> en Windows):</p>
+<pre><code>cp .env.example .env                       <span class="c"># secretos de desarrollo; nunca los uses en producción</span>
+make up                                    <span class="c"># solo Postgres 16 (docker-compose.yml)</span>
+cd kernel &amp;&amp; cargo run -p novvus-gateway    <span class="c"># :8000 — aplica sus migraciones core al arrancar</span>
+
+pip install -e "sdk[dev]"                  <span class="c"># trae el CLI `novvus` del SDK</span>
+cd modules/crm
+novvus deploy --kernel http://127.0.0.1:8000 --token &lt;JWT con core.modules.manage&gt;
+<span class="c"># → imprime NOVVUS_SERVICE_TOKEN=nvk_... UNA sola vez: guárdalo en modules/crm/.env</span>
+NOVVUS_SERVICE_TOKEN=nvk_... novvus run --port 8110
+<span class="c"># projects igual, en 8120 (depende de crm habilitado)</span>
+
+cd apps/web &amp;&amp; npm install &amp;&amp; npm run dev   <span class="c"># :3000, rewrite /api → NOVVUS_KERNEL_URL</span></code></pre>
+      <p>Atajos: <code>make demo</code> levanta todo en contenedores con datos de demostración (<code>demo@novvus.dev</code>), y
+      <code>python scripts/bootstrap.py</code> con <code>NOVVUS_DEMO=1</code> aprovisiona usuario, organización, roles, módulos y seed contra un
+      kernel ya corriendo — exactamente lo que hace el job <code>e2e</code>. <code>off.bat</code> apaga todo en Windows.</p>
+
+      <h2>Correr cada suite</h2>
+      <p>Los tests de integración usan el Postgres de <code>make up</code> (<code>DATABASE_URL</code> con fallback a la BD dev) y crean
+      <strong>bases efímeras</strong> por test que se destruyen al terminar: nunca ensucian tus datos. En Windows, sustituye
+      <code>python</code> por <code>sdk/.venv/Scripts/python</code>.</p>
+<pre><code><span class="c"># Kernel (Rust) — requiere Postgres arriba</span>
+cd kernel &amp;&amp; cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings &amp;&amp; cargo fmt --check
+
+<span class="c"># SDK (Python)</span>
+pip install -e "sdk[dev]"                                   <span class="c"># una vez</span>
+cd sdk &amp;&amp; python -m pytest -q --cov=novvus_sdk
+python -m ruff check . ../modules/crm ../modules/projects ../modules/salesmx &amp;&amp; python -m mypy
+
+<span class="c"># Módulos: arnés con BD efímera + app en modo offline + peticiones firmadas como el gateway</span>
+cd modules/crm      &amp;&amp; python -m pytest -q --cov=.
+cd modules/projects &amp;&amp; python -m pytest -q --cov=.
+cd modules/salesmx  &amp;&amp; python -m pytest -q                <span class="c"># módulo sin modelos: sin cobertura</span>
+
+<span class="c"># Web (Next.js 16)</span>
+cd apps/web &amp;&amp; npm ci
+npm run lint              <span class="c"># eslint src — OBLIGATORIO: next build NO corre ESLint</span>
+npm test                  <span class="c"># vitest run (npm run test:coverage para cobertura)</span>
+npm run build             <span class="c"># incluye chequeo de tipos</span>
+npm run test:e2e          <span class="c"># playwright test; exige el stack completo corriendo</span>
+
+<span class="c"># CLI administrativo (Rust)</span>
+cd cli &amp;&amp; cargo fmt --check &amp;&amp; cargo clippy --all-targets -- -D warnings &amp;&amp; cargo test &amp;&amp; cargo build --release
+
+<span class="c"># Instalador del CLI (bash): shellcheck sigue el `source` de los tests</span>
+shellcheck -x distribution/install.sh distribution/tests/run.sh
+bash distribution/tests/run.sh   <span class="c"># servidor HTTP local + árbol de distribución falso; cero requests reales</span></code></pre>
+
+      <h3>Anatomía del arnés de tests de un módulo</h3>
+      <p>El patrón canónico está en <code>modules/projects/tests/conftest.py</code> (y en <code>modules/salesmx/tests/</code> para módulos sin modelos). Tres piezas:</p>
+      <ol>
+        <li><strong>Base efímera por sesión.</strong> Con el DSN admin (<code>DATABASE_URL</code>) crea <code>novvus_projects_test_&lt;hex&gt;</code>, la prepara con el rol <code>novvus_module</code> (<code>NOVVUS_MODULE_DB_PASSWORD</code>) y la destruye al terminar. Si Postgres no está, <code>pytest.skip</code>: la suite nunca falla por infraestructura ausente.</li>
+        <li><strong>App en modo offline.</strong> El módulo arranca con <code>NOVVUS_DATABASE_URL</code> + <code>NOVVUS_INTERNAL_HMAC_SECRET</code> fijos por el test, sin kernel: los <code>module.emit</code> se registran con warning y <code>module.call</code> lanza <code>RuntimeError</code>; lo que dependa del kernel se simula con <code>monkeypatch</code> (Proyectos parchea <code>dependency_statuses</code> para probar el estado degradado).</li>
+        <li><strong>Peticiones firmadas como el gateway.</strong> Un helper <code>signed_headers(method, path, org, perms, user)</code> que usa <code>novvus_sdk.security.sign</code> con el mismo secreto. Así cada test elige tenant y permisos y se cubren los 401/403 sin tocar el kernel.</li>
+      </ol>
+<pre><code><span class="c"># modules/projects/tests/conftest.py (extracto real)</span>
+<span class="k">if</span> sys.platform == <span class="s">"win32"</span>:
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+FULL_PERMS = <span class="s">"projects.projects.*,projects.tasks.*"</span>
+
+<span class="k">def</span> <span class="f">signed_headers</span>(method, path, org, perms=<span class="s">""</span>, user=<span class="k">None</span>):
+    <span class="k">from</span> novvus_sdk.security <span class="k">import</span> sign
+    timestamp = int(time.time())
+    user_str = str(user) <span class="k">if</span> user <span class="k">else</span> <span class="s">""</span>
+    <span class="k">return</span> {
+        <span class="s">"x-novvus-user"</span>: user_str, <span class="s">"x-novvus-org"</span>: str(org), <span class="s">"x-novvus-perms"</span>: perms,
+        <span class="s">"x-novvus-timestamp"</span>: str(timestamp),
+        <span class="s">"x-novvus-signature"</span>: sign(HMAC_SECRET, user_str, str(org), perms, timestamp, method, path),
+    }
+
+<span class="c"># En un test: el mismo registro con otra org debe ser 404 (RLS), sin permiso 403</span>
+r = <span class="k">await</span> client.get(<span class="s">f"/api/projects/projects/{pid}"</span>,
+                     headers=signed_headers(<span class="s">"GET"</span>, <span class="s">f"/api/projects/projects/{pid}"</span>, other_org, FULL_PERMS))
+<span class="k">assert</span> r.status_code == <span class="n">404</span></code></pre>
+      <p>Los umbrales de cobertura de cada módulo (<code>crm ≥ 95</code>, <code>projects ≥ 90</code>) se miden con <code>--cov=.</code> sobre el directorio del módulo, de modo que <code>business.py</code> y los handlers de eventos cuentan.</p>
+
+      <h3>Tests de integración del kernel</h3>
+      <p><code>kernel/crates/novvus-gateway/tests/</code> levanta la app real en proceso contra Postgres (<code>tests/common/mod.rs</code>, con timeouts HTTP) y cubre un flujo por archivo: <code>auth_flow</code>, <code>modules_lifecycle</code>, <code>org_modules</code>, <code>module_config</code>, <code>platform_bootstrap</code>, <code>events_flow</code>, <code>automation</code> (cron y hooks), <code>catalog</code>, <code>meta_flow</code>, <code>files_flow</code>, <code>extensions_flow</code>, <code>custom_fields_flow</code>, <code>chatter_flow</code> y <code>sse_flow</code>. Un endpoint nuevo en <code>lib.rs</code> sin su test en esta carpeta no pasa revisión: es lo que mantiene el trinquete del 85 % y lo que cazó el bug del JOIN de <code>org_lifecycle</code>.</p>
+
+      <h3>Añadir una migración del kernel o un idioma</h3>
+      <ul>
+        <li><strong>Migración de <code>core</code>:</strong> archivo <code>kernel/migrations/00NN_nombre.sql</code> (la siguiente es <code>0012</code>); <code>sqlx::migrate!</code> la embebe y el gateway la aplica al arrancar. Documenta la tabla en <code>DATA_MODEL.md</code> con la justificación de cada índice, y si añade permisos, insértalos ahí mismo como hace <code>0010_custom_fields.sql</code>.</li>
+        <li><strong>Migración de módulo:</strong> <code>novvus makemigration -m nombre</code> con <code>NOVVUS_DATABASE_URL</code> apuntando a una base donde ya corrió la anterior; revisa el SQL generado (RLS, <code>org_id</code>, <code>ext</code>/<code>custom</code>) antes de commitear.</li>
+        <li><strong>Idioma nuevo:</strong> añade el locale a <code>LOCALES</code> y su catálogo a <code>CATALOGS</code> en <code>apps/web/src/lib/i18n.tsx</code>, y un <code>i18n/{locale}.json</code> por módulo. No hay extracción automática: los catálogos se mantienen a mano.</li>
+      </ul>
+
+      <h3>Targets del Makefile</h3>
+      <table>
+        <tr><th>Target</th><th>Qué hace</th></tr>
+        <tr><td><code>up</code> · <code>down</code> · <code>ps</code> · <code>logs</code></td><td>Solo la infraestructura: Postgres 16 del <code>docker-compose.yml</code> raíz.</td></tr>
+        <tr><td><code>full-up</code> · <code>full-down</code> · <code>demo</code></td><td>Plataforma completa en Docker (<code>docker-compose.full.yml</code>, proyecto <code>novvus</code>); <code>demo</code> imprime las credenciales de demostración.</td></tr>
+        <tr><td><code>kernel-test</code> · <code>sdk-test</code> · <code>crm-test</code> · <code>projects-test</code> · <code>salesmx-test</code> · <code>web-test</code></td><td>Una suite cada uno. Ojo: <code>web-test</code> solo hace <code>npm run build</code>; lint y Vitest van aparte.</td></tr>
+        <tr><td><code>test</code></td><td>Todas las anteriores en cadena.</td></tr>
+        <tr><td><code>fmt</code> · <code>lint</code></td><td><code>cargo fmt</code> / <code>clippy -D warnings</code> + ruff sobre SDK y los tres módulos + mypy.</td></tr>
+      </table>
+
+      <h2>Qué revisa el CI (8 jobs)</h2>
+      <p><code>.github/workflows/ci.yml</code> corre en cada push y PR a <code>main</code>, y es reutilizable desde <code>release.yml</code>: un tag no publica nada sin pasar exactamente esta suite.</p>
+      <table>
+        <tr><th>Job</th><th>Pasos</th><th>Gate</th></tr>
+        <tr><td><strong>kernel</strong></td><td>fmt --check → clippy -D warnings → <code>cargo test --workspace</code> con Postgres 16 de servicio.</td><td>Bloqueante. <code>timeout-minutes: 30</code> (guardia contra cuelgues: un test quedó 6 h colgado el 2026-08-12).</td></tr>
+        <tr><td><strong>cli</strong></td><td>fmt → clippy → <code>cargo test</code> → <code>cargo build --release</code>.</td><td>Bloqueante.</td></tr>
+        <tr><td><strong>installer</strong></td><td><code>shellcheck -x</code> + <code>distribution/tests/run.sh</code>.</td><td>Bloqueante.</td></tr>
+        <tr><td><strong>python</strong></td><td>ruff (sdk, crm, projects) → mypy → pytest con cobertura: sdk, crm, projects; salesmx sin umbral.</td><td><span class="badge ok">sdk ≥ 70 %</span> <span class="badge ok">crm ≥ 95 %</span> <span class="badge ok">projects ≥ 90 %</span> (<code>--cov-fail-under</code>). Usa <code>COVERAGE_CORE=sysmon</code>.</td></tr>
+        <tr><td><strong>kernel-coverage</strong></td><td><code>cargo llvm-cov --workspace --summary-only --fail-under-lines 85</code>.</td><td><span class="badge ok">≥ 85 % líneas</span> (baseline 2026-07-28: 87.6 %; hoy 91.5 %).</td></tr>
+        <tr><td><strong>mutation-python</strong></td><td><code>mutmut run</code> sobre <code>novvus_sdk/manifest.py</code> + <code>mutmut results</code>.</td><td><span class="badge warn">informativo</span> (<code>continue-on-error</code>; los survivors se leen en el log). Solo Linux.</td></tr>
+        <tr><td><strong>web</strong></td><td><code>npm ci</code> → <code>npm run lint</code> → <code>npm test</code> → <code>npm run build</code> (Node 22).</td><td>Bloqueante. El lint es explícito porque <code>next build</code> ya no lo corre.</td></tr>
+        <tr><td><strong>e2e</strong></td><td>Stack real en el runner: gateway en debug + <code>scripts/bootstrap.py</code> en modo demo (admin, org, roles, deploy de crm/projects, seed) + <code>novvus run</code> de ambos módulos + <code>next build &amp;&amp; next start</code>, todo <em>health-gated</em> con <code>curl --retry</code>; encima, Playwright (Chromium).</td><td>Bloqueante a propósito; <code>timeout 30m</code>. En fallo sube logs y traces.</td></tr>
+      </table>
+      <div class="note"><b>Inconsistencia conocida.</b> El <code>Makefile</code> pasa ruff sobre <code>modules/salesmx</code>; el job <code>python</code> del CI todavía no lo incluye en el lint (sí corre sus tests).</div>
+      <details class="fold"><summary>Ver más: el job e2e paso a paso (y cómo reproducirlo en local)</summary>
+        <ol>
+          <li><code>cargo build -p novvus-gateway</code> y arranque en background con <code>NOVVUS_BIND_ADDR=127.0.0.1:8000</code>; espera con <code>curl --retry 60</code> a <code>/health</code>.</li>
+          <li><code>pip install -e sdk</code> y <code>python scripts/bootstrap.py</code> con <code>NOVVUS_DEMO=1</code>, <code>NOVVUS_TOKENS_DIR</code>, <code>NOVVUS_MODULES_DIR</code> y <code>NOVVUS_DATABASE_URL</code> del rol <code>novvus_module</code> (para el seed).</li>
+          <li><code>source</code> de <code>crm.env</code> / <code>projects.env</code> (los tokens que escribió el bootstrap) y <code>novvus run --port 8110 / 8120</code>; espera a ambos <code>/health</code> (esto valida también el handshake).</li>
+          <li><code>npm ci &amp;&amp; npm run build &amp;&amp; npm run start</code>; espera a <code>http://localhost:3000/login</code>.</li>
+          <li><code>npx playwright install chromium --with-deps</code> y <code>npm run test:e2e</code> (<code>apps/web/e2e/smoke.spec.ts</code>).</li>
+          <li>En fallo: vuelca <code>gateway.log</code>, <code>crm.log</code>, <code>projects.log</code>, <code>web.log</code> y sube <code>apps/web/test-results/</code> como artifact.</li>
+        </ol>
+        <p>En local basta con tener el stack arriba (<code>start.bat</code> o el flujo manual de arriba, con datos demo) y ejecutar <code>npm run test:e2e</code> desde <code>apps/web</code>. Si el smoke se volviera inestable, la instrucción del propio workflow es bajarlo a <code>continue-on-error: true</code> documentando el porqué.</p>
+      </details>
+
+      <h2>Baseline de QA y trinquetes</h2>
+      <p>La tabla de <code>QA.md §2</code> es el baseline vigente (2026-07-28, iteración 4). Los umbrales de CI están fijados justo debajo y <strong>solo pueden subir</strong>.</p>
+      <table>
+        <tr><th>Suite</th><th>Tests</th><th>Cobertura (líneas)</th></tr>
+        <tr><td>kernel (7 crates)</td><td>149</td><td>91.5 % (89.2 % regiones, 90.0 % funciones); <code>routes/modules.rs</code> 98.3 %, <code>routes/extensions.rs</code> 91.7 % de regiones</td></tr>
+        <tr><td>sdk</td><td>85</td><td>75 %, 0 <code>SAWarning</code></td></tr>
+        <tr><td>modules/crm</td><td>8</td><td>98 %</td></tr>
+        <tr><td>modules/projects</td><td>3</td><td>94 %</td></tr>
+        <tr><td>modules/salesmx</td><td>8</td><td>n/a (sin modelos)</td></tr>
+        <tr><td>apps/web (Vitest)</td><td>53</td><td>15.9 % statements (páginas CRM 82–89 %); umbral pendiente hasta tener masa de tests de páginas</td></tr>
+        <tr><td>apps/web (Playwright)</td><td>1 smoke de 5 pasos</td><td>n/a</td></tr>
+      </table>
+      <h3>Mutation testing</h3>
+      <ul>
+        <li><strong>Rust:</strong> <code>cargo-mutants</code> sobre <code>novvus-registry/src/manifest.rs</code>: 152 mutantes, 117 cazados, 0 vivos, 35 inviables → <strong>100 % de kill rate</strong> de los viables (era 74 % antes de 16 kill-tests). La pasada con <code>--test-workspace</code> sobre lifecycle/org_lifecycle/catalog/migrations dejó solo 2 mutantes equivalentes demostrados.</li>
+        <li><strong>Python:</strong> <code>mutmut</code> sobre <code>manifest.py</code>, solo en CI Linux (mutmut 3 exige <code>fork</code>).</li>
+        <li>Por qué paga: el kill-test de la iteración 7 encontró que <code>org_lifecycle::view_for</code> concatenaba <code>AND m.id = $2</code> al <code>ON</code> del LEFT JOIN y, con ≥ 2 módulos, <code>install/enable/disable</code> podía responder la vista de <em>otro</em> módulo (<code>QA.md §5</code>).</li>
+      </ul>
+      <details class="fold"><summary>Ver más: otros bugs que la auditoría de QA encontró</summary>
+        <ul>
+          <li>Tras el login SPA, <code>/api/core/me</code> nunca se pedía (query congelada en <code>enabled: false</code> en los providers raíz) y toda nav gateada por permiso se ocultaba hasta recargar. Fix: navegación dura al entrar. Detectado porque el trace de Playwright no mostraba la petición.</li>
+          <li><code>GET /api/crm/reports/conversion</code> perdía leads nocturnos al oeste de UTC (ventana exclusiva sobre timestamps UTC). Fix: ventana inclusiva. El test solo fallaba después de las 18:00 hora de México: <em>los tests dependientes de la hora del día son sospechosos por diseño</em>.</li>
+          <li>7 errores de ESLint invisibles porque <code>next build</code> ya no lo corre y <code>npm run lint</code> no apuntaba a <code>src</code>. Ahora el gate vive en CI.</li>
+        </ul>
+      </details>
+
+      <h2>Trampas conocidas del entorno</h2>
+      <ul>
+        <li><strong>Windows + Rust GNU:</strong> el toolchain es <code>stable-x86_64-pc-windows-gnu</code> (sin Visual Studio Build Tools). Si WinLibs está en el <code>PATH</code>, <code>dlltool</code> falla al enlazar; sácalo del PATH para compilar.</li>
+        <li><strong>No quites los <code>opt-level = 3</code></strong> de <code>argon2</code>, <code>blake2</code>, <code>digest</code> y <code>sha2</code> en <code>kernel/Cargo.toml</code>: Argon2id de 19 MiB sin optimizar tarda minutos por hash y la suite «se cuelga».</li>
+        <li><strong>psycopg async en Windows</strong> no funciona sobre el <code>ProactorEventLoop</code>; <code>novvus run</code> fuerza <code>SelectorEventLoop</code> vía <code>loop_factory</code> y los <code>pytest.ini</code> de los módulos silencian la deprecación de <code>asyncio.set_event_loop_policy</code> hasta que pytest-asyncio exponga <code>loop_factory</code>.</li>
+        <li><strong>Cobertura Rust en Windows GNU: imposible</strong> (sin <code>profiler_builtins</code>). Mídela en Linux: CI o <code>docker run rust:1</code> apuntando a la BD dev por <code>host.docker.internal</code>.</li>
+        <li><strong>mutmut local en Windows: imposible</strong> (v3 exige fork; v2 rompe con pony + Python 3.14). Vive solo en CI.</li>
+        <li><strong>Cobertura Python 3.12:</strong> el core <code>settrace</code> pierde código dentro de corutinas con pytest-asyncio 1.4 (business.py del CRM «caía» de 95 % a 52 %). Usa <code>COVERAGE_CORE=sysmon</code> como hace el CI.</li>
+        <li>El binario del kernel no se puede recompilar mientras corre: <code>off.bat</code> primero, luego <code>cargo build</code>/<code>cargo test</code>.</li>
+        <li><strong>Tests de kernel que «no terminan»:</strong> el arnés de <code>tests/common/mod.rs</code> tiene timeouts HTTP y el CI acota el job a 30 min; si un test se cuelga en local, revisa primero que Postgres esté arriba en <code>:5432</code> y que no haya otro gateway ocupando el puerto de prueba.</li>
+        <li><strong>Secretos:</strong> los valores de <code>.env.example</code> son de desarrollo y públicos; nunca los copies a <code>.env.prod.example</code> ni a un servidor (el compose de producción exige que cada secreto esté definido).</li>
+        <li><code>novvus run</code> del SDK y <code>novvus</code> del CLI Rust son <strong>dos programas homónimos</strong>; en tu máquina de desarrollo solo instalas el del SDK.</li>
+      </ul>
+
+      <h2>Proponer un módulo nuevo</h2>
+      <p>Empieza con <code>novvus new-module &lt;id&gt;</code> y la guía <code>BUILDING_MODULES.md</code>. Antes de abrir el PR, verifica el criterio de conformidad de <code>MODULE_CONTRACT.md §12</code> ampliado con lo que hoy exige el repo:</p>
+      <table>
+        <tr><th>#</th><th>Criterio</th><th>Cómo se comprueba</th></tr>
+        <tr><td>1</td><td><code>novvus.toml</code> valida contra §2 (id, semver, prefijos, <code>[presentation]</code>, <code>[ui]</code>, <code>[[config]]</code>, <code>[[cron]]</code>, <code>[extensions]</code>).</td><td><code>POST /api/core/modules</code> devuelve 201; el SDK falla al cargar si no.</td></tr>
+        <tr><td>2</td><td><code>install → migrate → enable</code> sin pasos manuales, por instancia y por organización.</td><td><code>novvus deploy</code> + <code>POST /orgs/{org}/modules/{id}/enable</code>.</td></tr>
+        <tr><td>3</td><td>Toda tabla vive en <code>mod_{id}</code>, con <code>org_id</code>, RLS activo (<code>FORCE ROW LEVEL SECURITY</code>) y las columnas <code>ext</code> y <code>custom</code> JSONB.</td><td>Migración generada por <code>novvus makemigration</code>; el arnés de tests lo verifica con otra org.</td></tr>
+        <tr><td>4</td><td>Todo endpoint pasa por el gateway y aplica permisos (<code>enforce</code>/<code>@requires</code>) del propio namespace.</td><td>Sin firma → 401; sin permiso → 403, con test.</td></tr>
+        <tr><td>5</td><td><code>uninstall</code> de instancia no deja tablas huérfanas; el de organización no destruye datos.</td><td><code>DROP SCHEMA … CASCADE</code>; test de lifecycle.</td></tr>
+        <tr><td>6</td><td>Eventos: <code>emits</code> declarados y emitidos tras el <code>flush</code>; handlers idempotentes (el SDK ya deduplica por <code>event.id</code>, pero belt-and-braces como en Proyectos).</td><td>Test que reentrega el mismo evento.</td></tr>
+        <tr><td>7</td><td>Modelos con <code>__novvus_views__</code> (labels es-MX, <code>display</code>, vistas) y meta válido: un meta roto rechaza el handshake.</td><td><code>GET /_novvus/meta</code> en dev; test de <code>validate_views</code>.</td></tr>
+        <tr><td>8</td><td>Catálogo <code>i18n/en-US.json</code> para los textos de negocio; textos fuente en español.</td><td>Revisión.</td></tr>
+        <tr><td>9</td><td>Tests con el arnés del repo (BD efímera, modo offline, peticiones firmadas); <code>@module.seed</code> si aporta datos demo; cobertura al nivel de los módulos existentes.</td><td>Copia <code>modules/projects/tests/</code> (o <code>modules/salesmx/tests/</code> si no tiene modelos).</td></tr>
+        <tr><td>10</td><td>Integración con el repo: target <code>{id}-test</code> en el <code>Makefile</code>, ruff/pytest en <code>ci.yml</code>, y — si va a producción — imagen en <code>release.yml</code>, servicio en <code>docker-compose.prod.yml</code> y registro en <code>scripts/bootstrap.py</code>.</td><td>Hoy solo <code>crm</code> y <code>projects</code> se publican como imágenes; <code>salesmx</code> es el ejemplo de módulo aún no distribuido.</td></tr>
+      </table>
+
+      <h2>Versionado y releases</h2>
+      <ul>
+        <li><strong>Fuente única de la versión de plataforma: el archivo <code>VERSION</code></strong> en la raíz (hoy <code>0.1.6</code>). <code>kernel/crates/novvus-gateway/build.rs</code> y <code>cli/build.rs</code> lo embeben como <code>NOVVUS_VERSION</code>; <code>/health</code> y <code>novvus version</code> lo reportan.</li>
+        <li>Kernel y SDK llevan semver independiente en <code>CHANGELOG.md</code> (Keep a Changelog, en español); cada módulo declara su propio semver en <code>[module] version</code>. Romper un contrato de módulo (manifiesto, headers internos, auto-API, meta) es <em>major</em>.</li>
+        <li>Las imágenes <code>X.Y.Z</code> y las carpetas versionadas de <code>downloads.novvus.dev</code> son <strong>inmutables</strong>: nunca se re-publica una versión; <code>latest</code> es el único puntero mutable.</li>
+      </ul>
+<pre><code><span class="c"># Secuencia de release</span>
+git push origin main                                   <span class="c"># todo mergeado y en verde</span>
+echo 0.1.7 &gt; VERSION &amp;&amp; git commit -am "Bump version to 0.1.7" &amp;&amp; git push
+git tag -a v0.1.7 -m "Novvus Core v0.1.7" &amp;&amp; git push origin v0.1.7</code></pre>
+      <p>El tag dispara <code>release.yml</code>: <code>version</code> (falla si el tag ≠ <code>VERSION</code>) → <code>tests</code> (todo <code>ci.yml</code>) → <code>cli-build</code> (binarios estáticos musl para linux-x64 y linux-arm64, este último compilado y ejecutado bajo QEMU) → <code>cli-dist</code> (<code>latest</code>, <code>&lt;v&gt;/manifest.json</code> con SHA-256, binarios, <code>install.sh</code>, verificado con un bootstrap real contra un servidor local) → <code>build-push</code> (imágenes <code>ghcr.io/novvus/{core,web,bootstrap,crm,projects}</code> con tags <code>X.Y.Z</code> y <code>latest</code>) → <code>publish-downloads</code> (Cloudflare R2 con <code>put-object</code> archivo por archivo, nunca <code>sync --delete</code>; verifica checksums en el dominio público y sube <code>latest</code> <em>al final</em>, solo si las imágenes ya existen). Detalle operativo en <a href="actualizacion.html">Actualización y releases</a>.</p>
+
+      <h2>Checklist antes de abrir el PR</h2>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>¿Toqué un contrato? Entonces el <code>.md</code> correspondiente cambió en el mismo PR, y la decisión de diseño tiene su línea en <code>DECISIONS.md</code>.</div></div>
+        <div class="step"><span class="num">2</span><div>Suites locales en verde para lo que toqué, incluido <code>npm run lint</code> si hubo cambios en <code>apps/web</code>.</div></div>
+        <div class="step"><span class="num">3</span><div>Endpoint nuevo del kernel → test de integración en <code>tests/</code>; ruta nueva de módulo → test con peticiones firmadas; página nueva → al menos un test de Vitest o paso del smoke E2E.</div></div>
+        <div class="step"><span class="num">4</span><div>Textos de UI en español con <code>t()</code>/<code>module._()</code> y su entrada en <code>en-US.json</code>; nada de claves artificiales.</div></div>
+        <div class="step"><span class="num">5</span><div>Variables de entorno nuevas documentadas en <code>.env.example</code> y, si aplican a producción, en <code>.env.prod.example</code>, <code>docker-compose.prod.yml</code> y la migración de <code>.env</code> del CLI (<code>cli/src/envfile.rs</code>).</div></div>
+        <div class="step"><span class="num">6</span><div>Si el cambio será visible para usuarios, una línea en <code>CHANGELOG.md</code>.</div></div>
+      </div>
+
+      <h2>Backlog resumido</h2>
+      <p>Lo detectado y <strong>no</strong> implementado (<code>BACKLOG.md</code>); no se adelanta nada de esto sin su fase.</p>
+      <table>
+        <tr><th>Área</th><th>Pendientes</th></tr>
+        <tr><td>Seguridad</td><td>Rotación de claves JWT con <code>kid</code> y migración a EdDSA; un rol de BD por módulo; 2FA; cuotas por módulo en el bus; verificación de email; cerrar el registro público tras el first-run (invitaciones, <code>NOVVUS_ALLOW_PUBLIC_REGISTRATION</code>).</td></tr>
+        <tr><td>Distribución</td><td>Firma criptográfica de releases (hoy solo SHA-256 contra un manifest del mismo origen); <code>novvus backup list/prune</code>; <code>novvus restore</code> público; <code>--force-downgrade</code>.</td></tr>
+        <tr><td>Plataforma</td><td>Marketplace fuera del monorepo; panel de operación de eventos (reintentar <code>failed</code>, lag); NATS/Redpanda según <code>EVENTS.md §5</code>; webhooks salientes. Hecho: habilitación por organización.</td></tr>
+        <tr><td>Datos</td><td>Particionado/archivado de <code>core.events</code> y <code>core.audit_log</code>; índices guiados por <code>pg_stat_statements</code>.</td></tr>
+        <tr><td>Vistas genéricas</td><td>Calendario semanal; grupos AND/OR anidados en el filtro visual (el DSL ya los soporta); selector de columnas; resolver el <code>display</code> de relaciones en lista y export.</td></tr>
+        <tr><td>Chatter</td><td>Correo saliente por org; markdown sanitizado (hoy texto plano); adjuntar desde el composer; nombres de autor en el timeline; purga dura de mensajes.</td></tr>
+        <tr><td>Campos personalizados</td><td>Kanban agrupado por campo custom; <code>GET /custom-fields/{id}/usage</code>; <code>novvus purge-custom</code>; tipo <code>relation</code> y calculados.</td></tr>
+        <tr><td>Adjuntos</td><td>Miniaturas en un worker aparte; antivirus; limpieza al borrar el padre; versionado y URLs presignadas.</td></tr>
+        <tr><td>DX e i18n</td><td>Plantillas de CI para módulos de terceros; <code>novvus doctor</code>; extracción automática de cadenas; pluralización y formatos por locale; locale persistido por usuario en el kernel.</td></tr>
+      </table>
+
+      <nav class="page-nav">
+        <a href="seguridad.html"><span class="dir">← Anterior</span>Seguridad</a>
+        <a class="next" href="referencia.html"><span class="dir">Siguiente →</span>Referencia técnica</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

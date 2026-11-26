@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La API — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav active" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / La API</div>
+    <article>
+      <h1>La API</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Una sola puerta de entrada: el gateway del kernel. Debajo de <code>/api/core/…</code>
+      viven la identidad, las organizaciones, el ciclo de vida de módulos, los metadatos, los adjuntos,
+      las extensiones, los campos personalizados, el chatter y el tiempo real; debajo de
+      <code>/api/{módulo}/…</code>, la API automática y los endpoints de negocio de cada módulo,
+      reenviados con headers firmados. Esta página es la referencia completa de ambas superficies,
+      verificada contra <code>kernel/crates/novvus-gateway/src/lib.rs</code>.</p>
+
+      <h2>Cómo llegar al gateway</h2>
+      <table>
+        <tr><th>Entorno</th><th>URL base</th><th>Quién responde</th></tr>
+        <tr><td>Desarrollo, directo</td><td><code>http://127.0.0.1:8000</code></td><td>El kernel (<code>NOVVUS_BIND_ADDR=0.0.0.0:8000</code>). Ideal para <code>curl</code>.</td></tr>
+        <tr><td>Desarrollo, vía web</td><td><code>http://localhost:3000/api/…</code></td><td>Next.js reescribe <code>/api/:path*</code> → <code>NOVVUS_KERNEL_URL/api/:path*</code> (same-origin, sin CORS).</td></tr>
+        <tr><td>Producción</td><td><code>http://&lt;servidor&gt;:8077/api/…</code></td><td><strong>Solo la web escucha en el host</strong> (<code>NOVVUS_WEB_PORT</code>, contenedor 3000). El kernel y Postgres viven en la red interna de Docker; el rewrite de Next es la única ruta al kernel.</td></tr>
+      </table>
+      <div class="note"><b>El rewrite se fija al compilar.</b> <code>NOVVUS_KERNEL_URL</code> se lee durante <code>next build</code>
+      y queda serializado en el manifiesto de rutas; cambiarlo en runtime con <code>next start</code> no tiene efecto.
+      En Docker llega como build-arg (<code>apps/web/Dockerfile</code>).</div>
+
+      <h2>Convenciones</h2>
+      <ul>
+        <li>JSON en ambos sentidos; identificadores <strong>UUIDv7</strong>; fechas ISO-8601 con zona.</li>
+        <li>Errores del kernel: <code>{"error": {"code": "…", "message": "…"}}</code>. Errores de módulos (FastAPI): <code>{"detail": "…"}</code>. El cliente <code>lib/api.ts</code> normaliza ambos en <code>ApiError</code>.</li>
+        <li>Códigos: <code>401</code> sin credenciales o token inválido · <code>403</code> sin permiso o token no ligado a la organización · <code>404</code> · <code>409</code> conflicto · <code>413</code> cuota de archivos · <code>422</code> validación · <code>429</code> rate limit en <code>/auth/*</code> · <code>503</code> módulo no habilitado o runtime desconectado.</li>
+        <li>Las rutas de <code>/api/core/auth/*</code> tienen rate limit <strong>por IP</strong>: 30 peticiones/minuto por defecto (<code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE</code>).</li>
+      </ul>
+
+      <h2>Los cuatro actores</h2>
+      <table>
+        <tr><th>Actor</th><th>Cómo se autentica</th><th>Dónde se acepta</th></tr>
+        <tr><td><strong>Usuario</strong></td><td><code>Authorization: Bearer &lt;access_token&gt;</code> (JWT HS256, 15 min). Los permisos <em>no</em> salen del token: cada handler los resuelve en vivo vía RBAC (caché 30 s).</td><td>Todo <code>/api/core/*</code> de tenant y el proxy a módulos. Casi todo exige un token <strong>ligado a una organización</strong> (<code>org_id</code> en los claims); sin ella responde 403 «no active organization».</td></tr>
+        <tr><td><strong>Módulo (servicio)</strong></td><td><code>x-novvus-service-token: nvk_…</code> (emitido una sola vez en <code>install</code>; el kernel guarda solo su hash SHA-256) + <code>x-novvus-org</code> cuando actúa sobre un tenant.</td><td><code>handshake</code>, <code>modules/status</code>, <code>events</code>, <code>config</code>, <code>extensions</code>, <code>custom-fields/service</code>, y <code>files</code>/<code>chatter</code> <em>solo sobre sus propios modelos</em>. En el proxy, para llamadas módulo→módulo.</td></tr>
+        <tr><td><strong>Bootstrap de plataforma</strong></td><td><code>x-novvus-bootstrap-token</code> comparado en tiempo constante contra <code>NOVVUS_BOOTSTRAP_TOKEN</code>. Sin variable configurada, el header se rechaza (fail-closed).</td><td><strong>Exactamente 6 endpoints</strong> de ciclo de vida de instancia: <code>POST /modules</code>, <code>/modules/{id}/install</code>, <code>/migrate</code>, <code>/enable</code>, <code>/disable</code>, <code>/uninstall</code>. No es usuario, no tiene organización, ningún endpoint de tenant lo acepta.</td></tr>
+        <tr><td><strong>Navegador en SSE</strong></td><td><code>GET /api/core/stream?token=&lt;access_token&gt;</code> — <code>EventSource</code> no puede enviar headers, así que el mismo access JWT viaja por query y se valida igual que el Bearer.</td><td>Solo <code>/stream</code>.</td></tr>
+      </table>
+
+      <h2>Flujo de sesión con curl</h2>
+<pre><code>BASE=http://127.0.0.1:8000
+
+<span class="c"># 1. Registro (201 → {"user": {...}})</span>
+curl -s -X POST $BASE<span class="f">/api/core/auth/register</span> -H 'Content-Type: application/json' \
+  -d '{"email":"ana@acme.test","password":"una-clave-larga","display_name":"Ana"}'
+
+<span class="c"># 2. Login → {"user", "tokens": {"access_token", "refresh_token", "org_id"}}</span>
+TOKENS=$(curl -s -X POST $BASE<span class="f">/api/core/auth/login</span> -H 'Content-Type: application/json' \
+  -d '{"email":"ana@acme.test","password":"una-clave-larga"}')
+ACCESS=$(echo $TOKENS | jq -r .tokens.access_token)
+REFRESH=$(echo $TOKENS | jq -r .tokens.refresh_token)
+
+<span class="c"># 3. Crear organización (201; Ana recibe el rol Owner con permiso "*")</span>
+ORG=$(curl -s -X POST $BASE<span class="f">/api/core/orgs</span> -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"name":"ACME","slug":"acme"}' | jq -r .id)
+
+<span class="c"># 4. Re-emitir el par LIGADO a la organización (así se cambia de org)</span>
+TOKENS=$(curl -s -X POST $BASE<span class="f">/api/core/auth/refresh</span> -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"$REFRESH\",\"org_id\":\"$ORG\"}")
+ACCESS=$(echo $TOKENS | jq -r .tokens.access_token)
+
+<span class="c"># 5. ¿Quién soy y qué puedo?  → {"user", "org_id", "roles", "permissions": ["*"]}</span>
+curl -s $BASE<span class="f">/api/core/me</span> -H "Authorization: Bearer $ACCESS"
+
+<span class="c"># 6. Cerrar sesión (204): revoca el refresh presentado</span>
+curl -s -X POST $BASE<span class="f">/api/core/auth/logout</span> -H 'Content-Type: application/json' \
+  -d "{\"refresh_token\":\"$REFRESH\"}"</code></pre>
+      <div class="warn"><b>Los refresh tokens son de un solo uso.</b> Cada <code>/auth/refresh</code> devuelve un refresh
+      nuevo y quema el anterior (la base guarda solo el hash SHA-256). Reutilizar uno rotado se interpreta como robo y
+      revoca la cadena completa de sesiones. <code>login</code> también acepta <code>org_id</code> opcional para
+      salir ya ligado a una organización.</div>
+
+      <h2>Referencia de /api/core</h2>
+      <p>Todas las rutas van bajo <code>/api/core</code>. «Bearer + org» significa JWT con organización activa. Los cuerpos y respuestas
+      se resumen a sus claves principales.</p>
+
+      <h3>Autenticación e identidad</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor</th><th>Body → respuesta</th></tr>
+        <tr><td><code>POST /auth/register</code></td><td>— (rate limit)</td><td><code>{email, password, display_name}</code> → 201 <code>{user}</code>. Argon2id; email único global.</td></tr>
+        <tr><td><code>POST /auth/login</code></td><td>— (rate limit)</td><td><code>{email, password, org_id?}</code> → <code>{user, tokens}</code>.</td></tr>
+        <tr><td><code>POST /auth/refresh</code></td><td>— (rate limit)</td><td><code>{refresh_token, org_id?}</code> → <code>{tokens}</code>. Rota el refresh y permite cambiar de organización.</td></tr>
+        <tr><td><code>POST /auth/logout</code></td><td>— (rate limit)</td><td><code>{refresh_token}</code> → 204.</td></tr>
+        <tr><td><code>GET /me</code></td><td>Bearer</td><td>→ <code>{user, org_id, roles, permissions[]}</code>. Los permisos van ordenados y son los <strong>efectivos</strong>; sin org activa, lista vacía. Base del gating de UI.</td></tr>
+      </table>
+
+      <h3>Organizaciones y RBAC</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor / permiso</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET /orgs</code></td><td>Bearer</td><td>→ mis organizaciones <code>[{id, name, slug, …}]</code>.</td></tr>
+        <tr><td><code>POST /orgs</code></td><td>Bearer</td><td><code>{name, slug}</code> → 201 organización; el creador recibe el rol Owner.</td></tr>
+        <tr><td><code>GET /orgs/{org_id}/members</code></td><td><code>core.members.manage</code>; el token debe estar ligado a <em>esa</em> org</td><td>→ <code>[{membership_id, user_id, email, display_name, created_at, roles[]}]</code>.</td></tr>
+        <tr><td><code>POST /orgs/{org_id}/members</code></td><td><code>core.members.manage</code></td><td><code>{email}</code> → 201 membresía. El usuario debe existir (invitaciones: BACKLOG).</td></tr>
+        <tr><td><code>GET /roles</code></td><td><code>core.roles.read</code></td><td>→ roles de la org con sus permisos.</td></tr>
+        <tr><td><code>POST /roles</code></td><td><code>core.roles.manage</code></td><td><code>{name, description?}</code> → 201 rol.</td></tr>
+        <tr><td><code>POST /roles/{role_id}/permissions</code></td><td><code>core.roles.manage</code></td><td><code>{keys: [...]}</code> → <code>{granted: [...]}</code>. Las claves deben existir en el catálogo; se admiten comodines en el otorgamiento.</td></tr>
+        <tr><td><code>POST /roles/{role_id}/assign</code></td><td><code>core.roles.manage</code></td><td><code>{user_id}</code> → 204.</td></tr>
+        <tr><td><code>GET /permissions</code></td><td>Bearer + org</td><td>→ catálogo global <code>[{key, module_id, description}]</code>.</td></tr>
+      </table>
+
+      <h3>Módulos por organización, plan y configuración</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor / permiso</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET /modules</code></td><td>Bearer + org</td><td>→ <code>[{id, name, version, status, instance_status, manifest, base_url, …}]</code>. <code>status</code> es el efectivo para la org (<code>not-installed | installed | enabled | disabled</code>); <code>instance_status</code> el de la instancia. La tienda y el launcher se arman con esto.</td></tr>
+        <tr><td><code>GET /orgs/{org}/modules/{id}/plan</code></td><td>Bearer + org (cualquier miembro)</td><td>→ <code>{target, enable_order[], satisfied[], problems[]}</code>: cierre transitivo de dependencias. Con <code>problems</code> no vacío el plan no es accionable.</td></tr>
+        <tr><td><code>POST /orgs/{org}/modules/{id}/install</code></td><td><code>core.modules.manage</code></td><td>→ vista del módulo; dispara el hook <code>on_install</code> del runtime (best-effort).</td></tr>
+        <tr><td><code>POST …/enable</code> · <code>…/disable</code></td><td><code>core.modules.manage</code></td><td>→ vista del módulo; hooks <code>on_enable</code> / <code>on_disable</code>. <code>enable</code> verifica dependencias <em>por org</em>.</td></tr>
+        <tr><td><code>POST …/uninstall</code></td><td><code>core.modules.manage</code></td><td>→ 204. <strong>No destructivo</strong>: quita la fila de habilitación; el esquema y las filas del tenant sobreviven. El hook <code>on_uninstall</code> corre <em>antes</em> de borrar la fila.</td></tr>
+        <tr><td><code>GET /orgs/{org}/modules/{id}/config</code></td><td>Bearer + org</td><td>→ <code>{module_id, fields: [{key, type, label, options, permission, secret, value, is_set}]}</code>. Solo los campos cuyo <code>permission</code> tiene el llamante.</td></tr>
+        <tr><td><code>PUT /orgs/{org}/modules/{id}/config</code></td><td>permiso de cada clave (default <code>core.modules.manage</code>)</td><td><code>{values: {clave: valor}}</code> → vista actualizada. Validación de tipo y opciones de <code>select</code>.</td></tr>
+        <tr><td><code>GET /config</code> · <code>PUT /config</code></td><td>token de servicio + <code>x-novvus-org</code></td><td>El propio módulo lee (<code>{clave: valor}</code>, sin enmascarar) o escribe (<code>{values}</code>) su configuración para ese tenant. Es lo que usan <code>module.config()</code> y <code>module.set_config()</code>.</td></tr>
+      </table>
+
+      <h3>Ciclo de vida de instancia, handshake y status</h3>
+      <p>Los seis primeros aceptan usuario con <code>core.modules.manage</code> <strong>o</strong> el token de bootstrap.</p>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor</th><th>Body → respuesta</th></tr>
+        <tr><td><code>POST /modules</code> (register)</td><td>manage · bootstrap</td><td><code>{manifest_toml, migrations: [{version, sql}]}</code> → 201 <code>ModuleRecord</code> <code>{id, name, version, status, manifest, base_url}</code>. Valida id, semver, prefijos de permisos/eventos/config/cron/ui/extensions.</td></tr>
+        <tr><td><code>POST /modules/{id}/install</code></td><td>manage · bootstrap</td><td>→ <code>{module, applied_migrations[], service_token}</code>. Crea <code>mod_{id}</code>, aplica migraciones, registra permisos y cron. <strong>El token de servicio se devuelve una sola vez.</strong></td></tr>
+        <tr><td><code>POST /modules/{id}/migrate</code></td><td>manage · bootstrap</td><td>→ <code>{applied_migrations[]}</code>. Migraciones pendientes de una versión nueva; checksum inmutable.</td></tr>
+        <tr><td><code>POST /modules/{id}/enable</code> · <code>/disable</code></td><td>manage · bootstrap</td><td>→ <code>ModuleRecord</code>. ENABLED: el gateway rutea y el bus entrega; DISABLED: 503 en su namespace, los eventos se acumulan.</td></tr>
+        <tr><td><code>POST /modules/{id}/uninstall</code></td><td>manage · bootstrap</td><td><code>{"confirm": true}</code> → 204. Destructivo (<code>DROP SCHEMA … CASCADE</code>), solo desde DISABLED.</td></tr>
+        <tr><td><code>POST /modules/handshake</code></td><td>token de servicio</td><td><code>{module_id, base_url, meta?}</code> → <code>{module_id, status, internal_hmac_secret, database_url, schema}</code>. El token debe pertenecer a <code>module_id</code>. El <strong>meta viaja aquí</strong>; un meta inválido (serde estricto, ≤512 KB) rechaza el handshake.</td></tr>
+        <tr><td><code>GET /modules/status</code></td><td>token de servicio</td><td>→ <code>{"crm": "enabled", "projects": "disabled", …}</code>. Con esto un módulo reporta <code>degraded</code> en su <code>/health</code>.</td></tr>
+      </table>
+      <div class="note"><b>Sobre <code>confirm</code>.</b> El handler real (<code>routes/modules.rs</code>, <code>UninstallBody</code>) lo lee del
+      <strong>cuerpo JSON</strong>; <code>MODULE_CONTRACT.md §3</code> lo describe como query <code>?confirm=true</code>. El código manda.</div>
+<pre><code><span class="c"># Registrar + instalar con el token de bootstrap (lo que hace scripts/bootstrap.py)</span>
+curl -s -X POST $BASE<span class="f">/api/core/modules</span> -H "x-novvus-bootstrap-token: $NOVVUS_BOOTSTRAP_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"manifest_toml\": $(jq -Rs . &lt; modules/crm/novvus.toml), \"migrations\": [{\"version\":\"0001_init\",\"sql\":\"…\"}]}"
+curl -s -X POST $BASE<span class="f">/api/core/modules/crm/install</span> -H "x-novvus-bootstrap-token: $NOVVUS_BOOTSTRAP_TOKEN"
+<span class="c"># → {"module": {...}, "applied_migrations": ["0001_init", ...], "service_token": "nvk_..."}</span></code></pre>
+
+      <h3>Metadatos (vistas genéricas)</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor</th><th>Respuesta</th></tr>
+        <tr><td><code>GET /meta</code></td><td>Bearer + org</td><td>→ <code>{modules: [meta…]}</code> de los módulos <strong>habilitados en la org</strong>, con los campos de extensión (<code>ext.{extensor}.{campo}</code>) y los campos personalizados (<code>custom.{nombre}</code>) ya fusionados, filtrado por el permiso <code>read</code> de cada modelo y con <code>capabilities.create/update/delete=false</code> si falta el <code>write</code>. Headers <code>ETag</code> + <code>Cache-Control: private, max-age=60</code>; <code>If-None-Match</code> → 304.</td></tr>
+        <tr><td><code>GET /meta/{module_id}</code></td><td>Bearer + org</td><td>Lo mismo para un módulo; 404 si ningún modelo es visible para el usuario.</td></tr>
+      </table>
+
+      <h3>Archivos (adjuntos)</h3>
+      <p>Actor: usuario <em>o</em> módulo con token de servicio + <code>x-novvus-org</code> sobre sus propios modelos. El permiso es el del <strong>modelo padre</strong>, resuelto desde el meta (<code>read</code> para listar/descargar, <code>write</code> para subir/borrar).</p>
+      <table>
+        <tr><th>Método y ruta</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET /files?module_id=&amp;model=&amp;record_id=</code></td><td>→ <code>[{id, module_id, model, record_id, filename, mime, size_bytes, created_by, created_at}]</code> (vivos, más recientes primero).</td></tr>
+        <tr><td><code>POST /files</code></td><td>multipart en este orden: <code>module_id</code>, <code>model</code>, <code>record_id</code>, <code>file</code> (los metadatos deben preceder al archivo: el permiso se verifica antes de aceptar un byte). SHA-256 al vuelo, dedup por <code>(org, sha256)</code>, MIME por <em>sniffing</em> (nunca el <code>Content-Type</code> del cliente), ejecutables rechazados (422), cuota por org (413). → 201 vista del adjunto.</td></tr>
+        <tr><td><code>GET /files/{id}</code></td><td>Descarga en streaming con <code>X-Content-Type-Options: nosniff</code>; <code>Content-Disposition: inline</code> solo para PNG/JPEG/GIF/WebP verificados, <code>attachment</code> para todo lo demás (nunca HTML/SVG inline).</td></tr>
+        <tr><td><code>DELETE /files/{id}</code></td><td>→ 204. Borrado lógico; el GC libera el blob tras la retención (30 días).</td></tr>
+      </table>
+<pre><code>curl -s -X POST $BASE<span class="f">/api/core/files</span> -H "Authorization: Bearer $ACCESS" \
+  -F module_id=crm -F model=contacts -F record_id=$CONTACT -F file=@cotizacion.pdf</code></pre>
+
+      <h3>Extensiones y campos personalizados</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor / permiso</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET /extensions?org_id=</code></td><td>token de servicio</td><td>→ <code>[{extender_id, target_model, fields, ui}]</code>: definiciones que apuntan a los modelos del módulo llamante. Con <code>org_id</code>, solo extensores habilitados en esa org (lo que el SDK necesita para validar escrituras). Caché TTL 60 s en el SDK.</td></tr>
+        <tr><td><code>GET /custom-fields?module_id=&amp;model=</code></td><td>Bearer + org (cualquier miembro)</td><td>→ definiciones vivas <code>[{id, module_id, model, name, field_type, label, config, required, position, active, created_at}]</code>.</td></tr>
+        <tr><td><code>POST /custom-fields</code></td><td><code>core.custom_fields.manage</code></td><td><code>{module_id, model, name, type, label, config?, required?, position?}</code> → 201. <code>name</code> ∼ <code>^[a-z][a-z0-9_]{0,29}$</code> e inmutable; tipos <code>string|text|integer|decimal|boolean|date|datetime</code>; <code>choices</code> solo en <code>string</code>; el modelo debe existir en el meta y el módulo estar habilitado; 409 si el nombre ya existe; límite 50 por modelo (<code>NOVVUS_CUSTOM_FIELDS_LIMIT</code>).</td></tr>
+        <tr><td><code>PATCH /custom-fields/{id}</code></td><td><code>core.custom_fields.manage</code></td><td><code>{label?, config?, required?, position?, active?}</code> → definición. <code>name</code> y <code>type</code> no cambian nunca.</td></tr>
+        <tr><td><code>DELETE /custom-fields/{id}</code></td><td><code>core.custom_fields.manage</code></td><td>→ 204. Borrado lógico + purga diferida (30 días); los valores huérfanos los limpia el SDK perezosamente.</td></tr>
+        <tr><td><code>GET /custom-fields/service?org_id=</code></td><td>token de servicio</td><td>Definiciones activas que apuntan al módulo llamante, para validar payloads en el SDK.</td></tr>
+      </table>
+
+      <h3>Chatter, notificaciones y tiempo real</h3>
+      <p>Prefijo por registro: <code>/chatter/{module}/{model}/{record_id}</code>. Leer y comentar exigen el permiso <code>read</code> del modelo padre. Actor: usuario o módulo (solo mensajes <code>system</code> sobre sus modelos).</p>
+      <table>
+        <tr><th>Método y ruta</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET …/messages?cursor=&amp;limit=</code></td><td>→ <code>{items: [{id, record_id, author_id, kind, body, meta, attachment_ids, created_at, edited_at}], next_cursor}</code>. Keyset por <code>(created_at, id)</code>, más recientes primero; <code>limit</code> 1–200, default 50.</td></tr>
+        <tr><td><code>POST …/messages</code></td><td><code>{kind?: "comment"|"note"|"system", body, meta?, attachment_ids?}</code> → 201. Usuarios: <code>comment</code>/<code>note</code>; módulos: solo <code>system</code>. 1–10 000 caracteres. Menciones <code>@[uuid]</code> validadas contra la membresía. Autor auto-sigue el registro; fan-out <strong>síncrono</strong> en la misma transacción (mención → <code>mention</code>, seguidores → <code>follower_message</code>) y <code>pg_notify('novvus_notify')</code>.</td></tr>
+        <tr><td><code>PATCH /chatter/messages/{id}</code></td><td><code>{body}</code> → mensaje. Solo el autor, dentro de 15 min (<code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code>); fuera de ventana, 403.</td></tr>
+        <tr><td><code>DELETE /chatter/messages/{id}</code></td><td>→ 204. Solo el autor; lógico.</td></tr>
+        <tr><td><code>GET …/followers</code></td><td>→ <code>[{user_id, display_name, email}]</code>.</td></tr>
+        <tr><td><code>PUT …/followers/me</code> · <code>DELETE …/followers/me</code></td><td>Seguir / dejar de seguir → 204.</td></tr>
+        <tr><td><code>GET …/activities</code></td><td>→ <code>[{id, record_id, activity_type, summary, due_date, assigned_to, state, done_by, done_at, note, created_by, created_at}]</code>; abiertas primero.</td></tr>
+        <tr><td><code>POST …/activities</code></td><td><code>{activity_type: call|meeting|email|todo, summary, due_date, assigned_to, note?}</code> → 201. El asignado (si no es el creador) recibe <code>activity_assigned</code>.</td></tr>
+        <tr><td><code>POST /chatter/activities/{id}/done</code> · <code>/cancel</code></td><td>→ actividad cerrada. Puede cerrar el asignado, el creador o quien tenga el <code>write</code> del modelo padre. Otra acción → 404.</td></tr>
+        <tr><td><code>GET /notifications?unread=1&amp;cursor=&amp;limit=</code></td><td>Bearer + org → <code>{items: [{id, kind, payload, created_at, read_at}], next_cursor, unread_count}</code>; <code>limit</code> 1–100. Tipos: <code>mention</code>, <code>follower_message</code>, <code>activity_assigned</code>, <code>activity_due</code> (pasada horaria, una vez al día por actividad vencida).</td></tr>
+        <tr><td><code>POST /notifications/read</code> · <code>/read-all</code></td><td><code>{ids: [...]}</code> / sin body → 204.</td></tr>
+        <tr><td><code>GET /stream?token=</code></td><td>SSE. Emite eventos con nombre <code>notification</code> (payload <code>{org_id, user_ids, kind}</code>), filtrados por org y usuario; keep-alive <code>ping</code> cada 25 s. Un solo <code>LISTEN</code> por proceso del gateway; si el receptor se rezaga, salta eventos y la shell reconcilia por polling.</td></tr>
+      </table>
+<pre><code>curl -s -X POST $BASE<span class="f">/api/core/chatter/crm/contacts/$CONTACT/messages</span> -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"kind":"note","body":"Revisar con @[7d3f…] antes del viernes"}'
+
+<span class="c"># Tiempo real (EventSource no manda headers → token por query)</span>
+curl -N "$BASE<span class="f">/api/core/stream</span>?token=$ACCESS"</code></pre>
+
+      <h3>Catálogo (marketplace) y bus de eventos</h3>
+      <table>
+        <tr><th>Método y ruta</th><th>Actor / permiso</th><th>Body → respuesta</th></tr>
+        <tr><td><code>GET /catalog</code></td><td><code>core.modules.read</code></td><td>→ <code>[{module_id, name, version, summary, publisher, public_key, package_hash, published_at}]</code> (sin el blob del paquete).</td></tr>
+        <tr><td><code>POST /catalog</code></td><td><code>core.modules.manage</code></td><td><code>{package: {format_version, manifest_toml, migrations, assets}, publisher, public_key, signature}</code> → 201 entrada. Firma Ed25519 sobre los bytes canónicos, verificada contra <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code>; lista vacía = publicar deshabilitado (403).</td></tr>
+        <tr><td><code>POST /catalog/{module_id}/register</code></td><td><code>core.modules.manage</code></td><td>→ 201 <code>ModuleRecord</code>: copia el paquete a <code>core.modules</code> por el flujo normal de <code>register</code>, re-verificando la firma.</td></tr>
+        <tr><td><code>POST /events</code></td><td>token de servicio</td><td><code>{org_id, event_type, payload?}</code> → 202 evento <code>{id, org_id, event_type, emitted_by, payload, occurred_at}</code>. <code>event_type</code> debe estar en el <code>emits</code> del manifiesto del emisor.</td></tr>
+      </table>
+
+      <h3>Fuera de /api/core</h3>
+      <table>
+        <tr><th>Ruta</th><th>Respuesta</th></tr>
+        <tr><td><code>GET /health</code></td><td><code>{"status": "ok"|"degraded", "database": "up"|"down", "version": "0.1.6"}</code>; 503 si la base no responde. La versión sale del archivo <code>VERSION</code> embebido al compilar: <code>novvus update</code> la compara con la objetivo.</td></tr>
+        <tr><td><code>GET /metrics</code></td><td>Texto con contadores acumulados: peticiones totales, respuestas 4xx y 5xx.</td></tr>
+        <tr><td><code>ANY /api/{module_id}</code> · <code>/api/{module_id}/{*rest}</code></td><td>Proxy firmado hacia el runtime del módulo (ver abajo).</td></tr>
+      </table>
+
+      <h2>El proxy firmado a los módulos</h2>
+      <p>Al llamar <code>/api/crm/…</code> el gateway exige que el módulo esté <code>ENABLED</code> y con <code>base_url</code> registrado por handshake
+      (si no, 503), resuelve al llamante, y reenvía la petición con estos headers. <strong>El JWT nunca llega al módulo.</strong></p>
+<pre><code>x-novvus-user:      &lt;uuid del usuario&gt;          <span class="c"># vacío en llamadas de servicio</span>
+x-novvus-org:       &lt;uuid de la organización&gt;
+x-novvus-perms:     crm.contacts.read,crm.leads.write,...
+x-novvus-timestamp: &lt;unix seconds&gt;               <span class="c"># ventana anti-replay de ±60 s</span>
+x-novvus-signature: HMAC-SHA256(user \n org \n perms \n ts \n MÉTODO \n ruta)
+x-novvus-locale:    es-MX                        <span class="c"># informativo: FUERA de la firma, jamás autoriza</span></code></pre>
+      <ul>
+        <li>Solo cruzan <code>content-type</code>, <code>accept</code> y <code>accept-language</code> del cliente; cualquier <code>x-novvus-*</code> que intente colar un cliente muere en el gateway.</li>
+        <li>Cuerpo máximo proxyado: 10 MB. El SDK (<code>security.verify_request</code>) responde 401 a toda petición sin firma válida, así que llegar «por atrás» al puerto del módulo tampoco sirve.</li>
+        <li>El locale se toma de <code>x-novvus-locale</code>, si no del primer tag de <code>Accept-Language</code>, si no <code>es-MX</code>.</li>
+      </ul>
+
+      <h3>Llamadas módulo→módulo</h3>
+<pre><code>GET <span class="f">/api/crm/contacts/{id}</span>
+x-novvus-service-token: nvk_...
+x-novvus-org: &lt;uuid de la organización&gt;</code></pre>
+      <p>El gateway inyecta como permisos los <code>[dependencies] service_permissions</code> del manifiesto del llamante (nunca <code>core.*</code>) y el usuario
+      viaja vacío. Desde el SDK: <code>await module.call("GET", f"/api/crm/contacts/{cid}", org_id=…)</code> — así resuelve Proyectos el nombre del contacto al crear un proyecto.</p>
+
+      <h2>La API automática de los módulos</h2>
+      <p>Por cada modelo registrado con <code>@module.model</code>, el SDK monta <strong>siete rutas</strong> bajo <code>/api/{módulo}/{recurso}</code> (<code>autoapi.py</code>). Los permisos por defecto son <code>{módulo}.{recurso}.read/write</code>; <code>__novvus_api__["permissions"]</code> los cambia (las etapas del CRM usan <code>crm.pipelines.*</code>) y <code>__novvus_api__["disabled"]</code> apaga rutas (las tablas de unión <code>contact_tags</code> no exponen <code>list</code>).</p>
+      <table>
+        <tr><th>Método</th><th>Ruta</th><th>Permiso</th><th>Notas</th></tr>
+        <tr><td>GET</td><td><code>/{recurso}</code></td><td>read</td><td>Lista paginada → <code>{items, next_cursor}</code>.</td></tr>
+        <tr><td>GET</td><td><code>/{recurso}/group?by=</code></td><td>read</td><td>Conteos por valor de un campo <code>groupable</code> (incluye <code>custom.{nombre}</code> con <code>choices</code> o booleano) → <code>{groups: [{value, label, count}]}</code>. Alimenta el kanban.</td></tr>
+        <tr><td>GET</td><td><code>/{recurso}/export?format=csv|xlsx</code></td><td>read</td><td>Streaming con labels traducidos según locale; columnas <code>ext</code> y <code>custom</code> al final. Más de 100 000 filas (<code>__novvus_api__["export_max_rows"]</code>) → 422 «acota el filtro».</td></tr>
+        <tr><td>POST</td><td><code>/{recurso}</code></td><td>write</td><td>201. Esquema Pydantic con <code>extra="forbid"</code>: cualquier campo desconocido → 422, así que <code>org_id</code> es imposible de inyectar (lo pone el contexto). Acepta <code>ext</code> y <code>custom</code> validados contra las definiciones de la org.</td></tr>
+        <tr><td>GET</td><td><code>/{recurso}/{id}</code></td><td>read</td><td>404 si no existe <em>o es de otra organización</em> (RLS).</td></tr>
+        <tr><td>PATCH</td><td><code>/{recurso}/{id}</code></td><td>write</td><td>Parcial. Los campos en <code>__novvus_views__["track"]</code> publican un mensaje <code>system</code> en el chatter con <code>{field, old, new}</code>.</td></tr>
+        <tr><td>DELETE</td><td><code>/{recurso}/{id}</code></td><td>write</td><td>204. Borrado suave (<code>deleted_at</code>).</td></tr>
+      </table>
+
+      <h3>Parámetros de listado</h3>
+      <table>
+        <tr><th>Parámetro</th><th>Ejemplo</th><th>Qué hace</th></tr>
+        <tr><td><code>limit</code></td><td><code>limit=50</code></td><td>1–200, default 50.</td></tr>
+        <tr><td><code>cursor</code></td><td><code>cursor=eyJv…</code></td><td>Keyset: pasa el <code>next_cursor</code> anterior. Estable bajo inserciones; cursor corrupto → 422.</td></tr>
+        <tr><td><code>order_by</code></td><td><code>order_by=-created_at</code></td><td>Cualquier columna, <code>-</code> para descendente; default <code>-id</code>. Columna desconocida → 422.</td></tr>
+        <tr><td><code>q</code></td><td><code>q=garcía</code></td><td>ILIKE sobre los campos <code>searchable</code> del meta.</td></tr>
+        <tr><td><code>filter</code></td><td><code>filter={"and":[…]}</code></td><td>DSL JSON (abajo), URL-encodeado.</td></tr>
+        <tr><td><em>columna=valor</em></td><td><code>status=new</code></td><td>Igualdad plana; se conserva por compatibilidad. Valor no coercible → 422.</td></tr>
+      </table>
+
+      <h3>El DSL de filtros (<code>?filter=</code>)</h3>
+<pre><code>{"and": [
+  {"field": "stage_id", "op": "in", "value": ["…", "…"]},
+  {"or": [
+    {"field": "amount", "op": "gte", "value": "100000"},
+    {"field": "expected_close_date", "op": "between", "value": ["2026-09-01", "2026-09-30"]}
+  ]},
+  {"field": "ext.salesmx.rfc", "op": "contains", "value": "XAXX"},
+  {"field": "custom.segmento", "op": "eq", "value": "enterprise"},
+  {"field": "closed_at", "op": "is_null", "value": true}
+]}</code></pre>
+      <ul>
+        <li>Nodo = grupo <code>{"and": [...]}</code> / <code>{"or": [...]}</code> (una sola clave, lista no vacía) o condición <code>{field, op, value}</code>.</li>
+        <li>Operadores (whitelist cerrada, <code>filters.py</code>): <code>eq ne in is_null</code> para todo tipo filtrable; <code>gt gte lt lte between</code> para numéricos, <code>date</code>, <code>datetime</code>; <code>contains ilike</code> para <code>string</code>/<code>text</code>. <code>in</code> acepta hasta 100 valores; <code>contains</code> escapa <code>%</code> y <code>_</code>.</li>
+        <li>Límites: profundidad ≤ 5, ≤ 50 condiciones. Solo campos <code>filterable</code> del meta, más <code>ext.{extensor}.{campo}</code> y <code>custom.{nombre}</code> de definiciones activas (castings JSONB por tipo).</li>
+        <li>Todo rechazo es 422 con la ruta del nodo: <code>{"detail": {"message": "…", "path": "and[1].or[0].value"}}</code>. Nunca hay <code>text()</code> ni interpolación: solo expresiones de columna, y el tenant lo sigue poniendo la sesión + RLS.</li>
+      </ul>
+
+      <h3>Códigos de error de la auto-API</h3>
+      <table>
+        <tr><th>Código</th><th>Cuándo</th></tr>
+        <tr><td>401</td><td>Headers internos ausentes, firma inválida o timestamp fuera de ±60 s (el runtime solo acepta tráfico del gateway).</td></tr>
+        <tr><td>403</td><td><code>enforce()</code>: falta el permiso concreto; los requisitos nunca son comodines, los otorgamientos sí.</td></tr>
+        <tr><td>404</td><td>Registro inexistente o de otra org; también «unknown action» en rutas de negocio.</td></tr>
+        <tr><td>409</td><td>Reglas de negocio (p. ej. convertir un lead ya convertido).</td></tr>
+        <tr><td>422</td><td>Campo desconocido (<code>extra=forbid</code>), tipo incorrecto, cursor inválido, <code>order_by</code>/<code>by</code> desconocido, filtro malformado, formato de export, límite de filas, valor <code>ext</code>/<code>custom</code> que no cumple su definición.</td></tr>
+      </table>
+
+      <h2>Rutas internas del runtime (no pasan por el gateway)</h2>
+      <p>Las monta <code>NovvusModule.create_app()</code> (<code>app.py</code>). El gateway solo proxya <code>/api/{módulo}/…</code>, de modo que estas rutas <strong>no son alcanzables desde fuera</strong>; el kernel las llama directamente al <code>base_url</code> del handshake con headers firmados, y el middleware del SDK rechaza con 401 cualquier petición sin firma. La única excepción es el healthcheck.</p>
+      <table>
+        <tr><th>Ruta</th><th>Quién la llama</th><th>Respuesta</th></tr>
+        <tr><td><code>GET {runtime.healthcheck}</code> (default <code>/health</code>)</td><td>Docker, <code>start.bat</code>, CI, humanos</td><td><code>{status: "ok"|"degraded", module, version, degraded_dependencies: {dep: estado}}</code>. <strong>Única ruta sin firma.</strong></td></tr>
+        <tr><td><code>GET /_novvus/meta</code></td><td>Introspección en dev</td><td>El documento de meta. La copia autoritativa es la que viaja en el handshake.</td></tr>
+        <tr><td><code>POST /_novvus/events</code></td><td>Kernel (bus, at-least-once)</td><td><code>{status: "ignored"|"duplicate"|"processed"}</code>. Idempotencia por <code>event.id</code> en <code>mod_{id}._processed_events</code>, en la misma transacción del handler.</td></tr>
+        <tr><td><code>POST /_novvus/cron</code></td><td>Kernel (<code>CronScheduler</code>, <code>FOR UPDATE SKIP LOCKED</code>)</td><td>Body <code>{name, org_id}</code> → <code>{status: "ignored"|"ran"}</code>; el handler corre en la sesión tenant de esa org.</td></tr>
+        <tr><td><code>POST /_novvus/hooks/{hook}</code></td><td>Kernel en transiciones por org</td><td><code>on_install | on_enable | on_disable | on_uninstall</code> → <code>{status: "ignored"|"ran"}</code>. Best-effort: un fallo se registra, no revierte la transición.</td></tr>
+      </table>
+
+      <h2>Endpoints de negocio reales</h2>
+      <h3>CRM (<code>modules/crm/business.py</code>)</h3>
+      <p>Diez modelos con auto-API: <code>companies</code>, <code>contacts</code>, <code>tags</code>, <code>pipelines</code>, <code>stages</code>, <code>opportunities</code>, <code>leads</code>, <code>activities</code>, <code>contact_tags</code>, <code>opportunity_tags</code>. Encima, estas rutas custom:</p>
+<pre><code><span class="c"># Crear lead → 201; emite crm.lead.created {lead_id, source}</span>
+POST <span class="f">/api/crm/leads</span>   crm.leads.write
+     {"source":"manual|…","contact_id":null,"company_id":null,"notes":""}
+
+<span class="c"># Convertir lead → 201 oportunidad; el lead queda "converted" y enlazado; emite crm.lead.converted</span>
+POST <span class="f">/api/crm/leads/{id}/convert</span>   crm.leads.write
+     {"name":null,"amount":"0","currency":"MXN","pipeline_id":null,"expected_close_date":null,"priority":"medium"}
+     409 si ya está convertido o perdido · 422 sin pipeline default o sin etapas abiertas
+
+<span class="c"># Mover de etapa; won/lost fijan closed_at y emiten su evento además de stage_changed</span>
+POST <span class="f">/api/crm/opportunities/{id}/move</span>   crm.opportunities.write   {"stage_id":"…"}
+     422 si la etapa pertenece a otro pipeline
+
+<span class="c"># Completar actividad (idempotente); emite crm.activity.completed {activity_id, type}</span>
+POST <span class="f">/api/crm/activities/{id}/complete</span>   crm.activities.write
+
+<span class="c"># Etiquetas M2M (contacts y opportunities)</span>
+GET    <span class="f">/api/crm/contacts/{id}/tags</span>              crm.contacts.read
+POST   <span class="f">/api/crm/contacts/{id}/tags/{tag_id}</span>     crm.contacts.write   → 204
+DELETE <span class="f">/api/crm/contacts/{id}/tags/{tag_id}</span>     crm.contacts.write   → 204
+(idénticas bajo /opportunities/{id}/tags con crm.opportunities.*)
+
+<span class="c"># Reportes (crm.reports.read)</span>
+GET <span class="f">/api/crm/reports/pipeline?pipeline_id=</span>
+    → {pipeline_id, pipeline_name, stages:[{stage_id,name,position,probability,is_won,is_lost,count,total_amount}], open_count, won_count, lost_count}
+GET <span class="f">/api/crm/reports/conversion?start=2026-09-01&amp;end=2026-09-30</span>
+    → {start, end, leads, converted, lost, conversion_rate}   <span class="c"># ventana INCLUSIVA de calendario</span></code></pre>
+
+      <h3>Proyectos (<code>modules/projects/module.py</code>)</h3>
+      <p>No declara endpoints custom: solo la auto-API de <code>projects</code> y <code>tasks</code>. Su valor es la interoperabilidad: escucha <code>crm.opportunity.won</code>, crea el proyecto enlazado con tres tareas (una sola vez por oportunidad, aun con reentregas), resuelve el nombre del contacto por <code>module.call</code> al CRM (<code>service_permissions = ["crm.contacts.read"]</code>; si el CRM no está, degrada a cadena vacía) y emite <code>projects.project.created</code>.</p>
+
+      <h2>Clientes tipados del frontend</h2>
+      <table>
+        <tr><th>Archivo</th><th>Qué expone</th></tr>
+        <tr><td><code>lib/api.ts</code></td><td><code>api&lt;T&gt;(path, {method, body})</code>: prefija <code>/api</code>, añade <code>Authorization</code> y <code>x-novvus-locale</code>, y ante un 401 rota el refresh <em>una vez</em> (con <code>org_id</code> guardado) antes de mandar a <code>/login</code>. Tokens en <code>localStorage</code> (<code>novvus.access</code>, <code>novvus.refresh</code>, <code>novvus.org</code>, <code>novvus.locale</code>). Objetos <code>kernel</code> (auth, orgs, roles, módulos por org, config), <code>crm</code>, <code>projects</code>; <code>ApiError {status, code, message}</code>.</td></tr>
+        <tr><td><code>lib/meta/api.ts</code> · <code>use-meta.ts</code> · <code>overrides.tsx</code></td><td><code>meta.index()</code>/<code>meta.module(id)</code>; <code>records.list/one/create/update/remove/group</code> sobre cualquier <code>{módulo}/{recurso}</code> (serializa <code>filter</code> como JSON); hooks <code>useMetaIndex()</code>, <code>useModelMeta()</code>; <code>registerViewOverride()</code> para sustituir una vista genérica.</td></tr>
+        <tr><td><code>lib/chatter.ts</code></td><td><code>chatter.messages/post/edit/remove/followers/follow/unfollow/activities/createActivity/closeActivity</code>, <code>notifications.inbox/markRead/markAllRead</code> y <code>subscribeNotifications()</code>: un <code>EventSource</code> singleton a <code>/api/core/stream?token=</code> compartido por todos los suscriptores, con polling como respaldo.</td></tr>
+        <tr><td><code>lib/files.ts</code></td><td><code>attachments.list/upload/remove/fetchObjectUrl/download</code>. La subida usa <code>XMLHttpRequest</code> para reportar progreso; la descarga hace <code>fetch</code> con Bearer y crea un object URL.</td></tr>
+        <tr><td><code>lib/custom-fields.ts</code></td><td><code>customFields.list/create/update/remove</code> y <code>CUSTOM_FIELD_TYPES</code> (los siete tipos con label en español).</td></tr>
+        <tr><td><code>lib/modules/*</code></td><td><code>moduleService</code> (tienda: <code>getModules</code>, <code>installModule</code>, <code>enableModule</code>, <code>planEnable</code>, <code>enableModules</code> secuencial…), hooks <code>useModules/useEnabledModules/useModuleSummary/useModuleAction/useEnablePlan</code>, <code>MODULE_REGISTRY</code> como respaldo offline y <code>status.ts</code>/<code>open-route.ts</code>/<code>icons.ts</code>.</td></tr>
+      </table>
+
+      <h2>Consumir la API desde un sistema externo</h2>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><strong>Servidor a servidor con JWT.</strong> Usa el flujo de sesión de arriba contra <code>http://&lt;servidor&gt;:8077/api/…</code> (el rewrite de Next reenvía cualquier cliente HTTP, no solo navegadores) o contra <code>:8000</code> en desarrollo. Crea un usuario dedicado con un rol mínimo; renueva con <code>/auth/refresh</code> antes de los 15 min y guarda siempre el refresh nuevo.</div></div>
+        <div class="step"><span class="num">2</span><div><strong>Desde un sitio web ajeno (navegador).</strong> Al ser otro origen necesitas CORS: fija <code>NOVVUS_CORS_ORIGINS=https://tusitio.example,https://otro.example</code> en el kernel (lista separada por comas; vacía = CORS deshabilitado; con valor se permiten todos los métodos y headers para esos orígenes). En producción el kernel no está expuesto, así que además tendrías que publicarlo detrás de tu reverse proxy o apuntar el sitio al puerto de la web.</div></div>
+        <div class="step"><span class="num">3</span><div><strong>Integración profunda: registra tu sistema como módulo.</strong> Un manifiesto mínimo (sin modelos, como <code>salesmx</code>) registrado e instalado te da un <strong>token de servicio</strong> <code>nvk_</code> con el que llamar APIs de otros módulos por el proxy (<code>x-novvus-service-token</code> + <code>x-novvus-org</code>, permisos acotados por <code>service_permissions</code>), emitir eventos declarados y escuchar los de otros módulos en tu <code>/_novvus/events</code>.</div></div>
+      </div>
+      <div class="warn"><b>No existen API keys personales.</b> Las únicas credenciales son el JWT de usuario, el token de servicio de un módulo y el token de bootstrap (solo instancia). Tampoco hay webhooks salientes todavía (BACKLOG «Plataforma»).</div>
+
+      <details class="fold"><summary>Ver más: OpenAPI y exploración en desarrollo</summary>
+        <p>Cada runtime es FastAPI y publica <code>/openapi.json</code> y <code>/docs</code> en su propio proceso, pero el middleware de firma bloquea el acceso directo. Las formas prácticas de explorar en desarrollo son tres: leer las rutas en <code>autoapi.py</code>/<code>business.py</code>; arrancar el módulo en <strong>modo offline</strong> (<code>NOVVUS_DATABASE_URL</code> + <code>NOVVUS_INTERNAL_HMAC_SECRET</code>, sin kernel) y firmar tus peticiones con <code>novvus_sdk.security.sign()</code> como hace el arnés de tests; o simplemente pasar por el gateway con un JWT, que es lo que hace <code>modules/crm/requests.http</code>. El kernel en Rust no genera OpenAPI: esta página es su referencia.</p>
+      </details>
+
+      <nav class="page-nav">
+        <a href="base-de-datos.html"><span class="dir">← Anterior</span>Base de datos</a>
+        <a class="next" href="seguridad.html"><span class="dir">Siguiente →</span>Seguridad</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

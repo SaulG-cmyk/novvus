@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extensiones, campos, config y cron — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav active" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Construir módulos / Extensiones, campos, config y cron</div>
+    <article>
+      <h1>Extensiones, campos, config y cron</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">Todo lo que un módulo puede hacer <b>más allá de sus propios modelos</b>: aportar campos y
+      secciones a modelos de otros módulos, dejar que cada organización añada campos sin programar, declarar
+      configuración por organización, programar trabajos, reaccionar al ciclo de vida, traducirse, hablar con otros
+      módulos por eventos y distribuirse como paquete firmado.</p>
+
+      <h2>1. Extensiones entre módulos (<code>[extensions]</code>)</h2>
+      <p>Contrato: <code>documents/docs/EXTENSIONS.md</code>. Es el reemplazo del <code>_inherit</code> de Odoo, con un
+      contrato explícito en lugar de <i>monkey-patching</i>: un módulo declara en su <code>novvus.toml</code> qué campos y
+      qué sección de formulario aporta a un modelo ajeno; el kernel valida y registra; el módulo base los aplica a
+      través de su propio SDK sin saber que el extensor existe.</p>
+      <div class="note"><b>Principio rector: un solo escritor por esquema.</b> Los datos de extensión viven en la
+      tabla del módulo <b>base</b>, en la columna JSONB <code>ext</code> con forma <code>{extensor: {campo: valor}}</code>, y
+      solo el base los lee y escribe. El extensor opera por la API pública del base o simplemente deja que los
+      usuarios editen sus campos desde la UI del base. El rol de base de datos del módulo sigue sin privilegios fuera
+      de <code>mod_{id}</code>: "no tocar tablas ajenas" continúa siendo imposibilidad técnica, no promesa.</div>
+<pre class="diagram">salesmx (novvus.toml)           Kernel                            CRM (base)
+   │ [extensions]                  │                                 │
+   │ register / install            │                                 │
+   ├──────────────────────────────►│ valida contra el meta del base; │
+   │                               │ persiste core.model_extensions  │
+   │                               │                                 │
+   │                               │ GET /api/core/extensions ◄──────┤ ExtensionsRegistry (TTL 60 s)
+   │                               ├────────────────────────────────►│ valida y aplica ext en su API
+   │       GET /api/core/meta      │                                 │
+   │  shell ◄── campos ext.salesmx.* fusionados en crm.contacts ──┘  │</pre>
+
+      <h3>Ejemplo completo: <code>modules/salesmx/novvus.toml</code></h3>
+<pre><code>[module]
+id = <span class="s">"salesmx"</span>
+name = <span class="s">"Ventas México"</span>
+version = <span class="s">"0.1.0"</span>
+description = <span class="s">"Localización fiscal mexicana para el CRM (RFC y régimen)."</span>
+
+[dependencies]
+modules = [<span class="s">"crm&gt;=0.1"</span>]            <span class="c"># extender exige depender: el target debe estar aquí</span>
+
+[presentation]
+summary = <span class="s">"Agrega RFC y régimen fiscal a los contactos del CRM."</span>
+category = <span class="s">"Localizaciones"</span>
+icon = <span class="s">"landmark"</span>
+publisher = <span class="s">"Novvus"</span>
+license = <span class="s">"MIT"</span>
+
+[[extensions.fields]]
+target = <span class="s">"crm.contacts"</span>            <span class="c"># {módulo}.{resource del meta del base}</span>
+name = <span class="s">"rfc"</span>                       <span class="c"># clave dentro de ext['salesmx']; ^[a-z][a-z0-9_]{0,63}$</span>
+type = <span class="s">"string"</span>
+label = <span class="s">"RFC"</span>                      <span class="c"># texto fuente es-MX</span>
+config = { max_length = <span class="n">13</span>, pattern = <span class="s">"[A-ZÑ&amp;0-9]{12,13}"</span> }
+
+[[extensions.fields]]
+target = <span class="s">"crm.contacts"</span>
+name = <span class="s">"regimen"</span>
+type = <span class="s">"string"</span>
+label = <span class="s">"Régimen fiscal"</span>
+config = { choices = [
+    { value = <span class="s">"601"</span>, label = <span class="s">"601 — General de Ley"</span> },
+    { value = <span class="s">"612"</span>, label = <span class="s">"612 — Personas Físicas con Actividades Empresariales"</span> },
+    { value = <span class="s">"626"</span>, label = <span class="s">"626 — RESICO"</span> },
+] }
+
+[[extensions.ui]]
+target = <span class="s">"crm.contacts.form"</span>       <span class="c"># solo la vista form acepta contribuciones en v1</span>
+slot = <span class="s">"after:company_id"</span>          <span class="c"># "after:{campo del layout base}" | "section:end"</span>
+group_label = <span class="s">"Datos fiscales"</span>
+fields = [<span class="s">"rfc"</span>, <span class="s">"regimen"</span>]</code></pre>
+      <p>El <code>module.py</code> de salesmx tiene dos líneas útiles: <code>module = NovvusModule(...)</code> y
+      <code>app = module.create_app()</code>. No declara modelos ni migraciones; su valor entero está en el manifiesto.
+      El runtime existe para que en el futuro pueda escuchar eventos del CRM o exponer endpoints propios.</p>
+
+      <h3>Reglas y límites</h3>
+      <table>
+        <tr><th>Regla</th><th>Dónde se aplica</th></tr>
+        <tr><td>Todo <code>target</code> pertenece a un módulo declarado en <code>[dependencies] modules</code>; extender el propio módulo es error ("usa columnas normales").</td><td><code>manifest.py:370-386</code> (SDK) y validación espejo en el kernel al registrar.</td></tr>
+        <tr><td>Tipos v1: <code>string</code>, <code>text</code>, <code>integer</code>, <code>decimal</code>, <code>boolean</code>, <code>date</code>, <code>datetime</code>. <code>choices</code> vía <code>config</code>. Sin <code>relation</code> ni <code>json</code>.</td><td><code>EXT_FIELD_TYPES</code>, <code>manifest.py:180</code>.</td></tr>
+        <tr><td>Máximo <b>32 campos ext por módulo extensor</b> y <b>16 extensores por modelo base</b>.</td><td><code>MAX_EXT_FIELDS</code> (<code>manifest.py:183</code>); <code>MAX_EXTENDERS_PER_MODEL</code> (<code>novvus-registry/src/lifecycle.rs:22</code>).</td></tr>
+        <tr><td><code>[[extensions.ui]]</code> solo referencia campos declarados para el mismo target; <code>slot</code> con forma <code>after:{campo}</code> o <code>section:end</code>; <code>group_label</code> obligatorio.</td><td><code>manifest.py:408-437</code>.</td></tr>
+        <tr><td>Si el base aún no hizo handshake cuando se registra el extensor, la validación del modelo se repite al servir: un target inexistente no se fusiona y se registra en log. El orden de arranque no rompe el registro.</td><td>Kernel, <code>routes/meta.rs</code>.</td></tr>
+      </table>
+
+      <h3>Fusión en el meta y render</h3>
+      <p><code>GET /api/core/meta[/{módulo}]</code> añade a cada modelo del base, para los extensores <b>habilitados en la
+      org del usuario</b>, campos planos con <code>name = "ext.{extensor}.{campo}"</code> y la marca
+      <code>"ext": "{extensor}"</code>. Flags: <code>filterable</code> y <code>sortable</code> verdaderos, <code>groupable</code> solo para
+      boolean/choices, <code>searchable</code> falso. Las secciones de <code>[[extensions.ui]]</code> aterrizan en
+      <code>views.form.ext_sections</code>; el <code>GenericFormView</code> las pinta justo debajo de la fila que contiene el campo
+      del slot y, si el slot no existe en el layout, al final (degradación elegante, jamás rotura). La lista añade
+      las columnas ext al final. El ETag del meta ya cubre el documento fusionado.</p>
+
+      <h3>Cómo el módulo base lee y escribe <code>ext</code></h3>
+      <p>Nada que programar: lo hace la auto-API del base (<code>sdk/src/novvus_sdk/extensions.py</code>).</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Definiciones.</b> <code>ExtensionsRegistry.for_org(org_id)</code>
+        consulta <code>GET /api/core/extensions?org_id=</code> con el token de servicio y cachea por organización
+        <code>DEFINITIONS_TTL = 60</code> segundos. Si el kernel no responde, sirve la copia anterior (o vacío) y sigue
+        funcionando.</div></div>
+        <div class="step"><span class="num">2</span><div><b>Escritura.</b> <code>POST/PATCH</code> aceptan
+        <code>{"ext": {"salesmx": {"rfc": "XAXX010101000"}}}</code>. <code>validate_ext_payload()</code> rechaza con 422
+        extensores no habilitados, campos no declarados, tipos incorrectos, <code>max_length</code>, <code>pattern</code> y
+        <code>choices</code> incumplidos; <code>null</code> borra la clave; en <code>create</code> exige los <code>required</code>. El
+        permiso es el del recurso base (<code>crm.contacts.write</code>).</div></div>
+        <div class="step"><span class="num">3</span><div><b>Lectura.</b> <code>filter_ext_for_read()</code> deja salir
+        únicamente los namespaces de extensores habilitados para la org de la petición. Deshabilitar salesmx en una
+        org hace desaparecer <code>rfc</code> de las respuestas sin borrar datos.</div></div>
+        <div class="step"><span class="num">4</span><div><b>Filtros y export.</b> El DSL acepta
+        <code>{"field": "ext.salesmx.rfc", "op": "ilike", "value": "XAXX%"}</code> (traducido a
+        <code>ext -&gt; 'salesmx' -&gt;&gt; 'rfc'</code> con <i>cast</i> por tipo); el export añade las columnas ext al final con su
+        label.</div></div>
+      </div>
+<pre><code><span class="c"># Desde un endpoint custom del base, si alguna vez necesitas leer ext a mano:</span>
+defs = <span class="k">await</span> module.extensions.for_org(current_context().org_id)   <span class="c"># {resource: {extensor: {campo: decl}}}</span>
+rfc = (contact.ext.get(<span class="s">"salesmx"</span>) <span class="k">or</span> {}).get(<span class="s">"rfc"</span>)
+<span class="c"># En tests, module.ext_definitions_override = {...} evita el kernel por completo.</span></code></pre>
+      <table>
+        <tr><th>Ciclo de vida del extensor</th><th>Efecto sobre los datos</th></tr>
+        <tr><td>Habilitado en la org</td><td>Sus campos aparecen en meta, respuestas y validación para esa org.</td></tr>
+        <tr><td>Deshabilitado en la org</td><td>Desaparecen del meta y de las respuestas; el JSONB se conserva intacto.</td></tr>
+        <tr><td>Desinstalado de la instancia</td><td>Cae su fila de <code>core.model_extensions</code> (CASCADE); los datos huérfanos en <code>ext</code> se conservan. La purga es responsabilidad explícita del operador: el contrato prevé un comando de CLI que en v0.1.6 aún no existe.</td></tr>
+      </table>
+      <div class="tip"><b>Lógica extendida sin override de código ajeno.</b> Datos → campos ext. Reacciones →
+      eventos del base (<code>crm.contact.created</code>…). Consultas → <code>module.call()</code> con
+      <code>service_permissions</code>. UI compleja → rutas propias del extensor bajo <code>/salesmx/…</code>. Inyectar React
+      en vistas del base queda fuera por diseño (decisión de marketplace).</div>
+
+      <h2>2. Campos personalizados por organización</h2>
+      <p>Contrato: <code>documents/docs/CUSTOM_FIELDS.md</code>. Misma infraestructura que las extensiones, distinto dueño:
+      aquí es el <b>administrador de una organización</b> quien agrega "número de contrato" a oportunidades desde la UI,
+      sin programar, sin migraciones y sin tocar el esquema.</p>
+      <table>
+        <tr><th></th><th>Extensiones (<code>ext</code>)</th><th>Campos custom (<code>custom</code>)</th></tr>
+        <tr><td>Quién declara</td><td>Un módulo, en <code>novvus.toml</code></td><td>El admin de una org, en <code>/settings/custom-fields</code></td></tr>
+        <tr><td>Alcance</td><td>Toda la instancia (visible por org habilitada)</td><td>Una organización</td></tr>
+        <tr><td>Columna JSONB</td><td><code>ext</code> = <code>{extensor: {campo: valor}}</code></td><td><code>custom</code> = <code>{campo: valor}</code> (plano)</td></tr>
+        <tr><td>Nombre en el meta</td><td><code>ext.{extensor}.{campo}</code></td><td><code>custom.{campo}</code>, marca <code>"custom": true</code></td></tr>
+        <tr><td>Registro</td><td><code>core.model_extensions</code></td><td><code>core.custom_fields</code></td></tr>
+        <tr><td>Labels</td><td>Texto fuente es-MX, pasan por <code>t()</code></td><td><b>Texto del usuario, jamás se traduce</b></td></tr>
+      </table>
+      <h3>La tabla <code>core.custom_fields</code> y sus reglas duras</h3>
+      <p>Columnas: <code>id</code>, <code>org_id</code>, <code>module_id</code>, <code>model</code>, <code>name</code>
+      (<code>^[a-z][a-z0-9_]{0,29}$</code>, único por org/módulo/modelo, <b>inmutable</b>), <code>field_type</code>
+      (<b>inmutable</b>: cambiar el tipo con datos existentes es corrupción garantizada; se crea otro campo),
+      <code>label</code>, <code>config</code> (<code>max_length</code>, <code>pattern</code>, <code>choices</code>, <code>help</code>),
+      <code>required</code>, <code>position</code>, <code>active</code>, <code>created_by</code>, <code>deleted_at</code>.
+      Tipos: los siete de extensiones; <code>select</code> se modela como <code>string</code> + <code>config.choices</code>.
+      Límite por modelo: 50 (<code>DEFAULT_LIMIT_PER_MODEL</code>, <code>routes/custom_fields.rs:24</code>).
+      <b>Cero DDL en runtime</b>: crear campos no genera ninguna migración; la columna <code>custom jsonb NOT NULL DEFAULT
+      '{}'</code> ya existe en toda tabla del SDK (<code>models.py:59</code>).</p>
+      <table>
+        <tr><th>Ruta</th><th>Permiso</th><th>Efecto</th></tr>
+        <tr><td><code>GET /api/core/custom-fields?module_id=&amp;model=</code></td><td>cualquier miembro</td><td>Definiciones vivas de la org (la shell las necesita para renderizar).</td></tr>
+        <tr><td><code>POST /api/core/custom-fields</code></td><td><code>core.custom_fields.manage</code></td><td>Crear: valida nombre, tipo, que <code>module_id.model</code> exista en el meta, módulo habilitado, límite y choices.</td></tr>
+        <tr><td><code>PATCH /api/core/custom-fields/{id}</code></td><td>mismo</td><td>Solo <code>label</code>, <code>config</code>, <code>required</code>, <code>position</code>, <code>active</code>.</td></tr>
+        <tr><td><code>DELETE /api/core/custom-fields/{id}</code></td><td>mismo</td><td>Borrado lógico; la definición se purga a los 30 días (<code>main.rs:39-44</code>).</td></tr>
+        <tr><td><code>GET /api/core/custom-fields/service?org_id=</code></td><td>token de servicio</td><td>Variante para el SDK del módulo.</td></tr>
+      </table>
+      <h3>En el SDK del módulo</h3>
+      <p><code>CustomFieldsRegistry</code> (<code>sdk/src/novvus_sdk/custom_fields.py</code>) es hermano de
+      <code>ExtensionsRegistry</code>: caché por org con TTL 60 s del endpoint de servicio y degradación con copia
+      anterior. <code>validate_custom_payload()</code> acepta <code>{"custom": {"contract_number": "C-2026-118"}}</code>,
+      rechaza claves sin definición activa, coerciona por tipo, exige <code>required</code> al crear, hace <i>merge</i> por
+      campo en PATCH y <code>null</code> borra. Incluye el <b>barrido perezoso</b>: al escribir un registro, las claves sin
+      definición activa se descartan. El kernel nunca ejecuta SQL sobre <code>mod_*</code> para limpiar; ni para eso.</p>
+      <p>En la shell: el formulario genérico pinta los campos custom en una sección "Información adicional" al
+      final, ordenados por <code>position</code>; la lista los añade como columnas finales; el DSL admite
+      <code>custom.{nombre}</code> y <code>/group?by=custom.{nombre}</code> cuando el campo es boolean o tiene choices.
+      El administrador los gestiona en <code>/settings/custom-fields</code> (selector módulo → modelo desde el meta,
+      alta con vista previa, editar, desactivar, borrar con aviso).</p>
+
+      <h2>3. Configuración por organización (<code>[[config]]</code>)</h2>
+      <p>Inspirada en <code>res.config.settings</code>, sin herencia de modelos: el módulo declara un esquema, el kernel
+      persiste <b>valores por organización</b> en <code>core.org_module_config</code>, la shell renderiza un formulario
+      genérico en <code>/settings</code> y el SDK lee los valores tipados.</p>
+<pre><code><span class="c"># modules/crm/novvus.toml</span>
+[[config]]
+key = <span class="s">"crm.default_currency"</span>       <span class="c"># debe empezar por el id del módulo</span>
+type = <span class="s">"select"</span>                     <span class="c"># string | number | boolean | select</span>
+label = <span class="s">"Moneda predeterminada"</span>
+description = <span class="s">"Moneda usada para nuevas oportunidades."</span>
+options = [<span class="s">"MXN"</span>, <span class="s">"USD"</span>, <span class="s">"EUR"</span>]     <span class="c"># obligatorio para select</span>
+default = <span class="s">"MXN"</span>                     <span class="c"># debe coincidir con type</span>
+permission = <span class="s">"crm.pipelines.manage"</span> <span class="c"># default core.modules.manage; namespace del módulo</span>
+
+[[config]]
+key = <span class="s">"crm.rotting_days"</span>
+type = <span class="s">"number"</span>
+label = <span class="s">"Días para marcar oportunidad estancada"</span>
+default = <span class="n">14</span>
+permission = <span class="s">"crm.pipelines.manage"</span></code></pre>
+      <p>La clave <code>secret = true</code> enmascara el valor en las respuestas para el frontend (sigue siendo
+      escribible; devolver la máscara tal cual es un <i>no-op</i>, no un valor nuevo). El propio módulo, con su token
+      de servicio, recibe el valor real: <code>novvus-registry/src/config.rs:128</code>.</p>
+      <table>
+        <tr><th>Ruta</th><th>Quién</th><th>Efecto</th></tr>
+        <tr><td><code>GET /api/core/orgs/{org}/modules/{id}/config</code></td><td>usuario</td><td>Esquema + valores efectivos; solo los campos cuyo <code>permission</code> tiene el usuario.</td></tr>
+        <tr><td><code>PUT /api/core/orgs/{org}/modules/{id}/config</code></td><td>usuario</td><td>Fija valores; cada clave exige su permiso; validación de tipo y opciones.</td></tr>
+        <tr><td><code>GET|PUT /api/core/config</code></td><td>módulo (token de servicio + <code>x-novvus-org</code>)</td><td>El módulo lee/escribe su propia configuración para ese tenant.</td></tr>
+      </table>
+<pre><code><span class="c"># En el SDK (app.py:237-254): defaults del esquema fusionados con lo guardado por la org</span>
+settings = <span class="k">await</span> module.config()                     <span class="c"># org del contexto actual</span>
+currency = settings[<span class="s">"crm.default_currency"</span>]         <span class="c"># "MXN" si la org no fijó nada</span>
+<span class="k">await</span> module.set_config({<span class="s">"crm.rotting_days"</span>: <span class="n">21</span>}, org_id=org)
+
+<span class="c"># En modo offline (tests) config() devuelve solo los defaults; set_config lanza RuntimeError.</span></code></pre>
+
+      <h2>4. Cron y hooks de ciclo de vida</h2>
+      <p>Primitivas orquestadas por el kernel sobre el canal interno firmado: nunca ejecutan código arbitrario en
+      el kernel, siempre hacen POST a tu runtime con cabeceras HMAC que llevan el tenant.</p>
+      <h3>Trabajos programados</h3>
+<pre><code><span class="c"># novvus.toml</span>
+[[cron]]
+name = <span class="s">"crm.rot_opportunities"</span>     <span class="c"># {id}.{nombre}, único</span>
+interval_seconds = <span class="n">86400</span>            <span class="c"># ≥ 1</span>
+description = <span class="s">"Marca oportunidades estancadas"</span>
+
+<span class="c"># module.py — el handler corre dentro de la sesión de tenant de cada org habilitada</span>
+@module.cron(<span class="s">"crm.rot_opportunities"</span>)
+<span class="k">async def</span> <span class="f">rot</span>(session: AsyncSession) -&gt; <span class="k">None</span>:
+    settings = <span class="k">await</span> module.config()          <span class="c"># current_context().org_id es la org del disparo</span>
+    days = int(settings[<span class="s">"crm.rotting_days"</span>])
+    ...</code></pre>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>En <code>install</code> el kernel siembra las definiciones en
+        <code>core.cron_jobs</code> (<code>lifecycle.rs:347</code>). <code>@module.cron("x")</code> falla al importar si
+        <code>x</code> no está en <code>[[cron]]</code> (<code>app.py:149</code>).</div></div>
+        <div class="step"><span class="num">2</span><div>El <code>CronScheduler</code> (<code>novvus-events/src/cron.rs</code>)
+        mantiene una fila por job × organización habilitada en <code>core.cron_runs</code> y reclama las vencidas con
+        <code>FOR UPDATE SKIP LOCKED</code>: dos instancias del kernel nunca duplican una ejecución.</div></div>
+        <div class="step"><span class="num">3</span><div>Hace <code>POST /_novvus/cron</code> al runtime con
+        <code>{name, org_id}</code>; el SDK abre <code>tenant_session(org_id)</code> y llama al handler
+        (<code>app.py:389-397</code>). Éxito → <code>next_run_at = now() + interval</code>; fallo → reintento con el mismo
+        backoff exponencial que los eventos.</div></div>
+      </div>
+      <h3>Hooks por organización</h3>
+<pre><code>@module.on_install
+<span class="k">async def</span> <span class="f">setup</span>(session: AsyncSession) -&gt; <span class="k">None</span>:
+    <span class="c"># datos iniciales del tenant: pipeline por defecto, etapas…</span>
+    ...
+
+@module.on_enable
+<span class="k">async def</span> <span class="f">enabled</span>(session): ...
+@module.on_disable
+<span class="k">async def</span> <span class="f">disabled</span>(session): ...
+@module.on_uninstall
+<span class="k">async def</span> <span class="f">teardown</span>(session): ...</code></pre>
+      <p>El kernel los invoca en las transiciones <b>por organización</b>
+      (<code>POST /api/core/orgs/{org}/modules/{id}/{install|enable|disable|uninstall}</code>) con
+      <code>POST /_novvus/hooks/{hook}</code>. La entrega es <i>best-effort</i>: un fallo se registra pero <b>no revierte</b> la
+      transición (la verdad vive en <code>core.org_modules</code>). <code>on_uninstall</code> se dispara antes de borrar la fila
+      para que el runtime pueda resolver el tenant. Un hook no registrado responde <code>{"status": "ignored"}</code>.</p>
+
+      <h2>5. Internacionalización</h2>
+      <p>Contrato: <code>documents/docs/I18N.md</code>. Idioma fuente <b>es-MX</b>: escribes el texto en español y esa misma
+      cadena es la clave. Sin catálogo, todo pasa sin cambios; un texto sin traducir devuelve la fuente, nunca una
+      clave cruda ni un error. Resolución: locale exacto → locale base (<code>en-US</code> → <code>en</code>) → fuente.</p>
+<pre><code><span class="c">// modules/crm/i18n/en-US.json</span>
+{ <span class="s">"Oportunidad de {name}"</span>: <span class="s">"Opportunity for {name}"</span>, <span class="s">"Empresas"</span>: <span class="s">"Companies"</span>, <span class="s">"Puesto"</span>: <span class="s">"Job title"</span> }
+
+<span class="c"># Python: module._ es alias de module.gettext; la interpolación es explícita</span>
+name = module._(<span class="s">"Oportunidad de {name}"</span>).format(name=contact.name)
+forced = module._(<span class="s">"Oportunidad de lead"</span>, locale=<span class="s">"en-US"</span>)</code></pre>
+      <table>
+        <tr><th>Capa</th><th>Cómo llega el locale</th></tr>
+        <tr><td>Frontend</td><td><code>localStorage novvus.locale</code> (default es-MX); <code>lib/api.ts</code> añade <code>x-novvus-locale</code> a cada petición; <code>useI18n().t()</code> traduce los textos de la shell y también los labels del meta.</td></tr>
+        <tr><td>Gateway</td><td><code>resolve_locale</code> toma <code>x-novvus-locale</code> o el primer tag de <code>Accept-Language</code>, y lo reenvía al módulo en una cabecera <b>fuera de la firma HMAC</b>: es informativa y jamás autoriza.</td></tr>
+        <tr><td>SDK</td><td><code>verify_request</code> lo expone en <code>RequestContext.locale</code> (<code>security.py:67</code>). En cron, eventos y hooks no hay usuario: se usa es-MX. El export de la auto-API traduce las cabeceras con este locale.</td></tr>
+      </table>
+      <p>Añadir un idioma: agregar el locale a <code>LOCALES</code> y su catálogo a <code>CATALOGS</code> en
+      <code>apps/web/src/lib/i18n.tsx</code>, y un <code>i18n/{locale}.json</code> por módulo. No hay extracción automática:
+      los catálogos se mantienen a mano. Los labels de campos personalizados son datos del usuario y no se traducen.</p>
+
+      <h2>6. Eventos entre módulos (recordatorio)</h2>
+      <p>Lo viste en el tutorial; aquí solo la chuleta. Contrato completo en <code>documents/docs/EVENTS.md</code>.</p>
+<pre><code><span class="c"># modules/projects/module.py (recortado)</span>
+@module.on(<span class="s">"crm.opportunity.won"</span>)                    <span class="c"># debe estar en [events] listens</span>
+<span class="k">async def</span> <span class="f">create_project_from_won_opportunity</span>(event: Event, session: AsyncSession) -&gt; <span class="k">None</span>:
+    contact = <span class="k">await</span> module.call(<span class="s">"GET"</span>, <span class="s">f"/api/crm/contacts/{cid}"</span>, org_id=event.org_id)  <span class="c"># API pública, nunca tablas</span>
+    ...
+    <span class="k">await</span> module.emit(<span class="s">"projects.project.created"</span>, {<span class="s">"project_id"</span>: str(project.id)}, org_id=event.org_id)</code></pre>
+      <table>
+        <tr><th>Pieza</th><th>Detalle</th></tr>
+        <tr><td><code>emits</code> / <code>listens</code></td><td>Declarados en el manifiesto; <code>module.emit</code> de un tipo no declarado lanza <code>ValueError</code>; el kernel también lo valida.</td></tr>
+        <tr><td>Idempotencia</td><td>Entrega <i>at-least-once</i>. El SDK inserta <code>event.id</code> en <code>mod_{id}._processed_events</code> con <code>ON CONFLICT DO NOTHING</code> en la <b>misma transacción</b> del handler: duplicado → <code>{"status": "duplicate"}</code> sin reejecutar.</td></tr>
+        <tr><td><code>module.call(method, path, org_id, json)</code></td><td>Llamada módulo→módulo por el gateway con token de servicio; el gateway inyecta los <code>service_permissions</code> del manifiesto. En modo offline lanza <code>RuntimeError</code>.</td></tr>
+        <tr><td><code>module.dependency_statuses()</code></td><td>Estado de cada dependencia declarada (caché 10 s). <code>GET /health</code> responde <code>status: "degraded"</code> con <code>degraded_dependencies</code> cuando una no está <code>enabled</code>: el módulo sigue sirviendo, no "roto".</td></tr>
+      </table>
+
+      <h2>7. Empaquetado y catálogo (marketplace)</h2>
+      <p>Para distribuir módulos fuera del monorepo (<code>MODULE_CONTRACT.md §11</code>, <code>novvus-registry/src/package.rs</code>).
+      Un paquete es un JSON autocontenido, y se publica envuelto en una firma:</p>
+<pre><code>{
+  <span class="s">"package"</span>: {
+    <span class="s">"format_version"</span>: <span class="n">1</span>,
+    <span class="s">"manifest_toml"</span>: <span class="s">"…contenido de novvus.toml…"</span>,
+    <span class="s">"migrations"</span>: [{ <span class="s">"version"</span>: <span class="s">"0001_init"</span>, <span class="s">"sql"</span>: <span class="s">"…"</span> }],
+    <span class="s">"assets"</span>: [{ <span class="s">"path"</span>: <span class="s">"assets/icon.svg"</span>, <span class="s">"content_base64"</span>: <span class="s">"…"</span> }]
+  },
+  <span class="s">"publisher"</span>: <span class="s">"ACME"</span>,
+  <span class="s">"public_key"</span>: <span class="s">"&lt;base64 clave pública Ed25519&gt;"</span>,
+  <span class="s">"signature"</span>: <span class="s">"&lt;base64 firma Ed25519 de 64 bytes&gt;"</span>
+}</code></pre>
+      <table>
+        <tr><th>Regla</th><th>Detalle</th></tr>
+        <tr><td>Sin código ejecutable</td><td><code>assets</code> son estáticos declarativos (iconos, capturas). La shell nunca corre JS de un módulo.</td></tr>
+        <tr><td>Firma sobre bytes canónicos</td><td><code>canonical_bytes()</code> serializa con <code>migrations</code> y <code>assets</code> ordenados: determinista e independiente del orden de entrada. <code>package_hash</code> = SHA-256 hex de esos bytes.</td></tr>
+        <tr><td>Fail-closed</td><td>La clave pública del paquete debe estar en <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code> (lista de claves base64 separadas por coma). Clave ausente o firma inválida → 403. Lista vacía = nadie puede publicar.</td></tr>
+        <tr><td><code>GET /api/core/catalog</code></td><td>Módulos disponibles para instalar (<code>core.modules.read</code>); no expone el blob <code>package</code>.</td></tr>
+        <tr><td><code>POST /api/core/catalog</code></td><td>Publica un paquete firmado (<code>core.modules.manage</code>; re-verifica la firma). Persiste en <code>core.module_catalog</code>.</td></tr>
+        <tr><td><code>POST /api/core/catalog/{id}/register</code></td><td>Copia el paquete a <code>core.modules</code> por el flujo normal de <code>register</code> (re-verifica), y a partir de ahí aplica el ciclo de vida de siempre: install → enable → habilitar por organización desde la tienda <code>/apps</code>.</td></tr>
+      </table>
+      <div class="warn"><b>Dos cosas distintas.</b> El catálogo guarda módulos <i>disponibles</i>; <code>core.modules</code>
+      guarda módulos <i>registrados/instalados</i>. Y la firma del paquete es independiente de la verificación
+      SHA-256 con la que el CLI administrativo descarga releases de la plataforma.</div>
+
+      <details class="fold"><summary>Ver más: checklist de un módulo "extensor"</summary>
+        <ul>
+          <li>Declara el base en <code>[dependencies] modules</code> con restricción de versión.</li>
+          <li>Un <code>[[extensions.fields]]</code> por campo, máximo 32; tipos v1; <code>label</code> en español.</li>
+          <li>Un <code>[[extensions.ui]]</code> por sección, solo <code>.form</code>, con <code>slot</code> válido.</li>
+          <li>Si necesitas reaccionar a datos del base, escucha sus eventos y consúltalo con <code>module.call</code>.</li>
+          <li>Pruebas: el arnés de <code>modules/salesmx/tests</code> arranca el runtime sin modelos ni migraciones contra una
+          base efímera y comprueba que el manifiesto valida y el runtime responde.</li>
+        </ul>
+      </details>
+
+      <nav class="page-nav">
+        <a href="colaboracion.html"><span class="dir">← Anterior</span>Adjuntos, chatter y notificaciones</a>
+        <a class="next" href="arquitectura.html"><span class="dir">Siguiente →</span>Arquitectura</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

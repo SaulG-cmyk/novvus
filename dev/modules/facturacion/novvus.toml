@@ -1,0 +1,53 @@
+[module]
+id = "facturacion"
+name = "Facturación"
+version = "0.1.0"
+description = "Facturación y cobranza: facturas, líneas, pagos y control de saldos."
+
+[presentation]
+display_name = "Facturación"
+summary = "Emite facturas, registra pagos y controla saldos pendientes de clientes."
+category = "Finanzas"
+icon = "receipt"
+accent = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1"]
+service_permissions = [
+  "crm.companies.read",
+  "crm.contacts.read",
+  "crm.quotes.read",
+]
+
+[[permissions]]
+key = "facturacion.invoices.read"
+description = "Ver facturas"
+
+[[permissions]]
+key = "facturacion.invoices.write"
+description = "Crear y editar facturas"
+
+[[permissions]]
+key = "facturacion.payments.read"
+description = "Ver pagos"
+
+[[permissions]]
+key = "facturacion.payments.write"
+description = "Registrar pagos"
+
+[events]
+emits = ["facturacion.invoice.created", "facturacion.invoice.paid", "facturacion.invoice.overdue"]
+listens = ["crm.quote.accepted"]
+
+[runtime]
+port = 8180
+
+[[config]]
+key = "facturacion.default_currency"
+type = "string"
+label = "Moneda por defecto"
+description = "Moneda para nuevas facturas."
+default = "MXN"
+permission = "facturacion.invoices.write"

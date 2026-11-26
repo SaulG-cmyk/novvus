@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arquitectura — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav active" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / Arquitectura</div>
+    <article>
+      <h1>Arquitectura</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">NOVVUS CORE es un kernel de plataforma escrito en Rust sobre el que corren
+      módulos de negocio en Python, con un frontend Next.js que solo administra módulos y una
+      base PostgreSQL 16 compartida por todos los tenants. Esta página describe los cuatro planos,
+      cómo viaja una petición y un evento, los tres canales de comunicación entre módulos, el
+      ciclo de vida en dos ejes y el mapa del repositorio. El contrato normativo es
+      <code>documents/docs/ARCHITECTURE.md</code>; el detalle de cada crate está en
+      <a href="kernel.html">El kernel por dentro</a>.</p>
+
+      <h2>Idea central</h2>
+      <p>La plataforma se lee en tres capas: <strong>core de plataforma</strong> (kernel) →
+      <strong>sistema de módulos</strong> (SDK y contrato) → <strong>aplicaciones
+      empresariales</strong> (CRM, Proyectos, SalesMX). Es un modelo comparable a Odoo en lo
+      comercial, pero con contratos técnicos estrictos: los módulos no son mini-aplicaciones
+      libres, son extensiones gobernadas por un manifiesto que el kernel valida, y el kernel es el
+      <em>único</em> componente que emite credenciales, decide permisos, instala módulos y ejecuta
+      sus migraciones.</p>
+
+      <h2>Los cuatro planos</h2>
+<pre class="diagram">
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  4. FRONTEND  apps/web  (Next.js 16.2 · React 19 · Tailwind 4 · Base UI)      │
+│     Shell de plataforma: / (launcher) · /apps · /settings · /admin            │
+│     Frontend por módulo: /{module}/… (ModuleShell) y vistas genéricas /m/…    │
+└──────────────────────────────▲───────────────────────────────────────────────┘
+                               │ HTTPS · Authorization: Bearer (JWT HS256)
+                               │ (en producción vía rewrite same-origin /api/*)
+┌──────────────────────────────┴───────────────────────────────────────────────┐
+│  1. KERNEL  kernel/  (Rust: axum 0.8 · tokio · sqlx 0.8 · tower-http)         │
+│                                                                              │
+│  novvus-gateway ── router, extractores de actor, rate limit, proxy HMAC, SSE │
+│  novvus-identity  novvus-rbac  novvus-registry  novvus-events  novvus-files  │
+│  (JWT, Argon2id)  (permisos,   (manifiesto,     (bus, cron,    (object_store,│
+│                    caché)       ciclo de vida,   backoff)       dedup, GC)   │
+│                                 migraciones)                                 │
+│                        novvus-common (config, errores, ids, firma interna)   │
+└───────▲─────────────────────────────────────▲────────────────────────────────┘
+        │ HTTP interno firmado                │ SQL (sqlx) como rol novvus
+        │ X-Novvus-* + HMAC-SHA256            │
+┌───────┴──────────────────────────┐   ┌──────┴───────────────────────────────┐
+│  2. SDK  sdk/  (novvus-sdk)      │   │  PostgreSQL 16                       │
+│     modelos, auto-API, meta,     │   │  core.*      27 tablas del kernel    │
+│     firma, tenant, eventos, CLI  │   │  mod_crm.*   mod_projects.*  + RLS   │
+├──────────────────────────────────┤   │  (salesmx no crea tablas)            │
+│  3. MÓDULOS  modules/            │   │  LISTEN/NOTIFY: novvus_events (bus)  │
+│     crm · projects · salesmx     │   │                 novvus_notify (SSE)  │
+│     procesos FastAPI, red interna│   │  rol novvus_module para mod_*        │
+└──────────────────────────────────┘   └──────────────────────────────────────┘
+</pre>
+      <table>
+        <tr><th>Plano</th><th>Tecnología</th><th>Responsabilidad</th></tr>
+        <tr>
+          <td>Kernel</td>
+          <td>Rust; workspace de 7 crates (<code>kernel/Cargo.toml</code>)</td>
+          <td>Identidad, RBAC, registro y ciclo de vida de módulos, migraciones, bus de eventos, cron, archivos, chatter, proxy firmado.</td>
+        </tr>
+        <tr>
+          <td>SDK</td>
+          <td>Python 3.12, FastAPI, Pydantic, SQLAlchemy async, psycopg, Alembic (solo generador), httpx</td>
+          <td>Capa declarativa: modelos con <code>org_id</code>/RLS, auto-API, meta de vistas, verificación HMAC, sesión tenant, eventos, cron, hooks, CLI de desarrollo.</td>
+        </tr>
+        <tr>
+          <td>Módulos</td>
+          <td>Procesos FastAPI construidos solo con el SDK</td>
+          <td>Negocio: CRM, Proyectos (depende de CRM) y SalesMX (extiende contactos del CRM sin modelos propios).</td>
+        </tr>
+        <tr>
+          <td>Frontend</td>
+          <td>Next.js 16.2.10, React 19.2, Tailwind 4, componentes shadcn sobre Base UI</td>
+          <td>Shell de plataforma + chrome por módulo + vistas genéricas a partir del meta.</td>
+        </tr>
+        <tr>
+          <td>Datos</td>
+          <td>PostgreSQL 16</td>
+          <td>Esquema <code>core</code> (sin RLS, filtrado por el kernel) y esquemas <code>mod_*</code> (RLS obligatorio).</td>
+        </tr>
+      </table>
+      <div class="note"><b>Qué solo hace el kernel.</b> Emitir y validar JWT, decidir permisos,
+      instalar/habilitar módulos y ejecutar sus migraciones, y enrutar el tráfico externo hacia
+      los módulos. Nada de esto se delega ni se duplica en un módulo.</div>
+
+      <h2>Dos superficies de frontend</h2>
+      <p>Desde la decisión del 2026-07-28 (<code>DECISIONS.md</code>) la shell de plataforma es
+      <strong>solo un administrador de módulos</strong>; toda la UI de negocio vive en el frontend
+      de su módulo. Ambas superficies comparten un guard de sesión en
+      <code>app/(protected)/layout.tsx</code> (client-side, tokens en <code>localStorage</code>).</p>
+      <table>
+        <tr><th>Superficie</th><th>Rutas</th><th>Qué contiene</th></tr>
+        <tr>
+          <td>Shell de plataforma</td>
+          <td><code>/</code>, <code>/apps</code>, <code>/apps/{moduleId}</code>, <code>/settings</code>, <code>/settings/custom-fields</code>, <code>/admin</code></td>
+          <td>Login y first-run, launcher (grid de apps habilitadas + widgets <code>[ui.dashboard]</code>), tienda/instalador con plan de dependencias, configuración por módulo y de plataforma, administración de miembros y roles (<code>/admin</code> gatea por permiso a nivel de página).</td>
+        </tr>
+        <tr>
+          <td>Frontend por módulo</td>
+          <td><code>/{module_id}/…</code> y <code>/m/{module_id}/{model}[/{id}]</code></td>
+          <td>Cada módulo abre a pantalla completa con chrome propio (<code>ModuleShell</code>): barra superior con icono/accent de <code>[presentation]</code>, navegación de <code>[ui.nav]</code> y app-switcher. Las vistas genéricas (lista, formulario, kanban, calendario, export) se montan bajo el chrome del módulo dueño mediante <code>m/[moduleId]/layout.tsx</code>.</td>
+        </tr>
+      </table>
+      <p>Regla validada por el kernel (<code>valid_ui_path</code> en
+      <code>novvus-registry/src/manifest.rs</code>): toda <code>path</code> de <code>[ui]</code> vive
+      bajo <code>/{id}</code>; un item de <code>ui.nav</code> <em>no</em> puede apuntar a
+      <code>/m/…</code>. Un módulo sin páginas dedicadas simplemente no declara <code>nav</code> y la
+      shell deriva su navegación del meta bajo <code>/m/{id}/…</code>.</p>
+
+      <h2>Viaje de una petición</h2>
+      <p>Ejemplo: un usuario lista contactos del CRM desde el navegador.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><strong>Navegador → web.</strong> El cliente llama <code>GET /api/crm/contacts</code> con <code>Authorization: Bearer &lt;access&gt;</code>. En producción solo la web escucha en el host (puerto <code>NOVVUS_WEB_PORT</code>, default 8077); <code>apps/web/next.config.ts</code> reescribe <code>/api/:path*</code> hacia <code>NOVVUS_KERNEL_URL</code> (same-origin, sin CORS). En desarrollo el navegador puede hablar directo con el kernel en <code>:8000</code>.</div></div>
+        <div class="step"><span class="num">2</span><div><strong>Gateway: JWT.</strong> La ruta <code>/api/{module_id}/{*rest}</code> cae en <code>proxy::proxy_handler</code>. Primero comprueba que el módulo está <code>enabled</code> a nivel instancia y que tiene <code>base_url</code> (handshake hecho); si no, 503. Luego decodifica el JWT con <code>typ=access</code> (HS256, <code>NOVVUS_JWT_ACCESS_SECRET</code>, leeway 5 s).</div></div>
+        <div class="step"><span class="num">3</span><div><strong>Gateway: RBAC vivo.</strong> Los roles del token son solo informativos. El gateway resuelve los permisos efectivos de <code>(user, org)</code> desde la caché RBAC (TTL 30 s, invalidación inmediata al mutar roles/membresías) y los serializa ordenados en <code>X-Novvus-Perms</code>.</div></div>
+        <div class="step"><span class="num">4</span><div><strong>Gateway: proxy firmado.</strong> Firma HMAC-SHA256 sobre <code>user\norg\nperms\ntimestamp\nmethod\npath</code> con <code>NOVVUS_INTERNAL_HMAC_SECRET</code> y reenvía a <code>{base_url}{path?query}</code> con <code>X-Novvus-User/Org/Perms/Timestamp/Signature</code> más <code>X-Novvus-Locale</code> (informativo, fuera de la firma). Solo cruzan <code>content-type</code>, <code>accept</code> y <code>accept-language</code> del cliente: cualquier <code>X-Novvus-*</code> entrante muere aquí. Cuerpo máximo 10 MiB; timeout 30 s.</div></div>
+        <div class="step"><span class="num">5</span><div><strong>SDK: verificación.</strong> El middleware del SDK recalcula la firma con el secreto recibido en el handshake y rechaza si no coincide o si <code>|now − timestamp| &gt; 60 s</code>. Luego exige el permiso concreto del endpoint (<code>crm.contacts.read</code>).</div></div>
+        <div class="step"><span class="num">6</span><div><strong>SDK: sesión tenant.</strong> Abre una transacción y ejecuta <code>SELECT set_config('app.org_id', $1, true)</code> (equivalente a <code>SET LOCAL</code>, parametrizado). El módulo conecta como <code>novvus_module</code>, sin privilegios sobre <code>core</code> ni otros <code>mod_*</code>.</div></div>
+        <div class="step"><span class="num">7</span><div><strong>Postgres: RLS.</strong> La política <code>tenant_isolation</code> (<code>USING</code> + <code>WITH CHECK</code>, con <code>FORCE ROW LEVEL SECURITY</code>) filtra por <code>org_id = current_setting('app.org_id')::uuid</code>. Sin tenant fijado, <code>current_setting</code> falla: fail-closed.</div></div>
+        <div class="step"><span class="num">8</span><div><strong>Respuesta.</strong> El módulo devuelve JSON paginado por cursor; el gateway reenvía solo estado, <code>content-type</code> y cuerpo.</div></div>
+      </div>
+      <div class="tip"><b>Lo esencial.</b> El JWT nunca llega al módulo, el <code>org_id</code> nunca
+      se acepta del body o la query, y RLS es la segunda barrera aunque el código del módulo
+      olvidara un filtro.</div>
+
+      <h2>Viaje de un evento</h2>
+      <p>Ejemplo: el CRM gana una oportunidad y Proyectos reacciona.</p>
+<pre class="diagram">
+CRM (SDK)                 Kernel / novvus-events               PostgreSQL            Projects (SDK)
+  │ module.emit(...)             │                                 │                      │
+  │ POST /api/core/events        │                                 │                      │
+  │ x-novvus-service-token       │                                 │                      │
+  ├─────────────────────────────►│ ¿event_type ∈ manifest.emits?   │                      │
+  │                              │ BEGIN                           │                      │
+  │                              │  INSERT core.events             │                      │
+  │                              │  INSERT event_deliveries (una   │                      │
+  │                              │   por módulo enabled|disabled   │                      │
+  │                              │   con el tipo en listens)       │                      │
+  │                              │  pg_notify('novvus_events', id) │                      │
+  │                              │ COMMIT                          │                      │
+  │◄── 202 Accepted ─────────────┤                                 │                      │
+  │                              │◄── LISTEN novvus_events ────────┤                      │
+  │                              │ Dispatcher: FOR UPDATE SKIP     │                      │
+  │                              │ LOCKED (lote 20) → POST         │                      │
+  │                              │ {base_url}/_novvus/events       │                      │
+  │                              │ firmado (user="", perms="")     │                      │
+  │                              ├─────────────────────────────────┼─────────────────────►│
+  │                              │                                 │  verifica firma,     │
+  │                              │                                 │  INSERT _processed_  │
+  │                              │                                 │  events ON CONFLICT  │
+  │                              │                                 │  DO NOTHING + handler│
+  │                              │◄──────────── 2xx ───────────────┼──────────────────────┤
+  │                              │ delivered (o attempts+1 y       │                      │
+  │                              │ next_retry_at con backoff)      │                      │
+</pre>
+      <ul>
+        <li><strong>At-least-once.</strong> La tabla es la fuente de verdad; <code>NOTIFY</code> solo acelera. Un barrido cada 5 s retoma deliveries pendientes aunque el NOTIFY se haya perdido o el módulo estuviera caído.</li>
+        <li><strong>Backoff.</strong> <code>base^attempts</code> con exponente máximo 4 y tope 300 s (base 4: 4, 16, 64, 256 s). Tras 25 intentos la entrega pasa a <code>failed</code>.</li>
+        <li><strong>Idempotencia.</strong> El SDK inserta <code>event_id</code> en <code>mod_{id}._processed_events</code> en la misma transacción del handler; un duplicado responde 200 sin re-ejecutar.</li>
+        <li><strong>Módulos deshabilitados</strong> también reciben fila de delivery: acumulan mientras están abajo y se ponen al día al habilitarse; el despachador solo hace POST a los <code>enabled</code> con <code>base_url</code>.</li>
+      </ul>
+
+      <h2>Tres canales de comunicación entre módulos</h2>
+      <table>
+        <tr><th>Canal</th><th>Cuándo</th><th>Cómo se autoriza</th></tr>
+        <tr>
+          <td>Evento (asíncrono)</td>
+          <td>Algo ocurrió y otros deben reaccionar sin esperar respuesta.</td>
+          <td>El emisor solo publica tipos declarados en <code>emits</code>; el consumidor los declara en <code>listens</code>. Payload mínimo (IDs), tratado como no confiable.</td>
+        </tr>
+        <tr>
+          <td>API pública vía gateway (síncrono)</td>
+          <td>Un módulo necesita leer o accionar sobre otro ahora.</td>
+          <td><code>x-novvus-service-token</code> + <code>x-novvus-org</code>. El gateway inyecta como permisos los <code>service_permissions</code> del manifiesto del llamante (nunca <code>core.*</code>) y el usuario viaja vacío.</td>
+        </tr>
+        <tr>
+          <td>Extensiones (<code>[extensions]</code>)</td>
+          <td>Un módulo aporta campos y UI a modelos de otro sin tocar su esquema (p. ej. SalesMX añade RFC y régimen a <code>crm.contacts</code>).</td>
+          <td>El target debe estar en <code>[dependencies] modules</code>; los datos viven en la columna <code>ext</code> JSONB del base y solo el base los escribe. Límites: 32 campos por extensor, 16 extensores por modelo.</td>
+        </tr>
+      </table>
+      <p>Lo que nunca se permite: leer tablas de otro módulo. Proyectos no consulta
+      <code>mod_crm.contact</code>; el rol <code>novvus_module</code> ni siquiera tiene
+      <code>USAGE</code> sobre esquemas ajenos.</p>
+      <div class="note"><b>Un canal aparte: <code>novvus_notify</code>.</b> Las notificaciones del
+      chatter (menciones, seguidores, actividades) no pasan por el bus de módulos. El kernel hace
+      fan-out síncrono a <code>core.notifications</code> en la transacción del mensaje y emite
+      <code>pg_notify('novvus_notify', …)</code>; el gateway mantiene <em>una</em> conexión
+      <code>LISTEN</code> por proceso y reparte en memoria a las conexiones SSE
+      (<code>GET /api/core/stream?token=</code>). Es plano kernel → usuarios, no módulo → módulo.</div>
+
+      <h2>Pipeline de metadatos y vistas genéricas</h2>
+      <p>Los modelos declarados en el SDK alimentan un documento de <strong>meta</strong> (modelos,
+      campos tipados, vistas <code>list/form/kanban/calendar</code>, permisos, capacidades
+      <code>attachments</code>/<code>chatter</code>). El SDK lo envía <em>dentro del handshake</em>;
+      el kernel lo valida con tipos serde estrictos (<code>deny_unknown_fields</code>, máximo
+      512 KiB) y lo persiste en <code>core.modules.meta</code>. Un meta inválido rechaza el handshake
+      completo. <code>GET /api/core/meta</code> lo sirve filtrado por módulos habilitados en la org y
+      permiso <code>read</code>, fusionando extensiones y campos personalizados, con ETag y
+      <code>Cache-Control: private, max-age=60</code>. Contrato en <code>VIEWS.md</code>; guía en
+      <a href="vistas-genericas.html">Vistas genéricas y metadatos</a>.</p>
+
+      <h2>Ciclo de vida de módulos en dos ejes</h2>
+<pre class="diagram">
+Eje de INSTANCIA (core.modules.status) — JWT con core.modules.manage o token de bootstrap
+  (no existe) ─register─► registered ─install─► installed ─enable─► enabled
+                                                    ▲                  │
+                                                    │ enable        disable
+                                                    │                  ▼
+        (DROP SCHEMA mod_{id} CASCADE) ◄─uninstall─ disabled ◄─────────┘
+
+Eje por ORGANIZACIÓN (core.org_modules) — siempre un usuario de esa org
+  not-installed (sin fila) ─install─► installed ─enable─► enabled ⇄ disabled
+                                          ▲                            │
+                                          └──────── uninstall (borra la fila; NO destruye datos)
+</pre>
+      <table>
+        <tr><th>Transición</th><th>Instancia</th><th>Por organización</th></tr>
+        <tr><td>register</td><td>Valida el manifiesto y guarda manifest + SQL de migraciones (<code>core.module_migration_sources</code>). Sin efecto en datos.</td><td>—</td></tr>
+        <tr><td>install</td><td>Crea <code>mod_{id}</code>, <code>GRANT USAGE, CREATE</code> al rol de módulo, aplica migraciones pendientes, registra permisos y jobs de cron, emite el token de servicio (una sola vez).</td><td>Crea la fila <code>installed</code> y dispara el hook <code>on_install</code> (best-effort).</td></tr>
+        <tr><td>enable</td><td>Exige dependencias <code>enabled</code> y versión compatible. El gateway empieza a enrutar y el bus a entregar.</td><td>Exige dependencias habilitadas <em>para la misma org</em>; hook <code>on_enable</code>.</td></tr>
+        <tr><td>disable</td><td>503 en <code>/api/{id}</code>; los eventos se acumulan.</td><td>Se bloquea si otro módulo habilitado de la org lo requiere; hook <code>on_disable</code>.</td></tr>
+        <tr><td>uninstall</td><td>Destructivo: <code>DROP SCHEMA … CASCADE</code>, borra permisos y la fila de <code>core.modules</code> (cascada a migraciones y deliveries). Requiere <code>{"confirm": true}</code> en el body.</td><td>No destructivo: solo elimina la fila; esquema y filas del tenant sobreviven bajo RLS. Hook <code>on_uninstall</code> antes de borrar.</td></tr>
+      </table>
+      <p><code>GET /api/core/orgs/{org}/modules/{id}/plan</code> calcula el cierre transitivo de
+      dependencias (<code>novvus-registry/src/resolver.rs</code>): devuelve <code>enable_order</code>
+      (dependencias primero), <code>satisfied</code> y <code>problems</code> (<code>missing</code>,
+      <code>unavailable</code>, <code>version_conflict</code>, <code>cycle</code>). La tienda
+      <code>/apps</code> lo usa para habilitar toda la cadena con una confirmación.</p>
+
+      <h2>Multi-tenancy en una frase</h2>
+      <p>Una sola base, <code>org_id</code> en toda tabla de negocio, <code>SET LOCAL app.org_id</code>
+      por transacción y RLS con <code>FORCE</code> en <code>mod_*</code>; <code>core</code> no usa RLS
+      porque solo el kernel la toca y filtra explícitamente por <code>org_id</code> en cada endpoint.
+      Detalle completo en <a href="base-de-datos.html">Base de datos</a>.</p>
+
+      <h2>Mapa del monorepo</h2>
+<pre class="diagram">
+novvus/
+├── VERSION                   fuente única de la versión de plataforma (0.1.6)
+├── kernel/                   workspace Rust
+│   ├── Cargo.toml            7 miembros + perfil dev con opt-level=3 en cripto
+│   ├── crates/
+│   │   ├── novvus-common     config, errores, ids, firma interna, audit, tracing
+│   │   ├── novvus-identity   JWT, Argon2id, orgs, membresías
+│   │   ├── novvus-rbac       permisos, wildcards, caché
+│   │   ├── novvus-registry   manifiesto, ciclo de vida, migraciones, meta, catálogo
+│   │   ├── novvus-events     bus, dispatcher, cron, backoff
+│   │   ├── novvus-files      object_store, dedup, GC
+│   │   └── novvus-gateway    binario: router, proxy, SSE, extractores
+│   └── migrations/           0001_core … 0011_chatter (esquema core)
+├── sdk/src/novvus_sdk/       novvus-sdk (Python) + CLI de desarrollo
+├── modules/
+│   ├── crm/                  modelos, negocio, migraciones 0001-0003, i18n, tests
+│   ├── projects/             depende de CRM; escucha crm.opportunity.won
+│   └── salesmx/              sin modelos: solo [extensions] sobre crm.contacts
+├── apps/web/                 Next.js 16: shell de plataforma + ModuleShell + genéricas
+├── cli/                      CLI administrativo en Rust (install/update/status/version)
+├── distribution/             install.sh y sus tests
+├── docker/                   bootstrap.Dockerfile, module.Dockerfile
+├── scripts/                  bootstrap.py (aprovisionamiento one-shot)
+├── docker-compose.yml        solo Postgres (desarrollo)
+├── docker-compose.full.yml   demo local completa (:3000)
+├── docker-compose.prod.yml   producción con imágenes GHCR (:8077)
+└── documents/
+    ├── docs/                 19 contratos normativos (ARCHITECTURE, MODULE_CONTRACT, …)
+    └── documentación-html/   esta documentación
+</pre>
+
+      <h2>Plano de distribución</h2>
+      <p>Producción no compila nada ni necesita el repositorio. Un tag <code>vX.Y.Z</code> igual al
+      contenido de <code>VERSION</code> dispara <code>release.yml</code>, que publica cinco imágenes
+      (<code>ghcr.io/novvus/core</code>, <code>web</code>, <code>bootstrap</code>, <code>crm</code>,
+      <code>projects</code>) y compila el CLI estático (musl) para linux-x64 y linux-arm64.</p>
+<pre class="diagram">
+install.novvus.dev/install.sh ──► downloads.novvus.dev/latest ──► &lt;v&gt;/manifest.json
+        │                                                          (SHA-256 por plataforma)
+        ▼
+/usr/local/bin/novvus  (solo si el SHA-256 coincide; si no, se borra y aborta)
+        │
+        ▼
+sudo novvus install ──► /opt/novvus/{docker-compose.yml,.env} ──► docker pull ghcr.io/novvus/*
+        │                      secretos generados con permisos 600
+        ▼
+postgres → kernel (migraciones core) → bootstrap (one-shot, NOVVUS_BOOTSTRAP_TOKEN) → crm/projects → web :8077
+</pre>
+      <ul>
+        <li>Publicación en Cloudflare R2 archivo por archivo (histórico inmutable) y <code>latest</code> al final, solo si las imágenes GHCR ya existen.</li>
+        <li><code>novvus update</code> reutiliza el mismo protocolo desde Rust (<code>cli/src/release.rs</code>): descarga el CLI destino, verifica SHA-256, hace backup obligatorio y rollback automático si la verificación de salud falla.</li>
+        <li>Pendiente: firma criptográfica de releases (hoy solo SHA-256 contra un manifest del mismo origen). Ver <a href="seguridad.html">Seguridad</a>.</li>
+        <li>Nota: <code>salesmx</code> no forma parte de <code>docker-compose.prod.yml</code> ni de las imágenes publicadas; es un módulo de desarrollo/demo del contrato de extensiones.</li>
+      </ul>
+
+      <h2>Principios inquebrantables</h2>
+      <p>Tal como los fija <code>ARCHITECTURE.md §6</code>:</p>
+      <ol>
+        <li>Los módulos son ciudadanos de segunda clase respecto al kernel: nunca tocan auth, permisos ni tablas ajenas; todo pasa por los contratos del kernel/SDK.</li>
+        <li>Todo endpoint valida tenant (<code>org_id</code>) y permisos. Sin excepciones.</li>
+        <li>Cada pieza incluye tests. Nada se considera terminado sin tests que pasen.</li>
+        <li>Migraciones versionadas por módulo; el kernel orquesta su ejecución.</li>
+        <li>Código y comentarios en inglés; documentación de usuario en español.</li>
+        <li>Nada de fases futuras: lo que se detecte necesario se anota en <code>BACKLOG.md</code>.</li>
+      </ol>
+
+      <h2>Trade-offs de diseño</h2>
+      <table>
+        <tr><th>Decisión</th><th>Ventaja</th><th>Costo</th></tr>
+        <tr><td>Postgres como bus inicial</td><td>Eventos transaccionales, cero infraestructura extra.</td><td>No apto para &gt;500 ev/s sostenidos o fan-out masivo; criterios de migración a NATS/Redpanda en <code>EVENTS.md §5</code>.</td></tr>
+        <tr><td>Kernel central en Rust</td><td>Contratos y seguridad consistentes; un solo validador.</td><td>El gateway concentra tráfico y debe cuidarse (pool de 10 conexiones, rate limit solo en <code>/auth</code>).</td></tr>
+        <tr><td>RLS en una sola base</td><td>Aislamiento fuerte sin multiplicar bases.</td><td>Disciplina con <code>org_id</code> en índices y políticas; rol de módulo compartido (rol por módulo en BACKLOG).</td></tr>
+        <tr><td>UI declarativa + vistas genéricas</td><td>Un módulo obtiene CRUD completo sin escribir React.</td><td>Acepta los slots y componentes que la shell ofrece; las genéricas son default, con overrides registrables.</td></tr>
+        <tr><td>Módulos Python sobre kernel Rust</td><td>Rust para el núcleo crítico, Python para velocidad de negocio.</td><td>El contrato entre lenguajes (headers firmados, meta, handshake) debe mantenerse exacto.</td></tr>
+        <tr><td>Shell = administrador de módulos</td><td>La plataforma crece por módulos sin tocar la shell.</td><td>La navegación global desaparece: el usuario cambia de app por el launcher o el app-switcher.</td></tr>
+      </table>
+
+      <h2>Documentos relacionados</h2>
+      <ul>
+        <li><a href="kernel.html">El kernel por dentro</a>: los siete crates, variables de entorno, compilación.</li>
+        <li><a href="base-de-datos.html">Base de datos</a>: las 27 tablas de <code>core</code>, RLS, migraciones y consultas de diagnóstico.</li>
+        <li><a href="seguridad.html">Seguridad</a>: JWT, Argon2id, HMAC, bootstrap, archivos, paquetes firmados.</li>
+        <li><a href="api.html">La API</a>: inventario completo de rutas del kernel y de los módulos.</li>
+        <li><code>documents/docs/ARCHITECTURE.md</code>, <code>MODULE_CONTRACT.md</code>, <code>DECISIONS.md</code>.</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="extensibilidad.html"><span class="dir">← Anterior</span>Extensiones, campos, config y cron</a>
+        <a class="next" href="kernel.html"><span class="dir">Siguiente →</span>El kernel por dentro</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

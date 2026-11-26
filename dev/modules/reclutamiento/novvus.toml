@@ -1,0 +1,73 @@
+[module]
+id = "reclutamiento"
+name = "Reclutamiento"
+version = "0.1.0"
+description = "Gestión de reclutamiento: puestos, candidatos, aplicaciones, entrevistas y ofertas."
+
+[presentation]
+display_name = "Reclutamiento"
+summary = "Publica vacantes, evalúa candidatos y convierte una contratación en contacto CRM y proyecto de onboarding."
+category = "Recursos Humanos"
+icon = "user-plus"
+accent = "bg-pink-500/15 text-pink-600 dark:text-pink-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1", "projects>=0.1"]
+service_permissions = ["crm.contacts.write", "crm.contacts.read", "projects.projects.write", "projects.projects.read"]
+
+[[permissions]]
+key = "reclutamiento.job_positions.read"
+description = "Ver puestos"
+
+[[permissions]]
+key = "reclutamiento.job_positions.write"
+description = "Crear y editar puestos"
+
+[[permissions]]
+key = "reclutamiento.candidates.read"
+description = "Ver candidatos"
+
+[[permissions]]
+key = "reclutamiento.candidates.write"
+description = "Crear y editar candidatos"
+
+[[permissions]]
+key = "reclutamiento.applications.read"
+description = "Ver aplicaciones"
+
+[[permissions]]
+key = "reclutamiento.applications.write"
+description = "Crear y editar aplicaciones"
+
+[[permissions]]
+key = "reclutamiento.interviews.read"
+description = "Ver entrevistas"
+
+[[permissions]]
+key = "reclutamiento.interviews.write"
+description = "Crear y editar entrevistas"
+
+[[permissions]]
+key = "reclutamiento.offers.read"
+description = "Ver ofertas"
+
+[[permissions]]
+key = "reclutamiento.offers.write"
+description = "Crear y editar ofertas"
+
+[events]
+emits = ["reclutamiento.application.created", "reclutamiento.candidate.hired"]
+listens = []
+
+[runtime]
+port = 8140
+
+[[config]]
+key = "reclutamiento.default_currency"
+type = "string"
+label = "Moneda por defecto"
+description = "Moneda para ofertas y salarios."
+default = "MXN"
+permission = "reclutamiento.offers.write"

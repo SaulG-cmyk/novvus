@@ -1,0 +1,79 @@
+[module]
+id = "automatizacion"
+name = "Automatización"
+version = "0.1.0"
+description = "Automatización de procesos: procesos, pasos, ejecuciones y logs."
+
+[presentation]
+display_name = "Automatización"
+summary = "Conecta tus módulos con procesos automáticos: dispara acciones al ganar una oportunidad, contratar o entregar un envío."
+category = "Operaciones"
+icon = "bot"
+accent = "bg-yellow-500/15 text-yellow-600 dark:text-yellow-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1"]
+service_permissions = [
+  "crm.activities.read",
+  "crm.opportunities.read",
+  "projects.projects.read",
+  "projects.tasks.read",
+  "auditorias.audit_findings.read",
+  "auditorias.audits.read",
+  "logistica.shipments.read",
+  "reclutamiento.interviews.read",
+  "reclutamiento.candidates.read",
+]
+
+[[permissions]]
+key = "automatizacion.processes.read"
+description = "Ver procesos"
+
+[[permissions]]
+key = "automatizacion.processes.write"
+description = "Crear y editar procesos"
+
+[[permissions]]
+key = "automatizacion.process_steps.read"
+description = "Ver pasos"
+
+[[permissions]]
+key = "automatizacion.process_steps.write"
+description = "Crear y editar pasos"
+
+[[permissions]]
+key = "automatizacion.process_executions.read"
+description = "Ver ejecuciones"
+
+[[permissions]]
+key = "automatizacion.process_executions.write"
+description = "Ejecutar procesos"
+
+[[permissions]]
+key = "automatizacion.process_logs.read"
+description = "Ver logs"
+
+[events]
+emits = ["automatizacion.process.started", "automatizacion.process.completed", "automatizacion.process.failed"]
+listens = [
+  "crm.quote.accepted",
+  "crm.opportunity.won",
+  "crm.lead.created",
+  "reclutamiento.candidate.hired",
+  "logistica.shipment.delivered",
+  "auditorias.finding.created",
+  "projects.project.created",
+]
+
+[runtime]
+port = 8170
+
+[[config]]
+key = "automatizacion.max_concurrent_executions"
+type = "number"
+label = "Ejecuciones concurrentes máximas"
+description = "Límite de ejecuciones simultáneas por organización."
+default = 5
+permission = "automatizacion.processes.write"

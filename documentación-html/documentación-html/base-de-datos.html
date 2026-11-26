@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base de datos — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav active" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / Base de datos</div>
+    <article>
+      <h1>Base de datos</h1>
+      <span class="level avanzado">Nivel avanzado</span>
+      <p class="lead">Una sola base PostgreSQL 16 para la plataforma, los módulos y todas las
+      organizaciones. Esta página documenta las 27 tablas del esquema <code>core</code> tal como las
+      crean las migraciones <code>0001</code>–<code>0011</code> del kernel, los esquemas
+      <code>mod_*</code> que generan los módulos, los dos roles de base, el aislamiento multi-tenant
+      con Row-Level Security explicado desde cero, el corredor de migraciones y un conjunto de
+      consultas de diagnóstico. Fuente normativa: <code>documents/docs/DATA_MODEL.md</code> y
+      <code>MULTITENANCY.md</code>.</p>
+
+      <h2>Mapa mental</h2>
+<pre class="diagram">
+PostgreSQL: novvus
+├── core                       dueño: rol novvus · SIN RLS (el kernel filtra por org_id)
+│   ├── identidad      organizations, users, memberships, refresh_tokens
+│   ├── RBAC           roles, permissions, role_permissions, membership_roles
+│   ├── módulos        modules (manifest, meta), module_migration_sources,
+│   │                  module_migrations, org_modules, org_module_config, module_catalog
+│   ├── automatización cron_jobs, cron_runs
+│   ├── bus            events, event_deliveries
+│   ├── auditoría      audit_log
+│   └── v2             attachments, attachment_blobs, model_extensions, custom_fields,
+│                      messages, followers, activities, notifications
+├── mod_crm                    dueño de facto: novvus_module · RLS FORCE en cada tabla
+│   ├── company, contact, tag, pipeline, stage, opportunity, lead, activity,
+│   │   contact_tag, opportunity_tag        (todas con org_id, ext, custom)
+│   └── _processed_events
+├── mod_projects               project, task, _processed_events
+└── (salesmx)                  no crea esquema con tablas de negocio: solo extiende crm.contacts
+</pre>
+      <table>
+        <tr><th>Zona</th><th>Quién la toca</th><th>Cómo se protege</th></tr>
+        <tr><td><code>core</code></td><td>Solo el kernel, como rol <code>novvus</code>.</td><td>Filtrado explícito por <code>org_id</code> en cada endpoint y comprobación <code>auth.org == org_id</code>; sin RLS.</td></tr>
+        <tr><td><code>mod_*</code></td><td>El runtime del módulo dueño, vía SDK, como <code>novvus_module</code>.</td><td>Privilegios por esquema + <code>org_id</code> + RLS con <code>FORCE</code> (fail-closed).</td></tr>
+        <tr><td>Datos entre módulos</td><td>Nadie por SQL.</td><td>Eventos, API vía gateway o extensiones (columna <code>ext</code> del base).</td></tr>
+      </table>
+
+      <h2>Convenciones globales</h2>
+      <table>
+        <tr><th>Convención</th><th>Detalle</th><th>Por qué</th></tr>
+        <tr><td>UUIDv7 por la aplicación</td><td><code>novvus_common::ids::new_id()</code> = <code>Uuid::now_v7()</code>; el SDK hace lo propio en Python.</td><td>Ordenable por tiempo (mejor localidad en B-tree que v4) y sin ida a la base.</td></tr>
+        <tr><td><code>timestamptz</code> siempre</td><td>UTC en la base.</td><td>La zona horaria es asunto del frontend.</td></tr>
+        <tr><td><code>text</code> en <code>core</code></td><td>Sin <code>varchar(n)</code>.</td><td>Sin diferencia de rendimiento en Postgres; los límites se validan en aplicación. (Las tablas del SDK sí usan <code>VARCHAR(n)</code> generado por SQLAlchemy.)</td></tr>
+        <tr><td><code>jsonb</code> para contratos flexibles</td><td><code>manifest</code>, <code>meta</code>, <code>payload</code>, <code>value</code>, <code>detail</code>, <code>ext</code>, <code>custom</code>.</td><td>Evolucionar contratos sin DDL por cada campo.</td></tr>
+        <tr><td>FK con <code>ON DELETE CASCADE</code></td><td>En tablas de composición (memberships, role_permissions, org_modules…).</td><td>Borrar una organización limpia su grafo. <code>audit_log</code> y <code>events</code> no llevan FK a usuarios para no perder rastro.</td></tr>
+        <tr><td>Borrado lógico</td><td><code>deleted_at</code> en modelos del SDK, <code>attachments</code>, <code>custom_fields</code>, <code>messages</code>.</td><td>El CRUD oculta; la purga física es diferida (GC) o manual.</td></tr>
+        <tr><td>Índices solo con consulta concreta</td><td>Cada índice de <code>core</code> tiene justificación en <code>DATA_MODEL.md</code>.</td><td>Cada índice encarece escrituras; los que falten se añaden con evidencia (<code>pg_stat_statements</code>).</td></tr>
+      </table>
+
+      <h2>El esquema core, grupo por grupo</h2>
+      <h3>Identidad</h3>
+      <table>
+        <tr><th>Tabla</th><th>Columnas clave</th><th>Índices y por qué</th></tr>
+        <tr><td><code>organizations</code></td><td><code>id, name, slug UNIQUE, created_at, updated_at</code></td><td><code>UNIQUE(slug)</code>: lookup por slug estable y URL-safe.</td></tr>
+        <tr><td><code>users</code></td><td><code>id, email UNIQUE, password_hash (PHC Argon2id), display_name, is_active</code></td><td><code>UNIQUE(email)</code>: el lookup más frecuente (login).</td></tr>
+        <tr><td><code>memberships</code></td><td><code>id, org_id, user_id, UNIQUE(org_id, user_id)</code></td><td>El UNIQUE sirve "miembros de una org"; <code>memberships_user_idx (user_id)</code> sirve "orgs de un usuario" (selector tras login).</td></tr>
+        <tr><td><code>refresh_tokens</code></td><td><code>id (= jti), user_id, org_id?, token_hash UNIQUE, expires_at, revoked_at?, replaced_by?</code></td><td><code>UNIQUE(token_hash)</code>: lookup O(1) en <code>/auth/refresh</code>; <code>refresh_tokens_user_idx</code>: revocación masiva (reuso detectado, logout global).</td></tr>
+      </table>
+      <h3>RBAC</h3>
+      <table>
+        <tr><th>Tabla</th><th>Columnas clave</th><th>Índices y por qué</th></tr>
+        <tr><td><code>roles</code></td><td><code>id, org_id, name, description, is_system, UNIQUE(org_id, name)</code></td><td>Roles por organización; <code>Owner</code> es <code>is_system</code> y contiene <code>*</code>.</td></tr>
+        <tr><td><code>permissions</code></td><td><code>id, key UNIQUE, module_id, description</code></td><td>Catálogo global; <code>permissions_module_idx</code> para listar/borrar los de un módulo en <code>uninstall</code>.</td></tr>
+        <tr><td><code>role_permissions</code></td><td><code>PK(role_id, permission_id)</code></td><td>La PK sirve "permisos de un rol" (carga de caché); <code>role_permissions_permission_idx</code> el inverso.</td></tr>
+        <tr><td><code>membership_roles</code></td><td><code>PK(membership_id, role_id)</code></td><td>Resolución de permisos por petición (vía caché de 30 s); índice inverso para invalidar al editar un rol.</td></tr>
+      </table>
+      <h3>Módulos</h3>
+      <table>
+        <tr><th>Tabla</th><th>Columnas clave</th><th>Notas</th></tr>
+        <tr><td><code>modules</code></td><td><code>id text PK, name, version, status CHECK(registered|installed|enabled|disabled), manifest jsonb, meta jsonb (0006), base_url?, service_token_hash?</code></td><td>PK natural = id del manifiesto: el proxy resuelve en O(1). <code>meta</code> lo empuja el runtime en el handshake; <code>NULL</code> = sin vistas genéricas.</td></tr>
+        <tr><td><code>module_migration_sources</code></td><td><code>PK(module_id, version), sql, checksum</code></td><td>Kernel y módulos no comparten filesystem: el SQL viaja por API en <code>register</code>.</td></tr>
+        <tr><td><code>module_migrations</code></td><td><code>PK(module_id, version), checksum, applied_at</code></td><td>"¿Está aplicada V de M?"; una migración aplicada es inmutable.</td></tr>
+        <tr><td><code>org_modules</code></td><td><code>PK(org_id, module_id), status CHECK(installed|enabled|disabled), enabled_at</code></td><td>Eje por organización; sin fila = <code>not-installed</code>. <code>org_modules_org_status_idx (org_id, status)</code>: "módulos habilitados de la org O" al construir la shell.</td></tr>
+        <tr><td><code>org_module_config</code></td><td><code>PK(org_id, module_id, key), value jsonb, updated_by?</code></td><td>Solo valores; el esquema vive en el manifiesto. Sin fila = default.</td></tr>
+        <tr><td><code>module_catalog</code></td><td><code>module_id PK, version, publisher, manifest, package jsonb, public_key, signature, package_hash, published_by?</code></td><td>Paquetes <em>disponibles</em>, firmados Ed25519; <code>module_catalog_published_idx (published_at DESC)</code>.</td></tr>
+      </table>
+      <h3>Automatización, bus y auditoría</h3>
+      <table>
+        <tr><th>Tabla</th><th>Columnas clave</th><th>Índices y por qué</th></tr>
+        <tr><td><code>cron_jobs</code></td><td><code>PK(module_id, name), interval_seconds CHECK(&gt;=1), description</code></td><td>Definiciones de <code>[[cron]]</code>, sembradas en <code>install</code>.</td></tr>
+        <tr><td><code>cron_runs</code></td><td><code>PK(module_id, name, org_id), status CHECK(pending|failed), attempts, next_run_at, last_run_at, last_status</code></td><td>Calendario por job × org; <code>cron_runs_due_idx (next_run_at) WHERE status='pending'</code>: el scheduler solo escanea vencidos.</td></tr>
+        <tr><td><code>events</code></td><td><code>id, org_id, module_id (emisor), event_type, payload, occurred_at</code></td><td>Append-only. <code>events_org_type_time_idx (org_id, event_type, occurred_at DESC)</code> sirve auditoría; el despacho no consulta esta tabla por rango.</td></tr>
+        <tr><td><code>event_deliveries</code></td><td><code>PK(event_id, module_id), status CHECK(pending|delivered|failed), attempts, next_retry_at, delivered_at</code></td><td><code>event_deliveries_pending_idx (next_retry_at) WHERE status='pending'</code>: índice parcial; la tabla crece dominada por <code>delivered</code>, que el índice ignora.</td></tr>
+        <tr><td><code>audit_log</code></td><td><code>id, org_id?, user_id?, action, entity?, detail jsonb, occurred_at</code></td><td>Append-only; <code>audit_log_org_time_idx (org_id, occurred_at DESC)</code>: "actividad reciente de la org".</td></tr>
+      </table>
+      <h3>v2: adjuntos, extensiones, campos personalizados y chatter</h3>
+      <table>
+        <tr><th>Tabla</th><th>Columnas clave</th><th>Índices y por qué</th></tr>
+        <tr><td><code>attachments</code></td><td><code>id, org_id, module_id, model, record_id (sin FK: vive en mod_*), filename, mime (por sniffing), size_bytes, sha256, created_by? (NULL = subida programática, 0008), deleted_at?</code></td><td><code>attachments_record_idx (org_id, module_id, model, record_id) WHERE deleted_at IS NULL</code>: panel de adjuntos de un registro; <code>attachments_sha_idx (org_id, sha256)</code>: dedup y GC.</td></tr>
+        <tr><td><code>attachment_blobs</code></td><td><code>PK(org_id, sha256), size_bytes, refcount</code></td><td>Contenido físico compartido <em>por organización</em>; la cuota se mide aquí (tras dedup).</td></tr>
+        <tr><td><code>model_extensions</code></td><td><code>PK(extender_id, target_module, target_model), fields jsonb, ui jsonb</code></td><td>Catálogo de plataforma (sin org); <code>model_extensions_target_idx (target_module, target_model)</code>: fusión en el meta del base. Los datos viven en <code>ext</code> del base, nunca aquí.</td></tr>
+        <tr><td><code>custom_fields</code></td><td><code>id, org_id, module_id, model, name (inmutable), field_type (inmutable), label (texto del usuario, no i18n), config, required, position, active, deleted_at?, UNIQUE(org_id, module_id, model, name)</code></td><td><code>custom_fields_lookup_idx (org_id, module_id, model) WHERE deleted_at IS NULL</code>. Cero DDL en runtime; valores en la columna <code>custom</code>.</td></tr>
+        <tr><td><code>messages</code></td><td><code>id, org_id, module_id, model, record_id, author_id? (NULL = sistema), kind CHECK(comment|note|system), body, meta jsonb ({field, old, new}), attachment_ids uuid[], edited_at?, deleted_at?</code></td><td><code>messages_record_idx (org_id, module_id, model, record_id, created_at DESC) WHERE deleted_at IS NULL</code>: hilo con cursor keyset.</td></tr>
+        <tr><td><code>followers</code></td><td><code>PK(org_id, module_id, model, record_id, user_id)</code></td><td>La PK es el único acceso: fan-out por registro.</td></tr>
+        <tr><td><code>activities</code></td><td><code>id, org_id, …, activity_type CHECK(call|meeting|email|todo), summary, due_date, assigned_to, state CHECK(open|done|canceled), done_by?, done_at?, note?, last_due_notified date?</code></td><td><code>activities_record_idx … WHERE state='open'</code> y <code>activities_due_idx (due_date) WHERE state='open'</code>: pasada horaria de vencidas.</td></tr>
+        <tr><td><code>notifications</code></td><td><code>id, org_id, user_id, kind (mention|follower_message|activity_due|activity_assigned), payload, read_at?</code></td><td><code>notifications_inbox_idx (user_id, created_at DESC)</code>: buzón.</td></tr>
+      </table>
+
+      <h2>Relaciones principales</h2>
+<pre class="diagram">
+organizations 1──n memberships n──1 users
+      │                 │
+      │                 └──n membership_roles n──1 roles 1──n role_permissions n──1 permissions
+      │
+      ├──n refresh_tokens (user_id, org_id?)
+      ├──n org_modules n──1 modules 1──n module_migrations / module_migration_sources
+      ├──n org_module_config n──1 modules
+      ├──n events ──n event_deliveries n──1 modules
+      ├──n cron_runs n──1 cron_jobs n──1 modules
+      ├──n attachments ──(org_id, sha256)──► attachment_blobs
+      ├──n custom_fields · messages · followers · activities · notifications
+      └──n audit_log
+      modules 1──n model_extensions (extender_id)     module_catalog (sin org)
+</pre>
+
+      <h2>Esquemas de módulos (<code>mod_{id}</code>)</h2>
+      <p>El kernel crea el esquema en <code>install</code> y otorga <code>USAGE, CREATE</code> a
+      <code>novvus_module</code>; el contenido lo dictan las migraciones del módulo, generadas por el
+      SDK. Toda tabla de <code>NovvusModel</code> lleva las columnas base:</p>
+<pre><code>id          UUID PRIMARY KEY            <span class="c">-- UUIDv7 generado por el SDK</span>
+org_id      UUID NOT NULL               <span class="c">-- tenant; índice ix_{tabla}_org_id</span>
+created_at  TIMESTAMPTZ DEFAULT now()
+updated_at  TIMESTAMPTZ DEFAULT now()
+deleted_at  TIMESTAMPTZ                 <span class="c">-- borrado lógico</span>
+ext         JSONB NOT NULL DEFAULT '{}' <span class="c">-- {extensor: {campo: valor}} (0002_ext_column)</span>
+custom      JSONB NOT NULL DEFAULT '{}' <span class="c">-- {campo_custom: valor} (0003_custom_column)</span></code></pre>
+      <ul>
+        <li><code>ext</code>: un solo escritor por esquema. El extensor (p. ej. <code>salesmx</code>) declara campos; el base los valida y escribe. Índices GIN sobre <code>ext</code> son opt-in por modelo, no automáticos.</li>
+        <li><code>custom</code>: valores de campos personalizados por organización; la definición tipada vive en <code>core.custom_fields</code>. El kernel jamás ejecuta SQL sobre <code>mod_*</code>: la limpieza de claves huérfanas es un barrido perezoso del SDK.</li>
+        <li><code>_processed_events (event_id uuid PK, processed_at)</code>: idempotencia de consumidores; el SDK inserta con <code>ON CONFLICT DO NOTHING</code> en la misma transacción del handler.</li>
+        <li>Un módulo <strong>sin modelos</strong> (<code>salesmx</code>) no tiene migraciones: <code>install</code> crea un esquema <code>mod_salesmx</code> vacío y el módulo vive solo de <code>[extensions]</code>.</li>
+      </ul>
+      <p>Tablas actuales: <code>mod_crm</code> tiene <code>company, contact, tag, pipeline, stage,
+      opportunity, lead, activity, contact_tag, opportunity_tag</code>; <code>mod_projects</code> tiene
+      <code>project</code> y <code>task</code> con <code>UNIQUE(org_id, opportunity_id)</code> para crear un
+      solo proyecto por oportunidad ganada.</p>
+
+      <h2>Roles de base de datos</h2>
+      <table>
+        <tr><th>Rol</th><th>Uso</th><th>Privilegios</th></tr>
+        <tr><td><code>novvus</code></td><td>Kernel (<code>DATABASE_URL</code>).</td><td>Dueño de <code>core</code>. Aplica las migraciones de módulos con <code>SET LOCAL ROLE novvus_module</code>; para ello <code>install</code> hace <code>GRANT novvus_module TO CURRENT_USER</code>.</td></tr>
+        <tr><td><code>novvus_module</code></td><td>Todos los procesos de módulo (DSN entregado en el handshake).</td><td>Creado por el kernel con <code>LOGIN PASSWORD … NOBYPASSRLS</code>; <code>USAGE, CREATE</code> solo sobre cada <code>mod_{id}</code>. Sin privilegio alguno sobre <code>core</code> ni esquemas ajenos.</td></tr>
+      </table>
+      <div class="note"><b>Rol compartido.</b> Hoy hay un único <code>novvus_module</code> para todos
+      los módulos; el aislamiento entre módulos lo dan los <code>GRANT</code> por esquema. Un rol por
+      módulo (<code>novvus_mod_{id}</code>) está en <code>BACKLOG.md</code>.</div>
+
+      <h2>Multi-tenancy con RLS, desde cero</h2>
+      <p><strong>Row-Level Security</strong> es un mecanismo de Postgres por el que la base, no la
+      aplicación, decide qué filas puede ver o modificar una sesión. NOVVUS lo usa para que ninguna
+      consulta de un módulo pueda cruzar organizaciones, aunque el código tenga un bug.</p>
+      <h3>Las tres piezas</h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><strong><code>org_id</code> en toda tabla de negocio.</strong> El SDK la añade a cada modelo; no hay FK física hacia <code>core.organizations</code> porque el rol de módulo no ve <code>core</code>; el kernel garantiza la integridad (solo firma headers con orgs existentes).</div></div>
+        <div class="step"><span class="num">2</span><div><strong>El tenant en la sesión.</strong> Al inicio de cada transacción el SDK ejecuta <code>SELECT set_config('app.org_id', $1, true)</code>: el tercer argumento <code>true</code> equivale a <code>SET LOCAL</code>, y el valor va parametrizado, nunca interpolado.</div></div>
+        <div class="step"><span class="num">3</span><div><strong>La política.</strong> Generada por el SDK en la migración inicial de cada tabla:</div></div>
+      </div>
+<pre><code><span class="k">ALTER TABLE</span> contact <span class="k">ENABLE ROW LEVEL SECURITY</span>;
+<span class="k">ALTER TABLE</span> contact <span class="k">FORCE ROW LEVEL SECURITY</span>;
+<span class="k">CREATE POLICY</span> tenant_isolation <span class="k">ON</span> contact
+    <span class="k">USING</span> (org_id = current_setting(<span class="s">'app.org_id'</span>)::uuid)
+    <span class="k">WITH CHECK</span> (org_id = current_setting(<span class="s">'app.org_id'</span>)::uuid);</code></pre>
+      <table>
+        <tr><th>Cláusula</th><th>Qué protege</th></tr>
+        <tr><td><code>USING</code></td><td>Lecturas, updates y deletes: filas de otra org simplemente no existen para la sesión.</td></tr>
+        <tr><td><code>WITH CHECK</code></td><td>Inserts y updates: nadie puede crear o mover una fila hacia otra org.</td></tr>
+        <tr><td><code>FORCE ROW LEVEL SECURITY</code></td><td>Obligatorio: sin él, el <em>dueño</em> de la tabla (el rol de módulo, que ejecutó la migración) ignoraría la política.</td></tr>
+      </table>
+      <h3>Por qué <code>SET LOCAL</code> y no <code>SET</code></h3>
+      <p>Los pools reutilizan conexiones. Con <code>SET</code> el tenant sobreviviría al <code>COMMIT</code>
+      y la siguiente petición que tomara esa conexión heredaría una organización ajena. Con
+      <code>SET LOCAL</code> el valor muere con la transacción. El SDK no expone conexiones fuera de este
+      contexto transaccional: no existe API para obtener una sesión "cruda".</p>
+      <h3>Fail-closed</h3>
+      <p>Si <code>app.org_id</code> no está fijado, <code>current_setting('app.org_id')</code> lanza error y
+      la consulta falla (500). Nunca devuelve "todas las filas". Es intencional: preferimos un error
+      visible a una fuga silenciosa.</p>
+      <div class="tip"><b>Si ves un error con <code>current_setting('app.org_id')</code></b>, no lo
+      "arregles" quitando RLS ni <code>FORCE</code>: significa que estás usando una conexión fuera del
+      contexto del SDK (p. ej. un script suelto o <code>psql</code>). Fija el tenant dentro de una
+      transacción como en la sección de <code>psql</code> más abajo.</div>
+      <h3><code>core</code> no usa RLS</h3>
+      <p>Solo el kernel toca <code>core</code>, y cada endpoint filtra explícitamente por
+      <code>org_id</code> y verifica que el token esté ligado a esa organización. Las tablas v2 con
+      <code>org_id</code> (adjuntos, campos custom, chatter) siguen el mismo patrón: un id de otra org
+      responde 404, no 403. Esta decisión corrigió planes de fase que proponían RLS en <code>core</code>
+      (<code>DECISIONS.md</code>, 2026-07-18 y 2026-07-19).</p>
+      <h3>Riesgos y mitigaciones (resumen de <code>MULTITENANCY.md §5</code>)</h3>
+      <table>
+        <tr><th>Riesgo</th><th>Mitigación</th></tr>
+        <tr><td>Conexión reutilizada con tenant ajeno</td><td><code>SET LOCAL</code>; tests de integración de fuga entre dos orgs.</td></tr>
+        <tr><td>Consulta sin tenant</td><td>Fail-closed por <code>current_setting</code>.</td></tr>
+        <tr><td>El dueño ignora RLS</td><td><code>FORCE</code> en toda tabla generada; verificado por test del SDK.</td></tr>
+        <tr><td>Módulo lee tablas ajenas</td><td><code>GRANT</code> por esquema es la primera línea; RLS la segunda.</td></tr>
+        <tr><td><code>org_id</code> inyectado por el cliente</td><td>Solo del claim del JWT → header firmado → sesión; el SDK ignora cualquier <code>org_id</code> del payload.</td></tr>
+        <tr><td>Índices sin <code>org_id</code></td><td>Convención: todo índice de negocio antepone <code>org_id</code>.</td></tr>
+      </table>
+
+      <h2>Migraciones</h2>
+      <h3>Del kernel (<code>kernel/migrations/</code>)</h3>
+      <p>Embebidas en el binario con <code>sqlx::migrate!("../../migrations")</code> y aplicadas en
+      <code>init()</code> al arrancar el gateway, antes de aceptar tráfico.</p>
+      <table>
+        <tr><th>Archivo</th><th>Qué agrega</th></tr>
+        <tr><td><code>0001_core.sql</code></td><td>Esquema <code>core</code>: identidad, RBAC, <code>refresh_tokens</code>, <code>modules</code>, fuentes y registro de migraciones, <code>events</code>, <code>event_deliveries</code>, <code>audit_log</code> y el catálogo de permisos <code>core.*</code> (incluido <code>*</code>).</td></tr>
+        <tr><td><code>0002_org_modules.sql</code></td><td>Habilitación por organización.</td></tr>
+        <tr><td><code>0003_org_module_config.sql</code></td><td>Valores de configuración por org y módulo.</td></tr>
+        <tr><td><code>0004_automation.sql</code></td><td><code>cron_jobs</code> y <code>cron_runs</code> con su índice parcial.</td></tr>
+        <tr><td><code>0005_module_catalog.sql</code></td><td>Catálogo de paquetes firmados.</td></tr>
+        <tr><td><code>0006_module_meta.sql</code></td><td>Columna <code>modules.meta jsonb</code> (meta empujado en el handshake).</td></tr>
+        <tr><td><code>0007_attachments.sql</code></td><td><code>attachments</code> y <code>attachment_blobs</code>.</td></tr>
+        <tr><td><code>0008_attachments_service.sql</code></td><td><code>attachments.created_by</code> pasa a nullable (subidas programáticas por token de servicio).</td></tr>
+        <tr><td><code>0009_model_extensions.sql</code></td><td>Catálogo de extensiones entre módulos.</td></tr>
+        <tr><td><code>0010_custom_fields.sql</code></td><td><code>custom_fields</code> y el permiso <code>core.custom_fields.manage</code>.</td></tr>
+        <tr><td><code>0011_chatter.sql</code></td><td><code>messages</code>, <code>followers</code>, <code>activities</code>, <code>notifications</code>.</td></tr>
+      </table>
+      <h3>De los módulos</h3>
+<pre class="diagram">
+novvus makemigration (SDK, Alembic offline)
+  └─ modules/{id}/migrations/NNNN_nombre.sql        artefacto canónico = SQL
+       └─ novvus deploy → POST /api/core/modules {manifest_toml, migrations[]}
+            └─ core.module_migration_sources (checksum SHA-256)
+                 └─ install / migrate: por cada pendiente, en su propia transacción
+                      SET LOCAL ROLE novvus_module; SET LOCAL search_path = mod_{id};
+                      … SQL …; RESET ROLE; INSERT core.module_migrations; COMMIT
+</pre>
+      <table>
+        <tr><th>Regla</th><th>Motivo / dónde se aplica</th></tr>
+        <tr><td>Nombre <code>NNNN_snake_case</code> (6–128 chars).</td><td><code>valid_migration_version</code> al registrar; orden lexicográfico de aplicación.</td></tr>
+        <tr><td>Una migración aplicada es inmutable.</td><td>Re-registrar con otro SQL para una versión aplicada → 409; <code>apply_pending</code> detecta drift de checksum antes de tocar nada.</td></tr>
+        <tr><td>Solo su esquema.</td><td><code>SET LOCAL ROLE novvus_module</code> + <code>search_path = mod_{id}</code>: sin privilegios fuera; el SQL generado no cualifica tablas.</td></tr>
+        <tr><td>Atómica por migración.</td><td>Aplicación y registro en la misma transacción; si una falla, las siguientes no se aplican y el estado queda razonable.</td></tr>
+        <tr><td>La inicial crea RLS y <code>_processed_events</code>.</td><td>El SDK lo genera; forma parte del criterio de conformidad de <code>MODULE_CONTRACT.md §12</code>.</td></tr>
+      </table>
+
+      <h2>Índices y rendimiento: reglas prácticas</h2>
+      <ul>
+        <li>En tablas de negocio, anteponer <code>org_id</code> en los índices de endpoints frecuentes: <code>(org_id, created_at DESC)</code> para listas, <code>(org_id, status)</code> para estados, <code>UNIQUE(org_id, name)</code> para unicidad por organización.</li>
+        <li>Para workers, índices parciales sobre pendientes: <code>event_deliveries_pending_idx</code>, <code>cron_runs_due_idx</code>, <code>activities_due_idx</code>.</li>
+        <li>Para paneles por registro, índices compuestos con filtro de vivos: <code>attachments_record_idx</code>, <code>messages_record_idx</code>, <code>custom_fields_lookup_idx</code>.</li>
+        <li>No añadir índices "por si acaso"; la política del repo exige una consulta concreta y, para <code>ext</code>, evidencia de <code>pg_stat_statements</code>.</li>
+      </ul>
+
+      <h2>Consultas de diagnóstico</h2>
+      <p>Solo lectura; en producción, ejecútalas con cuidado y evita cambios manuales sin ventana y
+      respaldo. Sustituye <code>&lt;uuid-org&gt;</code> por el id real.</p>
+<pre><code><span class="c">-- Módulos: estado de instancia, runtime conectado y si tienen meta</span>
+SELECT id, version, status, base_url IS NOT NULL AS connected, meta IS NOT NULL AS has_meta, updated_at
+FROM core.modules ORDER BY id;
+
+<span class="c">-- Estado por organización</span>
+SELECT o.name, om.module_id, om.status, om.enabled_at
+FROM core.org_modules om JOIN core.organizations o ON o.id = om.org_id
+ORDER BY o.name, om.module_id;
+
+<span class="c">-- Migraciones aplicadas vs. fuentes registradas (detecta pendientes)</span>
+SELECT s.module_id, s.version, m.applied_at
+FROM core.module_migration_sources s
+LEFT JOIN core.module_migrations m USING (module_id, version)
+ORDER BY s.module_id, s.version;
+
+<span class="c">-- Deliveries pendientes o fallidas (las failed ya no se reintentan solas)</span>
+SELECT e.event_type, e.org_id, d.module_id, d.status, d.attempts, d.next_retry_at
+FROM core.event_deliveries d JOIN core.events e ON e.id = d.event_id
+WHERE d.status IN ('pending', 'failed')
+ORDER BY d.next_retry_at LIMIT 50;
+
+<span class="c">-- Cron vencidos que el scheduler aún no reclamó, y jobs en error</span>
+SELECT module_id, name, org_id, attempts, last_status, next_run_at
+FROM core.cron_runs
+WHERE next_run_at &lt; now() - interval '1 minute' OR last_status = 'error'
+ORDER BY next_run_at;</code></pre>
+<pre><code><span class="c">-- Permisos efectivos por rol de una organización</span>
+SELECT r.name AS role, p.key AS permission
+FROM core.roles r
+JOIN core.role_permissions rp ON rp.role_id = r.id
+JOIN core.permissions p ON p.id = rp.permission_id
+WHERE r.org_id = '&lt;uuid-org&gt;' ORDER BY r.name, p.key;
+
+<span class="c">-- Uso de almacenamiento por organización (medida real de cuota: blobs tras dedup)</span>
+SELECT o.name,
+       pg_size_pretty(COALESCE(SUM(b.size_bytes), 0)) AS used,
+       COUNT(*) FILTER (WHERE b.refcount &gt; 0) AS blobs
+FROM core.organizations o LEFT JOIN core.attachment_blobs b ON b.org_id = o.id
+GROUP BY o.name ORDER BY SUM(b.size_bytes) DESC NULLS LAST;
+
+<span class="c">-- Adjuntos vivos por módulo/modelo de una org</span>
+SELECT module_id, model, COUNT(*) AS files, pg_size_pretty(SUM(size_bytes)) AS logical_size
+FROM core.attachments
+WHERE org_id = '&lt;uuid-org&gt;' AND deleted_at IS NULL
+GROUP BY module_id, model ORDER BY files DESC;
+
+<span class="c">-- Notificaciones sin leer por usuario</span>
+SELECT u.email, COUNT(*) AS unread, MIN(n.created_at) AS oldest
+FROM core.notifications n JOIN core.users u ON u.id = n.user_id
+WHERE n.read_at IS NULL AND n.org_id = '&lt;uuid-org&gt;'
+GROUP BY u.email ORDER BY unread DESC;
+
+<span class="c">-- Campos personalizados vivos de una org</span>
+SELECT module_id, model, name, field_type, required, active, position
+FROM core.custom_fields
+WHERE org_id = '&lt;uuid-org&gt;' AND deleted_at IS NULL
+ORDER BY module_id, model, position;
+
+<span class="c">-- Extensiones registradas: quién extiende qué</span>
+SELECT extender_id, target_module, target_model,
+       jsonb_array_length(fields) AS fields, jsonb_array_length(ui) AS ui_sections
+FROM core.model_extensions ORDER BY target_module, target_model, extender_id;
+
+<span class="c">-- Actividades vencidas abiertas</span>
+SELECT module_id, model, record_id, summary, due_date, assigned_to
+FROM core.activities
+WHERE state = 'open' AND due_date &lt; current_date AND org_id = '&lt;uuid-org&gt;'
+ORDER BY due_date;
+
+<span class="c">-- Auditoría reciente (auth, RBAC, ciclo de vida)</span>
+SELECT action, entity, user_id, detail, occurred_at
+FROM core.audit_log
+WHERE org_id = '&lt;uuid-org&gt;' OR org_id IS NULL
+ORDER BY occurred_at DESC LIMIT 50;</code></pre>
+
+      <h2>Conectarse con psql</h2>
+<pre><code><span class="c"># desarrollo (docker-compose.yml solo levanta Postgres en :5432)</span>
+docker compose exec postgres psql -U novvus -d novvus
+
+<span class="c"># demo local completa</span>
+docker compose -f docker-compose.full.yml exec postgres psql -U novvus -d novvus
+
+<span class="c"># producción instalada con el CLI (compose en /opt/novvus; Postgres no expone puerto al host)</span>
+cd /opt/novvus &amp;&amp; docker compose exec postgres psql -U novvus -d novvus</code></pre>
+      <p>Para probar RLS a mano, imita al SDK: fija el tenant dentro de una transacción y como el rol
+      de módulo.</p>
+<pre><code>SELECT id, name FROM core.organizations;
+
+BEGIN;
+SET LOCAL ROLE novvus_module;
+SELECT set_config('app.org_id', '&lt;uuid-org&gt;', true);
+SELECT count(*) FROM mod_crm.contact;      <span class="c">-- solo filas de esa org</span>
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE novvus_module;
+SELECT count(*) FROM mod_crm.contact;      <span class="c">-- ERROR: current_setting sin valor (fail-closed)</span>
+ROLLBACK;</code></pre>
+      <div class="warn"><b>No es un camino de aplicación.</b> En código de módulos usa siempre la sesión
+      que entrega el SDK. Esta técnica sirve solo para entender y depurar.</div>
+
+      <h2>Respaldos</h2>
+      <p>La base contiene identidad, roles, módulos, configuración, eventos y datos de negocio;
+      respaldar un solo esquema casi nunca basta. En producción hay además dos volúmenes:
+      <code>files</code> (adjuntos con backend local) y <code>tokens</code> (tokens de servicio de los
+      módulos: no respaldar es aceptable, borrarlo no). <code>novvus update</code> hace un
+      <code>pg_dump -Fc</code> obligatorio antes de tocar nada y restaura si la verificación falla. El
+      procedimiento manual está en <a href="mantenimiento.html">Mantenimiento</a>.</p>
+
+      <h2>Qué NO hacer</h2>
+      <ul>
+        <li>No conectes un módulo como superusuario ni como <code>novvus</code>; no des <code>BYPASSRLS</code> a <code>novvus_module</code>.</li>
+        <li>No escribas SQL de módulo contra <code>core</code> ni contra otro <code>mod_*</code>; no ejecutes SQL del kernel sobre <code>mod_*</code> (ni siquiera para limpiar <code>custom</code>).</li>
+        <li>No quites <code>FORCE ROW LEVEL SECURITY</code> ni uses <code>SET</code> en lugar de <code>SET LOCAL</code>.</li>
+        <li>No aceptes <code>org_id</code> del body o la query.</li>
+        <li>No edites una migración aplicada; crea una nueva.</li>
+        <li>No borres filas de <code>audit_log</code> o <code>events</code> desde aplicación; no toques <code>attachment_blobs.refcount</code> a mano.</li>
+        <li>No cambies <code>name</code> o <code>field_type</code> de un campo personalizado con datos: crea uno nuevo.</li>
+      </ul>
+
+      <h2>Checklist para cambios de datos</h2>
+      <ul>
+        <li>[ ] La tabla nueva vive en el esquema correcto (<code>core</code> solo desde el kernel).</li>
+        <li>[ ] Si es de negocio: <code>org_id</code>, <code>ENABLE</code> + <code>FORCE ROW LEVEL SECURITY</code>, política <code>tenant_isolation</code>, columnas <code>ext</code> y <code>custom</code>.</li>
+        <li>[ ] Los índices frecuentes empiezan por <code>org_id</code>; las unicidades por org incluyen <code>org_id</code>.</li>
+        <li>[ ] La migración no toca <code>core</code> ni cualifica esquemas ajenos.</li>
+        <li>[ ] No se editó ninguna migración aplicada.</li>
+        <li>[ ] Hay prueba de aislamiento entre dos organizaciones.</li>
+        <li>[ ] Hay respaldo antes de correrla en un ambiente compartido.</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="sdk.html"><span class="dir">← Anterior</span>El SDK por dentro</a>
+        <a class="next" href="api.html"><span class="dir">Siguiente →</span>La API</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inicio — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav active" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Empezar / Inicio</div>
+    <article>
+      <h1>NOVVUS CORE</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">Plataforma modular de software empresarial: un <strong>kernel</strong> en Rust
+      sobre el que corren <strong>módulos de negocio</strong> escritos en Python, con un frontend
+      unificado en Next.js y una sola base de datos PostgreSQL compartida por todas las
+      organizaciones. Esta documentación está escrita para que una persona que llega hoy al
+      equipo, sin conocer el proyecto, pueda instalarlo, usarlo y después construir sobre él.</p>
+
+      <h2>La idea en 60 segundos</h2>
+      <p>Si conoces Odoo o SAP, la idea te sonará: hay un <em>núcleo</em> que resuelve lo que todas
+      las aplicaciones necesitan (usuarios, permisos, organizaciones, instalación de apps) y
+      encima corren <em>aplicaciones de negocio</em> (CRM, Proyectos…) que no repiten ese trabajo.
+      La diferencia es la arquitectura, pensada desde cero con herramientas actuales:</p>
+<pre class="diagram">
+Core de plataforma   &gt;   Sistema de módulos   &gt;   Aplicaciones empresariales
+   (kernel, Rust)         (novvus-sdk, Python)      (CRM, Proyectos, Ventas México…)
+</pre>
+      <ul>
+        <li>El <strong>kernel</strong> (Rust, 7 crates) es el único dueño de la autenticación, los
+            permisos, el ciclo de vida de los módulos, las migraciones, el bus de eventos, los
+            archivos adjuntos y la colaboración (chatter y notificaciones).</li>
+        <li>Los <strong>módulos</strong> (Python) son las aplicaciones de negocio. Se escriben con
+            <code>novvus-sdk</code> de forma declarativa: declaras modelos, permisos, eventos y
+            vistas; el SDK genera la API y habla con el kernel por ti.</li>
+        <li>El <strong>frontend</strong> (Next.js 16, React 19) es un <em>administrador de aplicaciones</em>:
+            un launcher, una tienda de apps y los ajustes. Cada app abre a pantalla completa. Y gracias
+            a las <strong>vistas genéricas</strong>, un módulo obtiene lista, formulario, kanban y
+            calendario sin escribir React.</li>
+        <li>Una <strong>sola base PostgreSQL 16</strong> aloja a todas las organizaciones
+            (multi-tenant). El aislamiento entre ellas lo garantiza la base de datos con
+            Row-Level Security, no la buena voluntad del programador.</li>
+        <li>Un módulo <strong>jamás</strong> toca la autenticación ni las tablas de otro módulo. Todo
+            pasa por contratos: la API del kernel, los eventos y las extensiones declaradas.</li>
+      </ul>
+
+      <h2>Cómo leer esta documentación</h2>
+      <p>El menú lateral está ordenado como una ruta de aprendizaje: de novato a experto. No hace
+      falta leerlo todo; cada sección tiene un objetivo y cada página indica su nivel.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Empezar</strong> (nivel básico). Entiende el vocabulario en
+          <a href="conceptos.html">Conceptos en 10 minutos</a>, levanta la plataforma con
+          <a href="instalacion.html">Instalación</a> y recórrela con la
+          <a href="guia-usuario.html">Guía de usuario</a>. Con esto ya puedes hacer una demo.
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Operar</strong> (nivel básico-medio). Cómo actualizar sin miedo con
+          <code>novvus update</code>, hacer respaldos y diagnosticar problemas.
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Construir módulos</strong> (nivel medio). El tutorial de tu primer módulo y las
+          tres piezas que te dan funcionalidad «gratis»: vistas genéricas, colaboración
+          (adjuntos, chatter, notificaciones) y extensibilidad (extensiones, campos
+          personalizados, configuración y cron).
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Profundizar</strong> (nivel avanzado). Arquitectura, kernel y SDK por dentro, base
+          de datos, la API completa y seguridad. Léelo cuando necesites cambiar la plataforma,
+          no solo usarla.
+        </div></div>
+        <div class="step"><span class="num">5</span><div>
+          <strong>Equipo</strong>. Cómo contribuir con calidad (tests, CI, convenciones) y la
+          referencia técnica para consultar puertos, variables, permisos y glosario.
+        </div></div>
+      </div>
+      <div class="tip">
+        <b>Niveles.</b> Cada página lleva una etiqueta <em>básico</em>, <em>medio</em> o
+        <em>avanzado</em> bajo su título. Dentro de las páginas básicas, los bloques plegables
+        «Ver más» contienen detalle avanzado que puedes saltar en la primera lectura.
+      </div>
+
+      <h2>Arranque rápido</h2>
+      <p>Hay dos formas de tener Novvus Core corriendo. Elige según lo que quieras hacer; los
+      detalles completos están en <a href="instalacion.html">Instalación</a>.</p>
+
+      <h3>Probarlo en tu computadora (demo con datos de ejemplo)</h3>
+      <p>Solo necesitas Docker Desktop y Python. Funciona en Windows, macOS y Linux:</p>
+<pre><code>git clone https://github.com/artmichel-dev/Novvus-Core &amp;&amp; cd Novvus-Core
+python install.py        <span class="c"># construye, enciende, siembra la demo y abre el navegador</span></code></pre>
+      <div class="tip">
+        <b>Credenciales de demo:</b> <code>demo@novvus.dev</code> / <code>demo-password-123</code>
+        en <code>http://localhost:3000</code>. La organización «Novvus Demo» viene con empresas,
+        contactos, leads y un pipeline con oportunidades, más los roles «Ventas» y
+        «Gerente de ventas».
+      </div>
+
+      <h3>Instalarlo en un servidor (producción)</h3>
+      <p>En un servidor Linux con Docker, el CLI administrativo <code>novvus</code> lo hace todo sin
+      preguntas y sin necesitar el repositorio:</p>
+<pre><code>curl -fsSL https://install.novvus.dev/install.sh | bash   <span class="c"># instala el CLI en /usr/local/bin</span>
+sudo novvus install                                        <span class="c"># descarga imágenes, genera secretos y levanta 6 servicios</span>
+novvus status                                              <span class="c"># salud de cada servicio + URL</span></code></pre>
+      <div class="warn">
+        <b>En producción no hay usuario demo.</b> La web queda en <code>http://&lt;servidor&gt;:8077</code>
+        y arranca en modo <em>first-run</em>: creas tu cuenta, creas tu organización y habilitas
+        las apps desde la tienda. Nunca publiques el puerto 8077 directamente a internet; ponle
+        un proxy HTTPS delante (ver <a href="instalacion.html">Instalación</a>).
+      </div>
+
+      <h2>Mapa de la documentación</h2>
+      <div class="cards">
+        <a class="card" href="conceptos.html">
+          <span class="kicker">Empezar</span>
+          <h3>Conceptos en 10 minutos</h3>
+          <p>Organización, módulo, kernel, SDK, permisos, vistas genéricas… explicados con analogías.</p>
+        </a>
+        <a class="card" href="instalacion.html">
+          <span class="kicker">Empezar</span>
+          <h3>Instalación</h3>
+          <p>Demo local con <code>install.py</code>, producción con <code>novvus install</code> y modo desarrollador.</p>
+        </a>
+        <a class="card" href="guia-usuario.html">
+          <span class="kicker">Empezar</span>
+          <h3>Guía de usuario</h3>
+          <p>Launcher, tienda de apps, vistas genéricas, chatter, ajustes, administración, CRM y Proyectos.</p>
+        </a>
+        <a class="card" href="actualizacion.html">
+          <span class="kicker">Operar</span>
+          <h3>Actualización y releases</h3>
+          <p><code>novvus update</code> con respaldo obligatorio y rollback automático; cómo se publica una versión.</p>
+        </a>
+        <a class="card" href="mantenimiento.html">
+          <span class="kicker">Operar</span>
+          <h3>Mantenimiento</h3>
+          <p>Comandos del día a día, respaldos, volúmenes, rotación de secretos y problemas comunes.</p>
+        </a>
+        <a class="card" href="tutorial-modulo.html">
+          <span class="kicker">Construir módulos</span>
+          <h3>Tutorial: tu primer módulo</h3>
+          <p>De <code>novvus new-module</code> a un módulo desplegado con modelos, eventos y pruebas.</p>
+        </a>
+        <a class="card" href="vistas-genericas.html">
+          <span class="kicker">Construir módulos</span>
+          <h3>Vistas genéricas y metadatos</h3>
+          <p><code>__novvus_views__</code>: lista, formulario, kanban y calendario sin escribir React.</p>
+        </a>
+        <a class="card" href="colaboracion.html">
+          <span class="kicker">Construir módulos</span>
+          <h3>Adjuntos, chatter y notificaciones</h3>
+          <p>Archivos en cualquier registro, conversaciones, seguidores, actividades y tiempo real.</p>
+        </a>
+        <a class="card" href="extensibilidad.html">
+          <span class="kicker">Construir módulos</span>
+          <h3>Extensiones, campos, config y cron</h3>
+          <p>Cómo un módulo aporta campos a otro, campos personalizados por organización, configuración y tareas programadas.</p>
+        </a>
+        <a class="card" href="arquitectura.html">
+          <span class="kicker">Profundizar</span>
+          <h3>Arquitectura</h3>
+          <p>Los cuatro planos del sistema, cómo viaja una petición y cómo viaja un evento.</p>
+        </a>
+        <a class="card" href="kernel.html">
+          <span class="kicker">Profundizar</span>
+          <h3>El kernel por dentro</h3>
+          <p>Los 7 crates de Rust: gateway, identidad, RBAC, registro de módulos, eventos y archivos.</p>
+        </a>
+        <a class="card" href="sdk.html">
+          <span class="kicker">Profundizar</span>
+          <h3>El SDK por dentro</h3>
+          <p>Cómo <code>novvus-sdk</code> genera la API, valida el meta, hace el handshake y aísla al tenant.</p>
+        </a>
+        <a class="card" href="base-de-datos.html">
+          <span class="kicker">Profundizar</span>
+          <h3>Base de datos</h3>
+          <p>Esquemas <code>core</code> y <code>mod_*</code>, Row-Level Security desde cero y migraciones.</p>
+        </a>
+        <a class="card" href="api.html">
+          <span class="kicker">Profundizar</span>
+          <h3>La API</h3>
+          <p>Todas las rutas de <code>/api/core</code> y la API automática de los módulos, con ejemplos.</p>
+        </a>
+        <a class="card" href="seguridad.html">
+          <span class="kicker">Profundizar</span>
+          <h3>Seguridad</h3>
+          <p>JWT, Argon2id, rotación de tokens, RBAC, headers firmados, token de bootstrap y archivos seguros.</p>
+        </a>
+        <a class="card" href="contribuir.html">
+          <span class="kicker">Equipo</span>
+          <h3>Contribuir y calidad</h3>
+          <p>Flujo de trabajo, convenciones, suites de tests, cobertura, mutation testing y los 8 jobs del CI.</p>
+        </a>
+        <a class="card" href="referencia.html">
+          <span class="kicker">Equipo</span>
+          <h3>Referencia técnica</h3>
+          <p>Stack, puertos, variables de entorno, catálogo de permisos y eventos, los dos CLI, glosario.</p>
+        </a>
+      </div>
+
+      <h2>Estado del proyecto</h2>
+      <p>La versión actual es la <strong>0.1.6</strong> (archivo <code>VERSION</code> en la raíz del
+      repositorio, única fuente de la versión de plataforma). El proyecto se construyó en dos
+      series de fases y ya es un producto distribuible.</p>
+      <table>
+        <tr><th>Serie</th><th>Fase</th><th>Entregable</th><th>Estado</th></tr>
+        <tr><td>v1</td><td>0</td><td>Diseño y contratos (<code>documents/docs/</code>)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v1</td><td>1</td><td>Kernel en Rust (7 crates)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v1</td><td>2</td><td>SDK de módulos en Python (<code>novvus-sdk</code>)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v1</td><td>3</td><td>Módulo CRM</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v1</td><td>4</td><td>Frontend Next.js</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v1</td><td>5</td><td>Interoperabilidad y empaquetado (módulo Proyectos, eventos)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v2</td><td>1</td><td>Vistas genéricas y pipeline de metadatos</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v2</td><td>2</td><td>Adjuntos y servicio de archivos</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v2</td><td>3</td><td>Extensiones entre módulos (módulo SalesMX)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v2</td><td>4</td><td>Campos personalizados por organización</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>v2</td><td>5</td><td>Chatter, notificaciones y tiempo real (SSE)</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>Producto</td><td>—</td><td>Distribución: CLI <code>novvus</code>, imágenes GHCR, <code>install.sh</code>, actualización segura</td><td><span class="badge ok">completa</span></td></tr>
+        <tr><td>Producto</td><td>—</td><td>Firma criptográfica de releases, <code>novvus backup</code>/<code>restore</code></td><td><span class="badge warn">pendiente</span></td></tr>
+      </table>
+
+      <div class="note">
+        <b>Fuente de verdad.</b> Esta documentación es la versión narrada y didáctica. Los
+        <em>contratos</em> formales viven en <code>documents/docs/</code> dentro del repositorio:
+        19 documentos (ARCHITECTURE, MODULE_CONTRACT, BUILDING_MODULES, DATA_MODEL, MULTITENANCY,
+        EVENTS, SECURITY, VIEWS, FILES, EXTENSIONS, CUSTOM_FIELDS, CHATTER, I18N, CLI, DEPLOYMENT,
+        DISTRIBUTION, QA, DECISIONS y BACKLOG). Regla de oro del proyecto:
+        <strong>contrato primero, código después</strong> — todo cambio de comportamiento se edita
+        primero en esos documentos y solo entonces en el código. Si esta guía y un contrato se
+        contradicen, gana el contrato.
+      </div>
+
+      <nav class="page-nav">
+        <a class="next" href="conceptos.html"><span class="dir">Siguiente →</span>Conceptos en 10 minutos</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

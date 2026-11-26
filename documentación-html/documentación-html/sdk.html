@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El SDK por dentro — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav active" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / El SDK por dentro</div>
+    <article>
+      <h1>El SDK por dentro</h1>
+      <span class="level avanzado">Nivel avanzado</span>
+      <p class="lead"><code>novvus-sdk</code> son 19 archivos Python (~3 600 líneas) en <code>sdk/src/novvus_sdk/</code>.
+      Esta página los recorre uno a uno, sigue el ciclo de arranque de un módulo, muestra cómo se genera la API,
+      cómo se verifica cada petición, cómo se aísla el tenant y cómo se prueba todo sin kernel. Con fragmentos del
+      código real y su ubicación aproximada.</p>
+
+      <h2>Anatomía: archivo por archivo</h2>
+      <table>
+        <tr><th>Archivo</th><th>Líneas</th><th>Responsabilidad</th></tr>
+        <tr><td><code>__init__.py</code></td><td>23</td><td>Superficie pública: <code>NovvusModel</code>, <code>NovvusModule</code>, <code>RequestContext</code>, <code>Translator</code>, <code>current_context</code>, <code>requires</code>. <code>__version__ = "0.1.0"</code> (versión del paquete, distinta de la de plataforma).</td></tr>
+        <tr><td><code>app.py</code></td><td>419</td><td><code>NovvusModule</code>: une manifiesto, modelos, auto-API, eventos, cron, hooks y handshake en una app FastAPI. Es el corazón.</td></tr>
+        <tr><td><code>autoapi.py</code></td><td>597</td><td>Genera esquemas Pydantic y el router CRUD por modelo: lista con cursor keyset, <code>/group</code>, <code>/export</code>, create/get/patch/soft-delete, ext/custom y tracking de chatter.</td></tr>
+        <tr><td><code>chatter.py</code></td><td>65</td><td><code>ChatterHelper</code>: <code>post()</code> y <code>track_changes()</code>, best-effort.</td></tr>
+        <tr><td><code>cli.py</code></td><td>270</td><td>Comando <code>novvus</code> del SDK: <code>new-module</code>, <code>run</code>, <code>makemigration</code>, <code>seed</code>, <code>deploy</code>. No confundir con el CLI administrativo en Rust.</td></tr>
+        <tr><td><code>context.py</code></td><td>56</td><td><code>RequestContext</code> (org, usuario, permisos, locale) en un <code>ContextVar</code>; <code>is_allowed()</code> con comodines.</td></tr>
+        <tr><td><code>custom_fields.py</code></td><td>120</td><td><code>CustomFieldsRegistry</code> + validación del payload <code>custom</code> con barrido perezoso.</td></tr>
+        <tr><td><code>db.py</code></td><td>55</td><td><code>Database</code>: motor async y <code>tenant_session()</code> que fija <code>app.org_id</code> con <code>SET LOCAL</code>.</td></tr>
+        <tr><td><code>events.py</code></td><td>66</td><td><code>Event</code>, <code>EventRegistry</code>, <code>mark_processed()</code> y el DDL de <code>_processed_events</code>.</td></tr>
+        <tr><td><code>extensions.py</code></td><td>177</td><td><code>ExtensionsRegistry</code> + validación/coerción del payload <code>ext</code> (el mismo <code>_coerce</code> lo reutiliza custom_fields).</td></tr>
+        <tr><td><code>files.py</code></td><td>64</td><td><code>FilesHelper</code>: <code>attach/list/download/delete</code> sobre las APIs de archivos del kernel.</td></tr>
+        <tr><td><code>filters.py</code></td><td>266</td><td><code>parse_filter()</code>: el DSL JSON → expresiones SQLAlchemy, con límites y errores con ruta.</td></tr>
+        <tr><td><code>i18n.py</code></td><td>64</td><td><code>Translator</code>: catálogos <code>i18n/{locale}.json</code>, resolución exacto → base → fuente.</td></tr>
+        <tr><td><code>kernel.py</code></td><td>232</td><td><code>KernelClient</code> (token de servicio, async) y <code>AdminClient</code> (JWT, sync, para el CLI).</td></tr>
+        <tr><td><code>manifest.py</code></td><td>487</td><td>Modelos Pydantic de <code>novvus.toml</code> con los mismos validadores que el kernel (id, semver, namespaces, ui, config, cron, extensions).</td></tr>
+        <tr><td><code>meta.py</code></td><td>292</td><td><code>field_specs</code>, <code>validate_views</code>, <code>build_module_meta</code>: el documento de metadatos (ver <a href="vistas-genericas.html">vistas genéricas</a>).</td></tr>
+        <tr><td><code>migrations.py</code></td><td>178</td><td>SQL inicial desde los modelos + bloque RLS; diffs incrementales con Alembic offline; carga de <code>migrations/*.sql</code> para registrar.</td></tr>
+        <tr><td><code>models.py</code></td><td>87</td><td><code>NovvusModel</code>: columnas de plataforma, <code>__tablename__</code>, <code>resource_name()</code>.</td></tr>
+        <tr><td><code>security.py</code></td><td>101</td><td><code>sign()</code>, <code>verify_request()</code>, <code>enforce()</code>, <code>@requires</code>.</td></tr>
+      </table>
+      <p>Tests en <code>sdk/tests/</code>: <code>test_autoapi_e2e</code>, <code>test_custom_fields_sdk</code>, <code>test_events_e2e</code>,
+      <code>test_extensions_sdk</code>, <code>test_filters_dsl</code>, <code>test_i18n</code>, <code>test_manifest</code>, <code>test_meta</code>,
+      <code>test_scaffold_and_migrations</code>, <code>test_security</code> (85 pruebas según la línea base de QA).</p>
+
+      <h2><code>NovvusModule</code>: el objeto que lo une todo</h2>
+      <h3>Constructor (<code>app.py:73-110</code>)</h3>
+<pre><code><span class="k">def</span> <span class="f">__init__</span>(self, manifest_path: str | Path | <span class="k">None</span> = <span class="k">None</span>) -&gt; <span class="k">None</span>:
+    path = Path(manifest_path) <span class="k">if</span> manifest_path <span class="k">else</span> find_manifest()   <span class="c"># busca novvus.toml hacia arriba, como git</span>
+    self.manifest: Manifest = Manifest.load(path)
+    self.root = path.parent
+    self.id = self.manifest.module.id
+    self.schema = <span class="s">f"mod_{self.id}"</span>
+
+    self.models: list[type[NovvusModel]] = []
+    self.events = EventRegistry()
+    self.router = APIRouter()                       <span class="c"># tus endpoints custom</span>
+    self._cron_handlers, self._hook_handlers = {}, {}
+    self.translator = Translator.load(self.root / <span class="s">"i18n"</span>)
+    self.files = FilesHelper(self)
+    self.extensions = ExtensionsRegistry(self)      <span class="c"># + ext_definitions_override para tests</span>
+    self.custom_fields = CustomFieldsRegistry(self) <span class="c"># + custom_definitions_override</span>
+    self.chatter = ChatterHelper(self)
+
+    <span class="c"># Se rellenan en startup(): handshake o modo offline</span>
+    self.db: Database | <span class="k">None</span> = <span class="k">None</span>
+    self.hmac_secret: str | <span class="k">None</span> = <span class="k">None</span>
+    self.kernel: KernelClient | <span class="k">None</span> = <span class="k">None</span></code></pre>
+      <h3>API de declaración y utilidades</h3>
+      <table>
+        <tr><th>Miembro</th><th>Qué hace</th><th>Línea</th></tr>
+        <tr><td><code>model(cls)</code></td><td>Decorador/registro: exige heredar de <code>NovvusModel</code>, ejecuta <code>validate_views</code> (fail-fast) y añade a <code>self.models</code>. El orden de registro es el orden del <code>CREATE TABLE</code> inicial.</td><td>116</td></tr>
+        <tr><td><code>gettext(msg, locale=None)</code> · alias <code>_</code></td><td>Traduce con los catálogos del módulo y el locale del contexto.</td><td>125-131</td></tr>
+        <tr><td><code>on(event_type)</code></td><td>Suscribe un handler; el tipo debe estar en <code>[events] listens</code> o lanza <code>ValueError</code>.</td><td>133</td></tr>
+        <tr><td><code>seed(fn)</code></td><td>Registra la función <code>(session, org_id)</code> que ejecuta <code>novvus seed</code>.</td><td>141</td></tr>
+        <tr><td><code>cron(name)</code></td><td>Liga un handler <code>(session)</code> a un job de <code>[[cron]]</code>; nombre no declarado → <code>ValueError</code>.</td><td>145</td></tr>
+        <tr><td><code>on_install / on_enable / on_disable / on_uninstall</code></td><td>Hooks por organización, un handler por hook.</td><td>165-179</td></tr>
+        <tr><td><code>call(method, path, org_id=None, json=None)</code></td><td>Llamada a otro módulo vía gateway; <code>raise_for_status()</code>; devuelve JSON o <code>None</code>. Offline → <code>RuntimeError</code>.</td><td>181</td></tr>
+        <tr><td><code>dependency_statuses()</code></td><td>Mapa dependencia → estado con caché de 10 s; extrae el id de specs como <code>crm&gt;=1.0</code>.</td><td>198</td></tr>
+        <tr><td><code>emit(event_type, payload=None, org_id=None)</code></td><td>Publica por el bus; tipo no declarado → <code>ValueError</code>; offline → <code>warning</code> y <code>{"skipped": True}</code> (la operación de negocio no falla).</td><td>215</td></tr>
+        <tr><td><code>config(org_id=None)</code> · <code>set_config(values, org_id=None)</code></td><td>Configuración efectiva por org (offline: solo defaults) · escritura (offline: <code>RuntimeError</code>).</td><td>237-254</td></tr>
+        <tr><td><code>session_dependency()</code></td><td>Dependencia FastAPI que abre <code>tenant_session(context.org_id)</code>. Úsala en tus endpoints: <code>Depends(module.session_dependency())</code>.</td><td>294</td></tr>
+        <tr><td><code>create_app()</code></td><td>Construye la app FastAPI (siguiente sección).</td><td>306</td></tr>
+        <tr><td><code>seed_function</code> · <code>processed_events_ddl</code></td><td>Propiedades para el CLI y las migraciones.</td><td>413-419</td></tr>
+      </table>
+
+      <h2>Ciclo de arranque de <code>create_app()</code></h2>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Lifespan.</b> <code>FastAPI(title, version, lifespan)</code>; el
+        lifespan llama <code>startup()</code> al iniciar y <code>shutdown()</code> al parar (cierra el pool y el cliente HTTP).</div></div>
+        <div class="step"><span class="num">2</span><div><b><code>startup()</code> decide el modo</b> (<code>app.py:260-286</code>).
+        Con <code>NOVVUS_SERVICE_TOKEN</code>: crea <code>KernelClient(NOVVUS_KERNEL_URL, token)</code>, construye el meta y
+        hace el handshake; del resultado toma <code>internal_hmac_secret</code> y <code>database_url</code> (el DSN del rol
+        <code>novvus_module</code>). Sin token pero con <code>NOVVUS_DATABASE_URL</code> + <code>NOVVUS_INTERNAL_HMAC_SECRET</code>: modo
+        offline. Ninguno de los dos: <code>RuntimeError</code> con el mensaje exacto de qué falta.</div></div>
+        <div class="step"><span class="num">3</span><div><b>Middleware <code>_internal_auth</code></b> (<code>app.py:321-335</code>).
+        Toda petición salvo el healthcheck debe traer cabeceras firmadas: si el runtime aún no tiene secreto → 503
+        "module runtime not ready"; si la firma no valida → 401; si valida, <code>set_context()</code> antes de seguir y
+        <code>reset_context()</code> en <code>finally</code>. Solo el kernel puede originar tráfico.</div></div>
+        <div class="step"><span class="num">4</span><div><b>Auto-API primero, router custom después</b>
+        (<code>app.py:337-350</code>): un <code>build_router()</code> por modelo y luego <code>self.router</code> con prefijo
+        <code>/api/{id}</code>. En FastAPI gana la primera ruta que coincide, así que para sustituir un endpoint generado
+        hay que deshabilitarlo en <code>__novvus_api__["disabled"]</code> —exactamente lo que hace <code>Lead</code> del CRM
+        con <code>create</code> para que la creación pase por el endpoint que emite <code>crm.lead.created</code>.</div></div>
+        <div class="step"><span class="num">5</span><div><b>Rutas internas.</b> <code>GET {runtime.healthcheck}</code> (sin firma;
+        reporta <code>degraded</code> si una dependencia no está <code>enabled</code>), <code>GET /_novvus/meta</code>,
+        <code>POST /_novvus/events</code>, <code>POST /_novvus/cron</code>, <code>POST /_novvus/hooks/{hook}</code>
+        (<code>app.py:352-408</code>). El gateway no expone ninguna.</div></div>
+      </div>
+<pre><code><span class="c"># app.py:375-387 — recepción de eventos con idempotencia en la misma transacción</span>
+@app.post(<span class="s">"/_novvus/events"</span>)
+<span class="k">async def</span> <span class="f">receive_event</span>(event: Event) -&gt; dict[str, Any]:
+    handlers = self.events.handlers_for(event.event_type)
+    <span class="k">if not</span> handlers:
+        <span class="k">return</span> {<span class="s">"status"</span>: <span class="s">"ignored"</span>}
+    <span class="k">async with</span> self.db.tenant_session(event.org_id) <span class="k">as</span> session:
+        first_time = <span class="k">await</span> mark_processed(session, event.id)   <span class="c"># INSERT … ON CONFLICT DO NOTHING</span>
+        <span class="k">if not</span> first_time:
+            <span class="k">return</span> {<span class="s">"status"</span>: <span class="s">"duplicate"</span>}
+        <span class="k">for</span> handler <span class="k">in</span> handlers:
+            <span class="k">await</span> handler(event, session)
+    <span class="k">return</span> {<span class="s">"status"</span>: <span class="s">"processed"</span>}</code></pre>
+      <div class="tip"><b>Handler y marca comparten transacción.</b> Si el handler lanza, la transacción se revierte
+      y la marca de procesado también: el kernel reintentará y el evento se procesará entonces. Es el
+      "exactly-once efectivo" dentro del módulo sobre un transporte at-least-once.</div>
+
+      <h2><code>NovvusModel</code>: lo que trae cada tabla</h2>
+<pre><code><span class="c"># models.py:34-71 (recortado)</span>
+<span class="k">class</span> NovvusModel(DeclarativeBase):
+    SYSTEM_COLUMNS = frozenset({<span class="s">"id"</span>, <span class="s">"org_id"</span>, <span class="s">"created_at"</span>, <span class="s">"updated_at"</span>, <span class="s">"deleted_at"</span>, <span class="s">"ext"</span>, <span class="s">"custom"</span>})
+
+    id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=<span class="k">True</span>), primary_key=<span class="k">True</span>, default=new_uuid7)  <span class="c"># uuid6.uuid7()</span>
+    org_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=<span class="k">True</span>), nullable=<span class="k">False</span>, index=<span class="k">True</span>)
+    ext: Mapped[dict] = mapped_column(JSONB, nullable=<span class="k">False</span>, default=dict, server_default=text(<span class="s">"'{}'::jsonb"</span>))
+    custom: Mapped[dict] = mapped_column(JSONB, nullable=<span class="k">False</span>, default=dict, server_default=text(<span class="s">"'{}'::jsonb"</span>))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=<span class="k">True</span>), nullable=<span class="k">False</span>, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=<span class="k">True</span>), nullable=<span class="k">False</span>, server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[datetime | <span class="k">None</span>] = mapped_column(DateTime(timezone=<span class="k">True</span>), nullable=<span class="k">True</span>)</code></pre>
+      <table>
+        <tr><th>Helper</th><th>Comportamiento</th></tr>
+        <tr><td><code>__tablename__</code></td><td><code>snake_case(cls.__name__)</code>: <code>ContactTag</code> → <code>contact_tag</code>. Sin esquema en el nombre: el SDK fija <code>search_path = mod_{id}</code> en cada conexión.</td></tr>
+        <tr><td><code>resource_name()</code></td><td><code>__resource__</code> si existe; si no, el nombre de tabla más una <code>s</code> cuando no termina en <code>s</code> (<code>company</code> → <code>companys</code>: por eso el CRM declara <code>__resource__ = "companies"</code>).</td></tr>
+        <tr><td><code>as_dict()</code></td><td>Diccionario con todas las columnas mapeadas; útil en handlers.</td></tr>
+        <tr><td>UUIDv7</td><td>Generado por la aplicación (<code>uuid6</code>), ordenable en el tiempo: por eso el cursor keyset puede desempatar por <code>id</code>.</td></tr>
+      </table>
+
+      <h2><code>autoapi.py</code>: generación de esquemas y router</h2>
+      <h3><code>build_schemas()</code> (<code>autoapi.py:71-106</code>)</h3>
+<pre><code><span class="k">for</span> column <span class="k">in</span> model.__table__.columns:
+    py_type = _python_type(column)                     <span class="c"># column.type.python_type, str si no aplica</span>
+    read_fields[name] = (py_type | <span class="k">None</span> <span class="k">if</span> column.nullable <span class="k">else</span> py_type, <span class="k">None</span>)
+    <span class="k">if</span> name <span class="k">in</span> NovvusModel.SYSTEM_COLUMNS:
+        <span class="k">continue</span>                                       <span class="c"># nunca escribibles por el cliente</span>
+    <span class="k">if</span> column.nullable <span class="k">or</span> column.default <span class="k">is not None</span> <span class="k">or</span> column.server_default <span class="k">is not None</span>:
+        create_fields[name] = (py_type | <span class="k">None</span>, <span class="k">None</span>)
+    <span class="k">else</span>:
+        create_fields[name] = (py_type, ...)           <span class="c"># obligatorio</span>
+    update_fields[name] = (py_type | <span class="k">None</span>, <span class="k">None</span>)
+
+create_fields[<span class="s">"ext"</span>] = update_fields[<span class="s">"ext"</span>] = (dict | <span class="k">None</span>, <span class="k">None</span>)
+create_fields[<span class="s">"custom"</span>] = update_fields[<span class="s">"custom"</span>] = (dict | <span class="k">None</span>, <span class="k">None</span>)
+
+strict = ConfigDict(extra=<span class="s">"forbid"</span>)     <span class="c"># un org_id enviado por el cliente → 422, nunca se cuela</span>
+lax = ConfigDict(from_attributes=<span class="k">True</span>)
+read = create_model(<span class="s">f"{model.__name__}Read"</span>, __config__=lax, **read_fields)
+create = create_model(<span class="s">f"{model.__name__}Create"</span>, __config__=strict, **create_fields)
+update = create_model(<span class="s">f"{model.__name__}Update"</span>, __config__=strict, **update_fields)</code></pre>
+      <div class="note"><b>Por qué <code>autoapi.py</code> no usa <code>from __future__ import annotations</code>.</b> Los
+      endpoints anotan su cuerpo con clases Pydantic creadas dinámicamente y guardadas en variables locales; FastAPI
+      solo las ve si las anotaciones se evalúan de forma inmediata (comentario en <code>autoapi.py:9-12</code>).</div>
+      <h3>Lo que hace cada endpoint generado</h3>
+      <table>
+        <tr><th>Endpoint</th><th>Detalles de implementación</th></tr>
+        <tr><td><code>GET ""</code> (lista, 231)</td><td><code>enforce(read_perm)</code>; valida <code>order_by</code> contra las columnas; <code>searched_and_filtered()</code> aplica <code>q</code> y el DSL; filtros planos por igualdad con <code>_coerce()</code>; cursor decodificado y traducido a <code>(col &lt; v) OR (col = v AND id &lt; last_id)</code>; pide <code>limit + 1</code> filas para saber si hay más; <code>serialized()</code> filtra <code>ext</code>/<code>custom</code> por definiciones activas.</td></tr>
+        <tr><td><code>GET /group</code> (305)</td><td>Registrado antes de <code>/{item_id}</code> para que la ruta literal gane. <code>select(group_col, count()).group_by(...)</code>; soporte para <code>custom.{n}</code> con choices/boolean; etiquetas desde <code>choices</code>.</td></tr>
+        <tr><td><code>GET /export</code> (358)</td><td>Cuenta primero (<code>select(func.count())</code>) y rechaza con 422 si supera <code>export_max_rows</code>; luego <code>session.stream_scalars()</code> fila a fila. CSV con <code>csv.writer</code> sobre un <code>StringIO</code> reciclado; XLSX con <code>Workbook(write_only=True)</code> y el archivo ensamblado al final (openpyxl no transmite).</td></tr>
+        <tr><td><code>POST ""</code> (480)</td><td><code>enforce(write_perm)</code>; <code>model_dump(exclude_unset=True)</code>; valida <code>ext</code>/<code>custom</code> con <code>creating=True</code>; <code>org_id</code> sale del contexto, nunca del cuerpo; <code>flush</code> + <code>refresh</code>; 201.</td></tr>
+        <tr><td><code>GET /{item_id}</code> (504)</td><td>404 si no existe o está borrado (<code>base_query()</code> filtra <code>deleted_at IS NULL</code>).</td></tr>
+        <tr><td><code>PATCH /{item_id}</code> (515)</td><td>Merge de <code>ext</code>/<code>custom</code> contra lo almacenado; captura cambios de campos <code>track</code> <b>antes</b> de aplicarlos; tras el <code>flush</code> llama <code>chatter.track_changes()</code>.</td></tr>
+        <tr><td><code>DELETE /{item_id}</code> (553)</td><td>Borrado suave: <code>deleted_at = now(UTC)</code>; 204.</td></tr>
+      </table>
+      <p>Serialización: <code>_json_value()</code> convierte <code>datetime/date</code> a ISO, <code>UUID</code> y <code>Decimal</code> a
+      cadena y <code>Enum</code> a su valor; el cursor guarda un marcador de tipo (<code>dt</code>, <code>d</code>, <code>uuid</code>,
+      <code>dec</code>, <code>raw</code>) para reconstruir el valor de orden al decodificar.</p>
+
+      <h2><code>security.py</code> y <code>context.py</code>: cada petición, verificada</h2>
+<pre><code><span class="c"># security.py:29-33 — la cadena canónica que firma el gateway (novvus_common::internal en Rust)</span>
+<span class="k">def</span> <span class="f">sign</span>(secret, user, org, perms, timestamp, method, path) -&gt; str:
+    canonical = <span class="s">f"{user}\n{org}\n{perms}\n{timestamp}\n{method}\n{path}"</span>
+    <span class="k">return</span> hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+
+<span class="c"># security.py:36-70 — verificación</span>
+<span class="k">def</span> <span class="f">verify_request</span>(request: Request, secret: str) -&gt; RequestContext:
+    ...                                                   <span class="c"># faltan cabeceras → 401 "missing internal headers"</span>
+    <span class="k">if</span> abs(time.time() - timestamp) &gt; MAX_SKEW_SECONDS:   <span class="c"># 60 s → 401 "stale internal signature"</span>
+        <span class="k">raise</span> HTTPException(status_code=<span class="n">401</span>, detail=<span class="s">"stale internal signature"</span>)
+    expected = sign(secret, user_raw, org_raw, perms_raw, timestamp, request.method, request.url.path)
+    <span class="k">if not</span> hmac.compare_digest(expected, signature):      <span class="c"># comparación en tiempo constante</span>
+        <span class="k">raise</span> HTTPException(status_code=<span class="n">401</span>, detail=<span class="s">"invalid internal signature"</span>)
+    locale = headers.get(HDR_LOCALE) <span class="k">or</span> DEFAULT_LOCALE      <span class="c"># x-novvus-locale: fuera de la firma</span>
+    <span class="k">return</span> RequestContext(org_id=UUID(org_raw), user_id=UUID(user_raw) <span class="k">if</span> user_raw <span class="k">else None</span>,
+                          permissions=frozenset(perms_raw.split(<span class="s">","</span>)), locale=locale)</code></pre>
+      <table>
+        <tr><th>Pieza</th><th>Regla</th></tr>
+        <tr><td>Cabeceras</td><td><code>x-novvus-user</code> (vacío en llamadas de servicio o del kernel), <code>x-novvus-org</code>, <code>x-novvus-perms</code> (CSV), <code>x-novvus-timestamp</code>, <code>x-novvus-signature</code>; <code>x-novvus-locale</code> informativo.</td></tr>
+        <tr><td><code>RequestContext.is_allowed(required)</code></td><td><code>_grant_matches</code>: concede <code>*</code>, igualdad exacta, o <code>prefijo.*</code> cuando <code>required</code> empieza por <code>prefijo.</code>. Los comodines solo viven en el lado otorgado; lo requerido siempre es concreto. Mismas reglas que el kernel.</td></tr>
+        <tr><td><code>enforce(perm)</code></td><td>403 <code>missing permission: …</code> si el contexto no lo cubre.</td></tr>
+        <tr><td><code>@requires(perm)</code></td><td>Decorador para endpoints <b>async</b> (con una función síncrona lanza <code>TypeError</code>); envuelve con <code>enforce</code>. Va <b>debajo</b> del decorador de ruta.</td></tr>
+        <tr><td><code>current_context()</code></td><td>Lee el <code>ContextVar</code>; fuera de una petición autenticada lanza <code>RuntimeError</code> con un mensaje explícito. <code>Translator</code> lo captura para caer a es-MX.</td></tr>
+      </table>
+
+      <h2><code>db.py</code>: la sesión de tenant</h2>
+<pre><code><span class="c"># db.py:31-52</span>
+<span class="k">class</span> Database:
+    <span class="k">def</span> <span class="f">__init__</span>(self, dsn: str, schema: str) -&gt; <span class="k">None</span>:
+        self.engine = create_async_engine(
+            to_async_dsn(dsn),                          <span class="c"># postgres:// → postgresql+psycopg://</span>
+            pool_size=<span class="n">5</span>, max_overflow=<span class="n">5</span>,
+            connect_args={<span class="s">"options"</span>: <span class="s">f"-csearch_path={schema}"</span>},   <span class="c"># nombres sin calificar → mod_{id}</span>
+        )
+        self._sessions = async_sessionmaker(self.engine, expire_on_commit=<span class="k">False</span>)
+
+    @asynccontextmanager
+    <span class="k">async def</span> <span class="f">tenant_session</span>(self, org_id: UUID) -&gt; AsyncIterator[AsyncSession]:
+        <span class="k">async with</span> self._sessions() <span class="k">as</span> session, session.begin():
+            <span class="k">await</span> session.execute(text(<span class="s">"SELECT set_config('app.org_id', :org, true)"</span>), {<span class="s">"org"</span>: str(org_id)})
+            <span class="k">yield</span> session                               <span class="c"># commit al salir sin excepción</span></code></pre>
+      <p>El tercer argumento <code>true</code> de <code>set_config</code> equivale a <code>SET LOCAL</code>: la variable muere con la
+      transacción y no contamina conexiones del pool. La política RLS que genera <code>migrations.rls_block()</code> usa
+      <code>current_setting('app.org_id')::uuid</code> en <code>USING</code> y <code>WITH CHECK</code>, con
+      <code>FORCE ROW LEVEL SECURITY</code>: sin tenant fijado la consulta <b>falla</b> en lugar de devolver todo
+      (<i>fail-closed</i>). El DSN que entrega el handshake pertenece al rol <code>novvus_module</code>, sin
+      <code>BYPASSRLS</code> y sin privilegios fuera de su esquema.</p>
+
+      <h2><code>migrations.py</code>: SQL como artefacto canónico</h2>
+      <table>
+        <tr><th>Función</th><th>Qué produce</th></tr>
+        <tr><td><code>rls_block(table)</code> (34)</td><td>Las cinco sentencias exactas de MULTITENANCY.md §2: <code>ENABLE</code>, <code>FORCE</code>, <code>CREATE POLICY tenant_isolation … USING … WITH CHECK …</code>.</td></tr>
+        <tr><td><code>generate_initial_sql(module)</code> (62)</td><td><code>CREATE TABLE</code> + índices por cada modelo registrado (compilados con el dialecto PostgreSQL), su bloque RLS, y al final el DDL de <code>_processed_events</code>.</td></tr>
+        <tr><td><code>generate_diff_sql(module, dev_url)</code> (85)</td><td>Alembic <code>produce_migrations</code> contra la base de desarrollo con <code>search_path = mod_{id}</code>, renderizado como SQL offline; añade RLS a las tablas nuevas; ignora <code>_processed_events</code>.</td></tr>
+        <tr><td><code>makemigration(module, name, dev_url)</code> (141)</td><td>Primera vez → <code>0001_{name}.sql</code> completo; después exige <code>NOVVUS_DATABASE_URL</code> y escribe <code>NNNN_{slug}.sql</code> solo si hay cambios.</td></tr>
+        <tr><td><code>load_migration_sources(root)</code> (165)</td><td>Lista <code>[{version, sql}]</code> ordenada por nombre (<code>VERSION_RE = ^(\d{4})_([a-z0-9_]+)\.sql$</code>) que el CLI envía al registrar.</td></tr>
+      </table>
+      <div class="warn"><b>El SDK genera, el kernel ejecuta.</b> Ningún módulo aplica sus propias migraciones: el
+      kernel las corre en <code>install</code>/<code>migrate</code>, una transacción por archivo, con el rol de módulo y
+      <code>search_path</code> fijado, y guarda el checksum. Cambiar un archivo ya aplicado aborta.</div>
+
+      <h2><code>kernel.py</code>: hablar con el kernel</h2>
+      <table>
+        <tr><th>Método de <code>KernelClient</code></th><th>Ruta del kernel</th><th>Notas</th></tr>
+        <tr><td><code>handshake(module_id, base_url, meta=None)</code></td><td><code>POST /api/core/modules/handshake</code></td><td>Devuelve <code>HandshakeResult(module_id, status, internal_hmac_secret, database_url, schema_name)</code>. Meta inválido → el kernel rechaza y el módulo no arranca.</td></tr>
+        <tr><td><code>emit(org_id, event_type, payload)</code></td><td><code>POST /api/core/events</code></td><td>El kernel valida <code>emits</code>.</td></tr>
+        <tr><td><code>module_statuses()</code></td><td><code>GET /api/core/modules/status</code></td><td>id → estado, base de <code>dependency_statuses()</code>.</td></tr>
+        <tr><td><code>get_config(org)</code> · <code>set_config(org, values)</code></td><td><code>GET|PUT /api/core/config</code></td><td>Tenant en <code>x-novvus-org</code>.</td></tr>
+        <tr><td><code>get_extensions(org=None)</code> · <code>get_custom_fields(org)</code></td><td><code>GET /api/core/extensions</code> · <code>GET /api/core/custom-fields/service</code></td><td>Definiciones que apuntan al módulo llamante.</td></tr>
+        <tr><td><code>post_chatter_message(...)</code></td><td><code>POST /api/core/chatter/{mod}/{model}/{record}/messages</code></td><td><code>kind="system"</code> por defecto.</td></tr>
+        <tr><td><code>upload_file / list_files / download_file / delete_file</code></td><td><code>/api/core/files…</code></td><td>Multipart con <code>httpx</code>.</td></tr>
+        <tr><td><code>call_module(method, path, org, json)</code></td><td>cualquier <code>/api/{otro}/…</code></td><td>Token de servicio + <code>x-novvus-org</code>; devuelve el <code>httpx.Response</code> crudo.</td></tr>
+      </table>
+      <p>Todas las llamadas llevan la cabecera <code>x-novvus-service-token</code> y un timeout de 15 s.
+      <code>AdminClient</code> (síncrono, <code>Authorization: Bearer</code>, 30 s) solo tiene <code>register_module(manifest_toml,
+      migrations)</code> y <code>lifecycle(module_id, action)</code>: es lo que usa <code>novvus deploy</code>.</p>
+
+      <h2><code>i18n.py</code>, <code>events.py</code>, <code>manifest.py</code></h2>
+      <table>
+        <tr><th>Archivo</th><th>Puntos que conviene conocer</th></tr>
+        <tr><td><code>i18n.py</code></td><td><code>Translator.load(dir)</code> lee todo <code>*.json</code> del directorio (catálogos malformados se ignoran); las claves de locale se normalizan a minúsculas; <code>gettext()</code> prueba <code>en-us</code> y luego <code>en</code>; sin contexto de petición usa <code>es-MX</code>.</td></tr>
+        <tr><td><code>events.py</code></td><td><code>Event(id, org_id, module_id, event_type, payload, occurred_at)</code> es el cuerpo exacto que envía el despachador del kernel; <code>mark_processed()</code> devuelve <code>rowcount == 1</code>; <code>PROCESSED_EVENTS_DDL</code> crea <code>_processed_events(event_id uuid PK, processed_at)</code>.</td></tr>
+        <tr><td><code>manifest.py</code></td><td>Espejo Pydantic de las reglas del kernel: <code>MODULE_ID_RE = ^[a-z][a-z0-9_]{1,31}$</code>, ids reservados <code>core/api/internal/novvus</code>, semver, <code>service_permissions</code> con forma <code>m.r.a</code> y nunca <code>core.*</code>, cron y config en el namespace del módulo, rutas <code>[ui]</code> bajo <code>/{id}</code>, extensiones con dependencias declaradas y tope de 32 campos. <code>to_toml_string()</code> lanza a propósito: al kernel se envía el archivo crudo, jamás una reserialización.</td></tr>
+      </table>
+
+      <h2>Modo offline: probar sin kernel</h2>
+      <p>Es el modo de todos los arneses de prueba del repositorio (<code>modules/crm/tests/conftest.py</code>,
+      <code>modules/salesmx/tests/conftest.py</code>, <code>sdk/tests/</code>). Requisitos: un Postgres accesible y dos
+      variables de entorno.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><b>Base efímera.</b> El fixture de sesión crea
+        <code>novvus_crm_test_{hex}</code>, se asegura de que exista el rol <code>novvus_module</code> con <code>NOBYPASSRLS</code>, crea
+        <code>mod_crm</code>, y aplica <code>migrations/*.sql</code> en orden con <code>SET LOCAL ROLE novvus_module</code> y
+        <code>search_path = mod_crm</code>, igual que haría el kernel. Al terminar, <code>DROP DATABASE … WITH (FORCE)</code>.</div></div>
+        <div class="step"><span class="num">2</span><div><b>Arranque offline.</b> <code>NOVVUS_DATABASE_URL</code> = DSN con las
+        credenciales del rol de módulo, <code>NOVVUS_INTERNAL_HMAC_SECRET</code> = un secreto cualquiera, y <b>sin</b>
+        <code>NOVVUS_SERVICE_TOKEN</code>. <code>load_module(root)</code> importa <code>module.py</code>, <code>create_app()</code> +
+        <code>await module.startup()</code>, y <code>httpx.AsyncClient(transport=ASGITransport(app=app))</code> habla con la app en
+        memoria.</div></div>
+        <div class="step"><span class="num">3</span><div><b>Peticiones firmadas.</b> No hay gateway, así que el test firma
+        como lo haría el gateway: <code>signed_headers()</code> usa <code>novvus_sdk.security.sign</code> con el mismo secreto;
+        <code>OrgClient(client, org, perms)</code> añade esas cabeceras a cada llamada y firma el path sin query string
+        (<code>path.split("?")[0]</code>), porque <code>verify_request</code> firma <code>request.url.path</code>.</div></div>
+      </div>
+<pre><code><span class="c"># modules/crm/tests/conftest.py:57-72 y 148-170 (recortado)</span>
+<span class="k">def</span> <span class="f">signed_headers</span>(method, path, org, perms, user=<span class="k">None</span>):
+    <span class="k">from</span> novvus_sdk.security <span class="k">import</span> sign
+    timestamp = int(time.time())
+    user_str = str(user) <span class="k">if</span> user <span class="k">else</span> <span class="s">""</span>
+    <span class="k">return</span> {
+        <span class="s">"x-novvus-user"</span>: user_str, <span class="s">"x-novvus-org"</span>: str(org), <span class="s">"x-novvus-perms"</span>: perms,
+        <span class="s">"x-novvus-timestamp"</span>: str(timestamp),
+        <span class="s">"x-novvus-signature"</span>: sign(HMAC_SECRET, user_str, str(org), perms, timestamp, method, path),
+    }
+
+<span class="k">class</span> OrgClient:
+    <span class="k">def</span> <span class="f">__init__</span>(self, client: httpx.AsyncClient, org: UUID, perms: str): ...
+    <span class="k">async def</span> <span class="f">request</span>(self, method, path, **kwargs):
+        headers = signed_headers(method, path.split(<span class="s">"?"</span>)[<span class="n">0</span>], self.org, self.perms)
+        <span class="k">return await</span> self.client.request(method, path, headers=headers, **kwargs)
+
+<span class="c"># En un test: dos orgs distintas = aislamiento por RLS sin trucos</span>
+ventas = OrgClient(client, org_a, <span class="s">"crm.contacts.*,crm.companies.*"</span>)
+r = <span class="k">await</span> ventas.post(<span class="s">"/api/crm/contacts"</span>, {<span class="s">"name"</span>: <span class="s">"Ana"</span>})
+<span class="k">assert</span> r.status_code == <span class="n">201</span>
+otra = OrgClient(client, org_b, <span class="s">"crm.contacts.*"</span>)
+<span class="k">assert</span> (<span class="k">await</span> otra.get(<span class="s">f"/api/crm/contacts/{r.json()['id']}"</span>)).status_code == <span class="n">404</span></code></pre>
+      <table>
+        <tr><th>Qué pasa offline con…</th><th>Comportamiento</th></tr>
+        <tr><td><code>module.emit()</code></td><td><code>warning</code> "offline mode: event … was not published" y <code>{"skipped": True}</code>.</td></tr>
+        <tr><td><code>module.call()</code>, <code>module.set_config()</code>, <code>module.files.*</code></td><td><code>RuntimeError</code> explícito.</td></tr>
+        <tr><td><code>module.config()</code></td><td>Solo los defaults del esquema.</td></tr>
+        <tr><td><code>module.chatter.post()</code></td><td><code>None</code> con <code>warning</code>; el PATCH con <code>track</code> sigue funcionando.</td></tr>
+        <tr><td>Extensiones y campos custom</td><td>Vacíos, salvo que fijes <code>module.ext_definitions_override</code> / <code>module.custom_definitions_override</code> con la forma normalizada (<code>{resource: {extensor: {campo: decl}}}</code> / <code>{resource: {campo: decl}}</code>).</td></tr>
+        <tr><td><code>dependency_statuses()</code></td><td><code>{}</code>; el health responde <code>ok</code>.</td></tr>
+      </table>
+      <div class="tip"><b>Windows.</b> psycopg async no corre sobre el <code>ProactorEventLoop</code>; los conftest fijan
+      <code>WindowsSelectorEventLoopPolicy</code> y el CLI usa <code>asyncio.SelectorEventLoop</code> en <code>run</code> y
+      <code>seed</code> (<code>cli.py:166-171, 205-209</code>).</div>
+
+      <h2>El CLI del SDK (<code>cli.py</code>)</h2>
+      <table>
+        <tr><th>Comando</th><th>Qué hace</th></tr>
+        <tr><td><code>novvus new-module &lt;id&gt; [--dir]</code></td><td>Valida el id, escribe <code>novvus.toml</code>, <code>module.py</code> (modelo <code>Item</code> + seed) y <code>tests/test_smoke.py</code> desde plantillas, y genera <code>migrations/0001_init.sql</code> cargando el módulo recién creado.</td></tr>
+        <tr><td><code>novvus run [--host] [--port]</code></td><td><code>load_module()</code> (importa <code>module.py</code> junto a <code>novvus.toml</code>, con la raíz en <code>sys.path</code> para que importe <code>models.py</code>), toma <code>app</code> o llama <code>create_app()</code>, y sirve con uvicorn en <code>NOVVUS_MODULE_PORT</code> o <code>[runtime] port</code> (default 8100).</td></tr>
+        <tr><td><code>novvus makemigration -m &lt;nombre&gt;</code></td><td>Primera migración completa o diff Alembic contra <code>NOVVUS_DATABASE_URL</code>.</td></tr>
+        <tr><td><code>novvus seed --org &lt;uuid&gt;</code></td><td>Ejecuta la función <code>@module.seed</code> dentro de <code>tenant_session(org)</code> contra <code>NOVVUS_DATABASE_URL</code>.</td></tr>
+        <tr><td><code>novvus deploy --kernel &lt;URL&gt; --token &lt;JWT&gt;</code></td><td><code>AdminClient</code>: registra manifiesto + migraciones, <code>install</code> (imprime las migraciones aplicadas y el <b>token de servicio, una sola vez</b>) y <code>enable</code>.</td></tr>
+      </table>
+      <div class="warn"><b>Dos comandos llamados <code>novvus</code>.</b> Este es el del SDK Python, para desarrollo y para
+      el arranque del contenedor del módulo. El CLI administrativo en Rust (<code>sudo novvus install</code>,
+      <code>novvus update</code>, <code>novvus status</code>) vive en <code>cli/</code> y no comparte nada con este.</div>
+
+      <details class="fold"><summary>Ver más: qué NO hace el SDK (y por qué)</summary>
+        <ul>
+          <li>No abre conexiones a otros esquemas: el DSN es del rol restringido y <code>search_path</code> apunta a <code>mod_{id}</code>.</li>
+          <li>No emite JWT ni valida contraseñas: solo verifica HMAC de cabeceras que únicamente el gateway sabe firmar.</li>
+          <li>No aplica migraciones ni ejecuta DDL en runtime: genera SQL y lo entrega al kernel.</li>
+          <li>No hace push de invalidación de cachés (extensiones, custom fields, dependencias): TTLs cortos con degradación a copia anterior, decisión registrada en <code>DECISIONS.md</code>.</li>
+          <li>No reexporta el meta después del arranque: el documento viaja una vez en el handshake; un cambio de modelos exige reiniciar el módulo (y, si hay columnas nuevas, una migración).</li>
+        </ul>
+      </details>
+
+      <nav class="page-nav">
+        <a href="kernel.html"><span class="dir">← Anterior</span>El kernel por dentro</a>
+        <a class="next" href="base-de-datos.html"><span class="dir">Siguiente →</span>Base de datos</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguridad — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav active" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Profundizar / Seguridad</div>
+    <article>
+      <h1>Seguridad</h1>
+      <span class="level avanzado">Nivel avanzado</span>
+      <p class="lead">Cómo protege NOVVUS CORE credenciales, sesiones, la frontera kernel↔módulos,
+      los archivos, la colaboración en tiempo real y la cadena de distribución. Cada afirmación
+      está contrastada con el código del kernel (<code>kernel/crates/</code>); donde el contrato
+      formal (<code>documents/docs/SECURITY.md</code>) y el código difieren, se indica y prevalece el
+      código.</p>
+
+      <h2>Modelo en capas</h2>
+      <table>
+        <tr><th>Capa</th><th>Qué protege</th><th>Dónde vive</th></tr>
+        <tr><td>Argon2id</td><td>Contraseñas frente a ataques offline.</td><td><code>novvus-identity/src/password.rs</code></td></tr>
+        <tr><td>JWT HS256 + rotación de refresh</td><td>Sesiones; detección de robo de refresh.</td><td><code>novvus-identity/src/{jwt,service}.rs</code></td></tr>
+        <tr><td>RBAC con caché</td><td>Autorización viva por (usuario, org).</td><td><code>novvus-rbac</code>, <code>gateway/src/state.rs</code></td></tr>
+        <tr><td>Headers internos HMAC</td><td>Identidad confiable gateway → módulo sin exponer el JWT.</td><td><code>novvus-common/src/internal.rs</code>, <code>gateway/src/proxy.rs</code></td></tr>
+        <tr><td>Tokens de servicio y de bootstrap</td><td>Autenticación de procesos, no de personas.</td><td><code>gateway/src/extract.rs</code>, <code>registry/src/lifecycle.rs</code></td></tr>
+        <tr><td>Privilegios de base + RLS</td><td>Aislamiento entre módulos y entre organizaciones.</td><td><code>registry/src/{lifecycle,migrations}.rs</code>, migraciones del SDK</td></tr>
+        <tr><td>Validación del manifiesto y firma de paquetes</td><td>Código de terceros dentro de límites.</td><td><code>registry/src/{manifest,package}.rs</code></td></tr>
+        <tr><td>Sniffing MIME y disposición</td><td>Archivos subidos por usuarios.</td><td><code>gateway/src/routes/files.rs</code></td></tr>
+        <tr><td>Rate limit, CORS, errores genéricos</td><td>Superficie HTTP.</td><td><code>gateway/src/{rate_limit,lib}.rs</code></td></tr>
+      </table>
+
+      <h2>Contraseñas: Argon2id</h2>
+      <table>
+        <tr><th>Parámetro</th><th>Valor</th></tr>
+        <tr><td>Algoritmo / versión</td><td>Argon2id, 0x13</td></tr>
+        <tr><td>Memoria</td><td>19 456 KiB (19 MiB)</td></tr>
+        <tr><td>Iteraciones / paralelismo</td><td>2 / 1</td></tr>
+        <tr><td>Salt / tag</td><td>16 bytes aleatorios de <code>OsRng</code> por hash / 32 bytes</td></tr>
+        <tr><td>Formato almacenado</td><td>Cadena PHC (<code>$argon2id$v=19$m=19456,t=2,p=1$…</code>) en <code>core.users.password_hash</code></td></tr>
+      </table>
+      <p>Recomendación OWASP para servicios interactivos. Detalles ya resueltos en
+      <code>service.rs::login</code>: si el email no existe se ejecuta <code>dummy_verify()</code> con un hash
+      estático para que el tiempo de respuesta no revele qué cuentas existen, y el error es siempre
+      el mismo 401 "invalid credentials". La verificación es en tiempo constante (crate
+      <code>argon2</code>). Registro: email normalizado a minúsculas, contraseña mínima de 8
+      caracteres.</p>
+
+      <h2>Sesiones: JWT con rotación y detección de reuso</h2>
+      <p>Dos tokens HS256 firmados con secretos distintos (<code>NOVVUS_JWT_ACCESS_SECRET</code>,
+      <code>NOVVUS_JWT_REFRESH_SECRET</code>; mínimo 32 bytes aleatorios en producción):</p>
+      <table>
+        <tr><th>Token</th><th>TTL (default)</th><th>Claims</th><th>Notas</th></tr>
+        <tr><td>Access</td><td>900 s (15 min), <code>NOVVUS_ACCESS_TOKEN_TTL_SECONDS</code></td><td><code>sub, org_id?, roles, typ="access", jti, iat, exp</code></td><td><code>roles</code> es informativo para la UI. Leeway de 5 s en <code>exp</code>.</td></tr>
+        <tr><td>Refresh</td><td>1 209 600 s (14 días), <code>NOVVUS_REFRESH_TOKEN_TTL_SECONDS</code></td><td><code>sub, org_id?, roles=[], typ="refresh", jti, iat, exp</code></td><td>En la base solo se guarda <code>sha256(token)</code> con <code>id = jti</code>.</td></tr>
+      </table>
+      <p>El gateway rechaza cualquier token cuyo <code>typ</code> no corresponda al uso: un refresh
+      jamás sirve como access ni al revés.</p>
+<pre class="diagram">
+login ─────────────► refresh_1  (fila en core.refresh_tokens, hash SHA-256)
+refresh_1 usado ───► par nuevo: refresh_2; refresh_1.revoked_at = now(), replaced_by = refresh_2
+refresh_1 usado OTRA VEZ ─► reuso detectado ─► UPDATE … SET revoked_at = now()
+                             WHERE user_id = ? AND revoked_at IS NULL   (todas las sesiones)
+                             audit "auth.refresh_reuse" · 401
+</pre>
+      <ul>
+        <li><code>/auth/refresh</code> acepta un <code>org_id</code> destino: cambiar de organización es pedir un par nuevo, siempre respaldado por una membresía.</li>
+        <li><code>/auth/logout</code> revoca el refresh presentado aunque esté expirado (firma y <code>typ</code> se siguen verificando).</li>
+        <li>Un usuario sin organización recibe <code>org_id = null</code> y solo puede usar identidad (<code>/auth/*</code>, <code>POST /orgs</code>); todo endpoint tenant responde 403.</li>
+        <li>Los tokens viven en <code>localStorage</code> del navegador y cruzan a la web por el rewrite same-origin de Next; en producción el kernel no está expuesto.</li>
+      </ul>
+
+      <h2>Rate limit en <code>/auth/*</code></h2>
+      <p><code>rate_limit_middleware</code> envuelve solo <code>register</code>, <code>login</code>,
+      <code>refresh</code> y <code>logout</code>. Implementación: ventana fija de 60 s por IP en memoria;
+      límite <strong><code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE = 30</code></strong> por defecto
+      (<code>novvus-common/src/config.rs:75</code>); exceso → 429 <code>rate_limited</code>.</p>
+      <div class="note"><b>Nota de consistencia.</b> <code>SECURITY.md §8</code> habla de "p. ej. 10
+      req/min" y de un token bucket; el código implementa ventana fija con default 30. Esta
+      documentación usa el valor del código. El contador se reinicia con el proceso y no es
+      distribuido: es un freno básico contra fuerza bruta, no sustituye un WAF.</div>
+
+      <h2>RBAC: permisos con comodines</h2>
+      <p>Clave de permiso <code>{module}.{resource}.{action}</code>. Los <em>roles</em> (por
+      organización) pueden otorgar comodines; los <em>endpoints</em> siempre exigen claves concretas.
+      Implementación en <code>novvus-rbac/src/lib.rs::grant_matches</code>:</p>
+      <table>
+        <tr><th>Otorgado al rol</th><th>¿Satisface <code>crm.contacts.read</code>?</th></tr>
+        <tr><td><code>crm.contacts.read</code></td><td><span class="badge ok">sí</span> exacto</td></tr>
+        <tr><td><code>crm.contacts.*</code></td><td><span class="badge ok">sí</span> comodín de recurso</td></tr>
+        <tr><td><code>crm.*</code></td><td><span class="badge ok">sí</span> comodín de módulo</td></tr>
+        <tr><td><code>*</code></td><td><span class="badge ok">sí</span> el rol Owner</td></tr>
+        <tr><td><code>crm.con.*</code></td><td><span class="badge warn">no</span> el prefijo debe ir seguido de <code>.</code>: corta por segmento completo</td></tr>
+      </table>
+      <p>La autorización <strong>nunca</strong> se decide con los roles del token: el gateway resuelve
+      los permisos vigentes desde la caché <code>(user, org)</code> con TTL de 30 s e invalidación
+      inmediata al editar roles/permisos (<code>invalidate_org</code>) o membresías
+      (<code>invalidate_user</code>). Revocar surte efecto en la siguiente petición. Permisos del kernel:
+      <code>core.orgs.*</code>, <code>core.members.manage</code>, <code>core.roles.*</code>,
+      <code>core.modules.*</code>, <code>core.audit.read</code>, <code>core.custom_fields.manage</code>.</p>
+
+      <h2>La frontera kernel ↔ módulos: headers firmados</h2>
+      <p>El JWT jamás llega a un módulo. El proxy traduce la identidad a headers internos:</p>
+<pre><code>X-Novvus-User:      &lt;uuid del usuario&gt;   <span class="c">(vacío en llamadas de servicio, eventos, cron y hooks)</span>
+X-Novvus-Org:       &lt;uuid de la org&gt;
+X-Novvus-Perms:     &lt;claves efectivas, ordenadas, separadas por coma&gt;
+X-Novvus-Timestamp: &lt;unix seconds&gt;
+X-Novvus-Signature: hex(HMAC-SHA256(secret, user + "\n" + org + "\n" + perms + "\n" + timestamp + "\n" + method + "\n" + path))
+X-Novvus-Locale:    es-MX | en-US …        <span class="c">(informativo, FUERA de la firma)</span></code></pre>
+      <ul>
+        <li><code>secret</code> = <code>NOVVUS_INTERNAL_HMAC_SECRET</code>, entregado a cada módulo en el handshake.</li>
+        <li>El SDK rechaza cualquier petición sin firma válida o con <code>|now − timestamp| &gt; 60 s</code> (<code>MAX_SKEW_SECONDS</code>); la verificación es en tiempo constante.</li>
+        <li>Incluir <code>method</code> y <code>path</code> impide reutilizar una firma válida contra otro endpoint; el <code>path</code> firmado es el de la petición original (la query no entra en la firma).</li>
+        <li>El proxy reenvía solo <code>content-type</code>, <code>accept</code> y <code>accept-language</code> del cliente: cualquier <code>X-Novvus-*</code> entrante muere en el gateway. Cuerpo máximo 10 MiB.</li>
+        <li><code>X-Novvus-Locale</code> solo elige idioma; el SDK jamás debe usarlo para autorizar.</li>
+        <li>Defensa en profundidad: aunque un atacante alcanzara la red interna, sin el secreto no puede forjar identidad ni permisos, y sin <code>app.org_id</code> válido RLS no entrega datos.</li>
+      </ul>
+
+      <h2>Token de servicio de módulo</h2>
+      <p>Emitido una sola vez en <code>install</code>: <code>nvk_</code> + 64 hex (32 bytes de
+      <code>OsRng</code>). El kernel guarda solo <code>sha256</code> en
+      <code>core.modules.service_token_hash</code>; en Docker el claro vive en el volumen
+      <code>tokens</code>. Lo usan el handshake, <code>POST /api/core/events</code>,
+      <code>GET /modules/status</code>, la config de servicio y las llamadas módulo→módulo por el
+      proxy.</p>
+      <ul>
+        <li>En el proxy, un llamante con token de servicio debe indicar <code>x-novvus-org</code>; sus permisos son exactamente los <code>service_permissions</code> del manifiesto (validados al registrar: tres segmentos, nunca <code>core.*</code>), y el usuario viaja vacío.</li>
+        <li>Sobre archivos y chatter (<code>OrgActor::Service</code>) un módulo solo puede actuar sobre <em>sus propios</em> modelos; cualquier otro <code>module_id</code> → 403.</li>
+        <li>Revocación: <code>disable</code> del módulo corta el proxy y el bus; <code>uninstall</code> borra la fila (y con ella el hash). Reinstalar emite un token nuevo.</li>
+      </ul>
+
+      <h3>Una llamada módulo → módulo, paso a paso</h3>
+<pre class="diagram">
+Projects (SDK)                         Gateway (proxy.rs)                        CRM (SDK)
+  │ GET /api/crm/contacts/{id}               │                                       │
+  │ x-novvus-service-token: nvk_…            │                                       │
+  │ x-novvus-org: &lt;org del evento&gt;           │                                       │
+  ├─────────────────────────────────────────►│ 1. crm enabled + base_url             │
+  │                                          │ 2. sha256(token) → core.modules.id    │
+  │                                          │ 3. perms = manifest.dependencies      │
+  │                                          │    .service_permissions (projects)    │
+  │                                          │ 4. user = "" · firma HMAC             │
+  │                                          ├──────────────────────────────────────►│
+  │                                          │                                       │ verifica firma,
+  │                                          │                                       │ exige crm.contacts.read
+  │                                          │                                       │ ∈ X-Novvus-Perms
+  │◄─────────────────────────────────────────┤◄──────────────────────────────────────┤
+</pre>
+      <p>El módulo llamante es confiable a nivel instancia (lo instaló un administrador), pero sus
+      permisos cross-módulo quedan declarados y acotados en su propio manifiesto; nunca hereda los
+      permisos de un usuario.</p>
+
+      <h2>Aislamiento por organización en <code>core</code></h2>
+      <p>Las tablas del kernel no usan RLS; la garantía la dan tres controles en cada handler:</p>
+      <table>
+        <tr><th>Control</th><th>Dónde</th></tr>
+        <tr><td>Filtro explícito <code>WHERE org_id = $1</code> con la org del token (<code>AuthUser::org()</code>) o del header de servicio.</td><td>Todos los endpoints tenant de <code>core</code> (org_modules, config, files, custom-fields, chatter, notifications).</td></tr>
+        <tr><td>El <code>{org_id}</code> de la ruta debe coincidir con <code>auth.org()</code>; si no, 403.</td><td><code>ensure_same_org</code> en <code>routes/modules.rs</code> (<code>/orgs/{org}/modules/{id}/*</code>) y comprobación inline en <code>routes/orgs.rs</code> (<code>/orgs/{org}/members</code>).</td></tr>
+        <tr><td>Un recurso de otra organización responde <strong>404</strong>, nunca 403: no se revela existencia.</td><td>Adjuntos (<code>fetch_owned</code>), mensajes, actividades, campos custom.</td></tr>
+      </table>
+      <p>Los tests de integración <code>tests/org_modules.rs</code>, <code>module_config.rs</code>,
+      <code>files_flow.rs</code> y <code>chatter_flow.rs</code> verifican que una org no ve ni afecta el
+      estado de otra.</p>
+
+      <h2>Configuración por organización y valores secretos</h2>
+      <ul>
+        <li>Cada campo de <code>[[config]]</code> puede declarar <code>permission</code>; si no, el gate es <code>core.modules.manage</code>. <code>GET …/config</code> solo devuelve los campos que el usuario puede leer (<code>has_perm</code> campo a campo) y <code>PUT</code> exige el permiso de cada clave escrita.</li>
+        <li><code>secret = true</code> enmascara el valor en las respuestas de la API; sigue siendo escribible. Úsalo para claves de APIs externas que el módulo lee con su token de servicio (<code>GET /api/core/config</code> + <code>x-novvus-org</code>).</li>
+        <li>Los valores se validan contra el tipo declarado y las opciones de <code>select</code> antes de persistirse en <code>core.org_module_config</code>.</li>
+      </ul>
+
+      <h2>Token de bootstrap de plataforma</h2>
+      <p><code>NOVVUS_BOOTSTRAP_TOKEN</code> (32 bytes aleatorios, generado por <code>novvus install</code>)
+      permite al servicio one-shot <code>bootstrap</code> registrar/instalar/migrar/habilitar módulos
+      <em>a nivel instancia</em> antes de que exista usuario u organización (first-run). Límites
+      verificados en <code>extract.rs::PlatformActor</code> y <code>tests/platform_bootstrap.rs</code>:</p>
+      <ul>
+        <li>Solo lo aceptan los seis endpoints de ciclo de instancia: <code>POST /api/core/modules</code> y <code>/modules/{id}/{install,migrate,enable,disable,uninstall}</code>. <code>AuthUser</code>, <code>OrgActor</code> y todo endpoint tenant lo rechazan con 401.</li>
+        <li>No es un usuario ni pertenece a una org: en auditoría <code>actor_id = None</code>.</li>
+        <li>Fail-closed: sin valor configurado, presentar el header responde "platform bootstrap is disabled".</li>
+        <li>Comparación en tiempo constante: se comparan los SHA-256 de ambos valores con OR acumulado de XOR, sin cortocircuito.</li>
+        <li>Nunca se loguea ni se expone al frontend; los usuarios con <code>core.modules.manage</code> siguen pudiendo usar los mismos endpoints (<code>novvus deploy</code>).</li>
+      </ul>
+
+      <h2>Seguridad de archivos</h2>
+      <table>
+        <tr><th>Control</th><th>Implementación (<code>routes/files.rs</code>, <code>novvus-files</code>)</th></tr>
+        <tr><td>Permisos del padre</td><td>Subir/borrar exige el <code>write</code> del modelo según su meta; listar/descargar el <code>read</code>. El módulo debe estar habilitado para la org y el modelo existir en el meta (si no, 422). Los campos <code>module_id/model/record_id</code> deben preceder al archivo para autorizar <em>antes</em> de aceptar un byte.</td></tr>
+        <tr><td>Aislamiento</td><td>Toda consulta filtra por la org activa; un id de otra org responde 404 (no se filtra existencia).</td></tr>
+        <tr><td>Tamaño y cuota</td><td>Stream con SHA-256 al vuelo; supera <code>NOVVUS_FILES_MAX_SIZE_BYTES</code> (50 MB) → se borra el staging y 413. Cuota por org (<code>NOVVUS_FILES_ORG_QUOTA_BYTES</code>, 10 GB) medida sobre blobs tras dedup → 413.</td></tr>
+        <tr><td>MIME por sniffing</td><td>Primeros 512 bytes: PNG, JPEG, GIF, WebP, PDF, ZIP (docx/xlsx/pptx), <code>MZ</code>, <code>ELF</code>, texto imprimible, o <code>application/octet-stream</code>. El <code>Content-Type</code> del cliente nunca se usa.</td></tr>
+        <tr><td>Denylist</td><td><code>application/x-msdownload</code> y <code>application/x-elf</code> → 422 "executable files are not accepted".</td></tr>
+        <tr><td>Descarga</td><td><code>Content-Disposition: attachment</code> siempre, salvo <code>image/png|jpeg|gif|webp</code> verificados que van <code>inline</code>; nunca HTML/SVG inline (XSS). <code>X-Content-Type-Options: nosniff</code>; nombre de archivo sin comillas ni caracteres de control, solo el último segmento de ruta.</td></tr>
+        <tr><td>Miniaturas</td><td>Client-side desde la descarga inline segura. No hay <code>/thumb</code> en el kernel: decodificar imágenes no confiables en el proceso es superficie de ataque (<code>DECISIONS.md</code>).</td></tr>
+        <tr><td>Borrado</td><td>Lógico; el GC horario libera el blob tras <code>NOVVUS_FILES_GC_RETENTION_DAYS</code> (30).</td></tr>
+      </table>
+
+      <h2>Tiempo real: SSE</h2>
+      <p><code>GET /api/core/stream?token=&lt;access&gt;</code>. <code>EventSource</code> no permite
+      headers, así que el access token viaja por query; es el mismo token de corta vida, no un
+      secreto nuevo, y se valida exactamente igual que el Bearer (<code>typ=access</code>, org activa
+      obligatoria). Cada conexión filtra en memoria por <code>org_id</code> y <code>user_id</code>: un
+      usuario nunca recibe eventos de otro. Un canal <code>LISTEN novvus_notify</code> por proceso;
+      heartbeat cada 25 s.</p>
+      <div class="warn"><b>Query strings y logs.</b> Un token en la URL puede terminar en logs de
+      proxies intermedios. En producción el kernel no está expuesto y el rewrite de Next es
+      same-origin; aun así, configura el proxy HTTPS para no registrar la query de
+      <code>/api/core/stream</code>.</div>
+
+      <h2>Chatter</h2>
+      <ul>
+        <li>Leer y comentar exige el permiso <code>read</code> del modelo padre (resuelto vía meta, como en archivos); un módulo con token de servicio solo publica mensajes <code>system</code> sobre sus modelos.</li>
+        <li>Cuerpo de 1 a 10 000 caracteres (<code>MAX_BODY_CHARS</code>). Se almacena como texto; hoy la shell lo renderiza como texto plano seguro (el render markdown con sanitizado por allowlist está en <code>BACKLOG.md</code>). Jamás HTML crudo.</li>
+        <li>Menciones <code>@[user_id]</code>: el kernel valida cada id contra <code>core.memberships</code> de la org y descarta las ajenas; una notificación por usuario, con deduplicación.</li>
+        <li>Edición y borrado solo por el autor; edición dentro de <code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code> (15 por defecto).</li>
+        <li>El fan-out es síncrono en la transacción del mensaje y nunca pasa por el bus de módulos.</li>
+      </ul>
+
+      <h2>Superficie de ataque del sistema de módulos</h2>
+      <table>
+        <tr><th>Amenaza</th><th>Mitigación</th></tr>
+        <tr><td>Manifiesto malicioso (permisos, eventos, UI o config de otro namespace)</td><td><code>Manifest::validate</code> rechaza el manifiesto entero: permisos y <code>emits</code> bajo <code>{id}.*</code>, <code>ui.path</code> bajo <code>/{id}</code>, <code>config.key</code>/<code>cron.name</code> bajo <code>{id}.</code>, <code>service_permissions</code> sin <code>core.*</code>, ids reservados (<code>core, api, internal, novvus</code>).</td></tr>
+        <tr><td>Extensión hostil sobre modelos ajenos</td><td>El target debe ser una dependencia declarada; tipos limitados (sin <code>relation</code>/<code>json</code>); topes de 32 campos por extensor y 16 extensores por modelo; solo el base escribe <code>ext</code>.</td></tr>
+        <tr><td>Migración maliciosa (SQL contra <code>core</code> u otros esquemas)</td><td>Se ejecuta como <code>novvus_module</code> (<code>NOBYPASSRLS</code>) con <code>search_path = mod_{id}</code>; el rol no tiene <code>USAGE</code> sobre <code>core</code> ni otros <code>mod_*</code>. Migraciones aplicadas inmutables por checksum.</td></tr>
+        <tr><td>Módulo comprometido intenta escalar permisos</td><td>Los permisos de sus llamadas los calcula el kernel desde el manifiesto; el secreto HMAC no permite forjar usuarios y el proxy descarta headers <code>X-Novvus-*</code> entrantes.</td></tr>
+        <tr><td>Bypass del gateway (golpear el puerto del módulo)</td><td>Los módulos escuchan solo en la red interna; sin firma HMAC válida y reciente todo es 401; sin tenant, RLS falla cerrado.</td></tr>
+        <tr><td>Robo del token de servicio</td><td>Solo el hash en base; permisos acotados a <code>service_permissions</code>; <code>disable</code>/<code>uninstall</code> lo invalidan; un módulo solo toca sus propios modelos en archivos/chatter.</td></tr>
+        <tr><td>Payload de evento como vector de inyección</td><td>El emisor solo publica tipos declarados; el consumidor valida con Pydantic y trata el payload como no confiable; idempotencia por <code>event_id</code>.</td></tr>
+        <tr><td>DoS por módulo ruidoso en el bus</td><td><code>SECURITY.md §6</code> prevé rate limiting en <code>POST /api/core/events</code>; <strong>en el código actual esa ruta no tiene limitador</strong> (solo <code>/auth</code> lo tiene). Mitigaciones vigentes: lote de 20 y timeout de 10 s en el despachador, backoff con tope de 5 min y <code>failed</code> a los 25 intentos. Circuit breaker y cuotas por módulo están en <code>BACKLOG.md</code>.</td></tr>
+        <tr><td>Meta hostil en el handshake</td><td>Tipos serde con <code>deny_unknown_fields</code>, máximo 512 KiB, permisos bajo el namespace del módulo; un meta inválido rechaza el handshake.</td></tr>
+        <tr><td>Paquete de catálogo falsificado</td><td>Firma Ed25519 sobre bytes canónicos + allowlist (ver abajo); los assets son estáticos, la shell nunca ejecuta JS de un módulo.</td></tr>
+      </table>
+
+      <h2>Paquetes firmados y allowlist fail-closed</h2>
+      <p>Un paquete es <code>{format_version, manifest_toml, migrations, assets}</code>; sus bytes
+      canónicos (migraciones y assets ordenados) se firman con Ed25519 y se hashean con SHA-256
+      (<code>package_hash</code>). <code>SignedPackage::verify</code>:</p>
+      <ol>
+        <li>La clave pública (base64, 32 bytes) debe estar en <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code>; si no, 403 "not signed by a trusted publisher key". Lista vacía = nadie puede publicar.</li>
+        <li>La firma (base64, 64 bytes) debe validar sobre los bytes canónicos; si no, 403.</li>
+      </ol>
+      <p>Se verifica al publicar (<code>POST /api/core/catalog</code>, <code>core.modules.manage</code>) y
+      de nuevo al registrar desde el catálogo. <code>GET /api/core/catalog</code> exige
+      <code>core.modules.read</code> y no expone el blob <code>package</code>.</p>
+
+      <h2>Integridad de la distribución</h2>
+      <ul>
+        <li><code>install.sh</code> y <code>novvus update</code> descargan <code>latest</code> → <code>&lt;v&gt;/manifest.json</code> → binario, y exigen que el SHA-256 coincida <strong>antes</strong> de ejecutar o instalar nada; si no coincide, se borra y aborta.</li>
+        <li>Las carpetas versionadas de <code>downloads.novvus.dev</code> son inmutables (<code>put-object</code> archivo por archivo, nunca <code>sync --delete</code>); <code>latest</code> se publica al final y solo si las imágenes GHCR existen.</li>
+        <li>Los secretos de producción los genera el CLI en <code>/opt/novvus/.env</code> con permisos 600; el binario del CLI no contiene credenciales.</li>
+        <li><strong>Pendiente</strong>: firma criptográfica de releases (minisign/Ed25519) verificada por <code>install.sh</code> y <code>novvus update</code>. Hoy la integridad depende de un manifest servido por el mismo origen que los binarios.</li>
+      </ul>
+
+      <h2>CORS y errores</h2>
+      <ul>
+        <li>CORS solo se activa si <code>NOVVUS_CORS_ORIGINS</code> no está vacío: orígenes explícitos, métodos y headers <code>Any</code>. En producción no hace falta: el navegador habla con la web y esta reescribe <code>/api/*</code> al kernel (same-origin).</li>
+        <li>Todos los errores de auth devuelven mensajes genéricos; los errores internos y de base se loguean y responden "internal error" sin detalle.</li>
+        <li>Logs: <code>telemetry::init</code> configura <code>tracing_subscriber</code> con filtro <code>novvus=info,info</code> (o <code>RUST_LOG</code>) y salida compacta; <code>TraceLayer</code> registra método, ruta y estado, no cabeceras. <code>SECURITY.md §9</code> afirma que el kernel redacta <code>Authorization</code> y headers internos; en el código no hay una capa de redacción explícita, así que no confíes en ella: no actives logging de cabeceras en el proxy HTTPS delante de la web.</li>
+      </ul>
+
+      <h2>Rastro de auditoría</h2>
+      <p><code>core.audit_log</code> es append-only y se escribe de forma best-effort
+      (<code>novvus_common::audit::record</code>). Acciones registradas por el código:</p>
+      <table>
+        <tr><th>Grupo</th><th>Acciones (<code>action</code>)</th><th>Actor / org</th></tr>
+        <tr><td>Identidad</td><td><code>auth.register</code>, <code>auth.login</code>, <code>auth.refresh_reuse</code> (con <code>revoked_all_sessions</code>), <code>auth.logout</code></td><td>usuario; org del token cuando existe</td></tr>
+        <tr><td>Organizaciones</td><td><code>orgs.create</code>, <code>orgs.add_member</code></td><td>usuario, org</td></tr>
+        <tr><td>RBAC</td><td><code>rbac.role_created</code>, <code>rbac.permissions_granted</code>, <code>rbac.role_assigned</code></td><td>usuario, org</td></tr>
+        <tr><td>Ciclo de instancia</td><td><code>modules.register</code>, <code>modules.install</code> (con migraciones aplicadas), <code>modules.migrate</code>, <code>modules.enable</code>, <code>modules.disable</code>, <code>modules.uninstall</code></td><td>usuario o <code>NULL</code> (bootstrap); sin org</td></tr>
+        <tr><td>Ciclo por organización</td><td><code>org_modules.install</code>, <code>org_modules.enable</code>, <code>org_modules.disable</code>, <code>org_modules.uninstall</code></td><td>usuario, org</td></tr>
+        <tr><td>Catálogo</td><td><code>catalog.publish</code></td><td>usuario</td></tr>
+      </table>
+      <p>El chatter no duplica auditoría: los cambios de negocio declarados con <code>track</code> viven
+      en <code>core.messages</code> como mensajes <code>system</code>, en un plano distinto
+      (<code>CHATTER.md §7</code>).</p>
+
+      <h2>Checklist para producción</h2>
+      <ul>
+        <li>☐ <code>NOVVUS_JWT_ACCESS_SECRET</code>, <code>NOVVUS_JWT_REFRESH_SECRET</code>, <code>NOVVUS_INTERNAL_HMAC_SECRET</code> y <code>NOVVUS_BOOTSTRAP_TOKEN</code> generados con CSPRNG (32+ bytes), distintos por entorno, fuera del repositorio (<code>novvus install</code> lo hace).</li>
+        <li>☐ <code>NOVVUS_MODULE_DB_PASSWORD</code> distinta del default; procesos de plataforma nunca como superusuario; <code>novvus_module</code> sin <code>BYPASSRLS</code>; TLS a Postgres fuera de localhost.</li>
+        <li>☐ HTTPS terminado delante de la web; HSTS; no registrar la query de <code>/api/core/stream</code>.</li>
+        <li>☐ Solo la web expuesta en el host (<code>NOVVUS_WEB_PORT</code>); kernel y Postgres en la red interna de Docker.</li>
+        <li>☐ <code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code> vacío salvo que uses el catálogo.</li>
+        <li>☐ Backend de archivos con cuotas acordes; volumen <code>files</code> respaldado; volumen <code>tokens</code> nunca borrado.</li>
+        <li>☐ Revisar <code>core.audit_log</code> (login, <code>auth.refresh_reuse</code>, cambios RBAC, ciclo de vida) y las deliveries <code>failed</code>.</li>
+        <li>☐ Tras el first-run, tener presente que el registro público sigue abierto (ver pendientes).</li>
+      </ul>
+
+      <h2>Reglas para autores de módulos</h2>
+      <ul>
+        <li>No implementes login, tokens ni contraseñas; confía solo en los headers firmados que verifica el SDK.</li>
+        <li>Exige la clave concreta de permiso en cada endpoint custom; no compares contra comodines ni contra <code>roles</code>.</li>
+        <li>Nunca leas <code>org_id</code> del body o la query: el SDK lo ignora y RLS lo haría fallar.</li>
+        <li>No uses <code>x-novvus-locale</code> para decidir nada más que el idioma de la respuesta.</li>
+        <li>Trata los payloads de eventos y los valores <code>ext</code>/<code>custom</code> como entrada no confiable: valida con Pydantic.</li>
+        <li>Declara en <code>service_permissions</code> solo lo que de verdad llamas; jamás <code>core.*</code>.</li>
+        <li>Guarda el token de servicio como secreto de despliegue (volumen <code>tokens</code> en Docker); si se filtra, deshabilita y reinstala el módulo para rotarlo.</li>
+      </ul>
+
+      <h2>Pendientes reconocidos (<code>BACKLOG.md</code>)</h2>
+      <table>
+        <tr><th>Tema</th><th>Estado</th></tr>
+        <tr><td>2FA (TOTP) en el login</td><td>No implementado.</td></tr>
+        <tr><td>Verificación de email en el registro</td><td>No implementado.</td></tr>
+        <tr><td>Cerrar el registro público tras el first-run (invitaciones, <code>NOVVUS_ALLOW_PUBLIC_REGISTRATION</code>, <code>GET /setup/status</code>)</td><td>No implementado; bloqueado por el flujo de invitación. Hoy <code>POST /auth/register</code> es público y <code>add_member</code> exige que el usuario ya exista.</td></tr>
+        <tr><td>Rotación de claves JWT con <code>kid</code> y migración a EdDSA</td><td>No implementado; HS256 con un solo validador (<code>DECISIONS.md</code>, 2026-07-11).</td></tr>
+        <tr><td>Rol de base por módulo (<code>novvus_mod_{id}</code>)</td><td>Hoy rol compartido <code>novvus_module</code>.</td></tr>
+        <tr><td>Circuit breaker y cuotas por módulo en el bus</td><td>No implementado (ver tabla de amenazas).</td></tr>
+        <tr><td>Firma criptográfica de releases</td><td>No implementado; solo SHA-256.</td></tr>
+        <tr><td>Antivirus en subida, purga dura de mensajes borrados</td><td>No implementado.</td></tr>
+      </table>
+
+      <h2>Documentos relacionados</h2>
+      <ul>
+        <li><a href="kernel.html">El kernel por dentro</a>: extractores, proxy, rate limit y variables de entorno.</li>
+        <li><a href="base-de-datos.html">Base de datos</a>: roles de base y RLS.</li>
+        <li><a href="api.html">La API</a>: qué actor acepta cada ruta.</li>
+        <li><code>documents/docs/SECURITY.md</code>, <code>MULTITENANCY.md</code>, <code>FILES.md</code>, <code>CHATTER.md</code>, <code>DISTRIBUTION.md</code>, <code>BACKLOG.md</code>.</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="api.html"><span class="dir">← Anterior</span>La API</a>
+        <a class="next" href="contribuir.html"><span class="dir">Siguiente →</span>Contribuir y calidad</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

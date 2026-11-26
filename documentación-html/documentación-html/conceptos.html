@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conceptos en 10 minutos — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav active" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Empezar / Conceptos en 10 minutos</div>
+    <article>
+      <h1>Conceptos en 10 minutos</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">El vocabulario mínimo para entender el resto de la documentación, explicado
+      con analogías y sin suponer que conoces Rust, Python o bases de datos. Léelo una vez de
+      corrido; el glosario del final te sirve después como chuleta.</p>
+
+      <h2>El edificio: una analogía para todo lo demás</h2>
+      <p>Imagina Novvus Core como un <strong>edificio de oficinas</strong>. El edificio tiene una
+      recepción con un portero, un directorio de empresas, un sistema de correo interno y un
+      almacén compartido. Cada empresa renta un piso y decide qué departamentos abre. Con esa
+      imagen en la cabeza, cada concepto de abajo cae en su lugar.</p>
+<pre class="diagram">
+                 EDIFICIO (la instalación de Novvus Core)
+ ┌──────────────────────────────────────────────────────────────────┐
+ │  Recepción / portero ........ kernel (autenticación, permisos)    │
+ │  Directorio de empresas ..... organizaciones (tenants)            │
+ │  Correo interno ............. bus de eventos                      │
+ │  Almacén compartido ......... PostgreSQL (una sola base)          │
+ │                                                                  │
+ │  Piso 3: «Acme S.A.»   → tiene CRM y Proyectos                    │
+ │  Piso 5: «Bravo S.C.»  → tiene solo CRM + Ventas México           │
+ │                                                                  │
+ │  Departamentos disponibles = módulos (apps) publicados            │
+ └──────────────────────────────────────────────────────────────────┘
+</pre>
+
+      <h2>Organización (tenant)</h2>
+      <p>Una <strong>organización</strong> es una empresa que usa la plataforma: «Acme S.A.» o
+      «Bravo S.C.». Todos los datos de negocio (contactos, oportunidades, proyectos, archivos,
+      conversaciones) pertenecen a una organización y son <em>invisibles</em> para las demás,
+      aunque vivan en la misma base de datos. En jerga técnica a esto se le llama
+      <em>tenant</em> («inquilino») y a la plataforma, <em>multi-tenant</em>.</p>
+      <p>Un mismo usuario puede pertenecer a varias organizaciones (como un contador que trabaja
+      para dos empresas) y cambia entre ellas desde el menú de organización. Quien crea una
+      organización recibe automáticamente el rol <strong>Owner</strong>, que lo puede todo dentro
+      de ella.</p>
+
+      <h2>Usuario, rol y permiso</h2>
+      <p>Un <strong>usuario</strong> es una persona con correo y contraseña. Un <strong>rol</strong>
+      es un gafete («Ventas», «Gerente de ventas») que agrupa permisos y se asigna a los miembros
+      de una organización. Un <strong>permiso</strong> es una llave concreta con un nombre de tres
+      partes:</p>
+<pre><code><span class="s">{modulo}</span>.<span class="s">{recurso}</span>.<span class="s">{accion}</span>
+
+crm.contacts.read        <span class="c"># ver contactos del CRM</span>
+crm.opportunities.write  <span class="c"># crear, editar y mover oportunidades</span>
+crm.reports.read         <span class="c"># ver reportes del CRM</span>
+core.members.manage      <span class="c"># administrar miembros de la organización (kernel)</span>
+core.custom_fields.manage<span class="c"># crear campos personalizados</span></code></pre>
+      <p>Los permisos los <em>declara</em> cada módulo en su manifiesto y los <em>otorga</em> el
+      administrador a los roles. La interfaz oculta lo que no puedes hacer, pero la restricción
+      real vive en el servidor: si intentas algo sin permiso recibes un <code>403</code>. El rol
+      Owner equivale al permiso comodín <code>*</code>.</p>
+
+      <h2>Módulo (= una app de negocio)</h2>
+      <p>Un <strong>módulo</strong> es una aplicación completa: el CRM, Proyectos, Ventas México.
+      Es un programa en Python, en su propia carpeta, con tres piezas:</p>
+      <ul>
+        <li>Un <strong>manifiesto</strong> <code>novvus.toml</code>: la ficha de identidad del módulo
+            (id, nombre, versión, permisos que declara, eventos que emite y escucha, menú,
+            configuración…). Es la única fuente de verdad sobre qué hace el módulo.</li>
+        <li><strong>Modelos</strong>: las «tablas» del negocio (empresas, contactos, oportunidades)
+            escritas como clases de Python.</li>
+        <li>Una <strong>API</strong>: rutas HTTP para leer y escribir esos modelos. La mayoría la genera
+            el SDK automáticamente; el módulo solo añade las reglas de negocio especiales (por
+            ejemplo «convertir un lead»).</li>
+      </ul>
+      <p>Los módulos se instalan en el edificio una vez (nivel <em>instancia</em>) y después cada
+      organización decide si los <em>habilita</em> en su piso (nivel <em>organización</em>), desde la
+      tienda de aplicaciones. Un módulo puede depender de otro: Proyectos requiere CRM.</p>
+
+      <h2>Kernel: el portero, el registro y el correo</h2>
+      <p>El <strong>kernel</strong> es el programa central, escrito en Rust. Hace tres trabajos y
+      no hace nada de negocio:</p>
+      <ul>
+        <li><strong>Portero</strong>: recibe <em>todas</em> las peticiones del navegador, verifica quién
+            eres (autenticación) y qué puedes hacer (permisos), y solo entonces reenvía la petición
+            al módulo correspondiente. Un módulo nunca está expuesto directamente a internet.</li>
+        <li><strong>Registro</strong>: sabe qué módulos existen, en qué versión, qué permisos declaran,
+            qué organizaciones los tienen habilitados y cómo se ven sus modelos (los metadatos).
+            Aplica las migraciones de base de datos de cada módulo.</li>
+        <li><strong>Correo interno (bus de eventos)</strong>: cuando un módulo anuncia «se ganó una
+            oportunidad», el kernel entrega ese aviso a los módulos suscritos, aunque estén
+            momentáneamente apagados (lo reintenta).</li>
+      </ul>
+      <p>Además presta servicios comunes que ningún módulo tiene que reinventar: archivos
+      adjuntos, conversaciones (chatter), notificaciones, campos personalizados y
+      configuración por organización.</p>
+
+      <h2>SDK: la librería que hace el trabajo pesado</h2>
+      <p><code>novvus-sdk</code> es la librería de Python con la que se escriben los módulos. Tú
+      declaras; ella ejecuta. A partir de una clase de modelo genera la API de lista, creación,
+      lectura, edición, borrado, agrupación y exportación; aplica el aislamiento por organización
+      en cada consulta; se presenta ante el kernel al arrancar (el <em>handshake</em>) y recibe los
+      eventos. Sin el SDK, cada módulo tendría que reimplementar todo eso y, tarde o temprano, se
+      equivocaría en seguridad.</p>
+
+      <h2>Esquemas: <code>core</code> y <code>mod_{id}</code></h2>
+      <p>Toda la plataforma usa una sola base PostgreSQL, ordenada en «carpetas» llamadas
+      esquemas. El esquema <code>core</code> pertenece al kernel (usuarios, organizaciones, roles,
+      módulos, eventos, adjuntos, mensajes…). Cada módulo recibe su propio esquema
+      <code>mod_{id}</code> (<code>mod_crm</code>, <code>mod_projects</code>) y solo puede tocar el
+      suyo: el usuario de base de datos de los módulos no tiene permiso sobre <code>core</code> ni
+      sobre el esquema de otro módulo. Toda tabla de negocio lleva una columna
+      <code>org_id</code> que dice a qué organización pertenece la fila.</p>
+
+      <h2>RLS en una frase</h2>
+      <div class="note">
+        <b>Row-Level Security.</b> Es una regla de PostgreSQL que hace que cada consulta de un
+        módulo <em>solo vea las filas de la organización activa</em>, y que si por error no se
+        indica la organización, la consulta no devuelva nada en lugar de devolverlo todo
+        («fail-closed»). El aislamiento entre inquilinos lo garantiza la base, no el código de
+        cada programador.
+      </div>
+
+      <h2>Manifiesto <code>novvus.toml</code></h2>
+      <p>Es un archivo de texto sencillo, en formato TOML, con secciones. Un fragmento real del
+      CRM:</p>
+<pre><code><span class="k">[module]</span>
+id = <span class="s">"crm"</span>
+name = <span class="s">"CRM"</span>
+version = <span class="s">"0.1.0"</span>
+
+<span class="k">[[permissions]]</span>
+key = <span class="s">"crm.leads.write"</span>
+description = <span class="s">"Crear, editar y convertir leads"</span>
+
+<span class="k">[events]</span>
+emits = [<span class="s">"crm.lead.created"</span>, <span class="s">"crm.opportunity.won"</span>]
+listens = []
+
+<span class="k">[runtime]</span>
+port = <span class="n">8110</span>
+
+<span class="k">[[ui.nav]]</span>
+path = <span class="s">"/crm/leads"</span>
+label = <span class="s">"Leads"</span>
+icon = <span class="s">"user-plus"</span></code></pre>
+      <p>El kernel lee este archivo al registrar el módulo y a partir de él crea los permisos,
+      valida los eventos, pinta el menú de la app y sabe qué dependencias exigir. Otras secciones
+      que verás más adelante: <code>[presentation]</code> (ficha en la tienda), <code>[[config]]</code>
+      (ajustes por organización), <code>[[cron]]</code> (tareas programadas) y <code>[extensions]</code>.</p>
+
+      <h2>Token de servicio</h2>
+      <p>Cuando un módulo se instala, el kernel le entrega una credencial secreta de una sola
+      vista, el <strong>token de servicio</strong> (<code>NOVVUS_SERVICE_TOKEN</code>, empieza por
+      <code>nvk_</code>). Es la «llave del empleado» con la que el módulo se identifica ante el kernel
+      al arrancar y al publicar eventos. Se guarda en variables de entorno o en un volumen de
+      Docker; nunca en el código. Si lo pierdes, se vuelve a desplegar el módulo. No lo
+      confundas con el <strong>token de bootstrap</strong> (<code>NOVVUS_BOOTSTRAP_TOKEN</code>), un
+      secreto de plataforma que solo usa el instalador para registrar módulos antes de que exista
+      cualquier usuario.</p>
+
+      <h2>Vistas genéricas: interfaz gratis desde metadatos</h2>
+      <p>Un módulo describe sus modelos con un pequeño diccionario <code>__novvus_views__</code>:
+      etiquetas en español, columnas de la lista, distribución del formulario, por qué campo
+      agrupar el kanban, qué fecha usar en el calendario. Ese <strong>meta</strong> viaja al kernel en
+      el handshake, el kernel lo guarda y lo entrega al navegador ya filtrado por permisos. Con
+      eso, el frontend pinta solo la ruta <code>/m/{modulo}/{modelo}</code> con lista (búsqueda,
+      filtros, orden, exportación CSV/XLSX), formulario, kanban y calendario. Nadie escribió una
+      pantalla para «Contactos» del CRM: es una vista genérica.</p>
+
+      <h2>Eventos entre módulos</h2>
+      <p>Un <strong>evento</strong> es un aviso con nombre <code>{modulo}.{entidad}.{accion}</code>, por
+      ejemplo <code>crm.opportunity.won</code>. El CRM lo emite cuando ganas una oportunidad; Proyectos
+      lo escucha y crea un proyecto con tareas iniciales. Ninguno conoce al otro: solo conocen el
+      nombre del evento y el contenido del mensaje. Las entregas son «al menos una vez», así que
+      el módulo receptor ignora duplicados con ayuda del SDK.</p>
+
+      <h2>Extensiones</h2>
+      <p>Una <strong>extensión</strong> permite que un módulo aporte campos y trozos de formulario a
+      los modelos de otro módulo <em>sin tocar su código ni su esquema</em>. El caso real:
+      <strong>Ventas México</strong> (<code>salesmx</code>) añade «RFC» y «Régimen fiscal» a los contactos
+      del CRM. Los valores se guardan en la columna <code>ext</code> de la tabla base y solo aparecen
+      en las organizaciones que habilitaron el módulo extensor.</p>
+
+      <h2>Campos personalizados</h2>
+      <p>Un administrador puede agregar campos a un modelo <em>desde la interfaz</em>, sin programar
+      y sin cambiar la base de datos: «Número de contrato» en oportunidades, «Zona» en empresas.
+      Cada organización tiene los suyos. Se guardan en la columna <code>custom</code> y aparecen en el
+      formulario bajo «Información adicional» y como filtros en la lista.</p>
+
+      <h2>Chatter, adjuntos y notificaciones</h2>
+      <p>Cualquier registro (un contacto, una oportunidad, un proyecto) puede tener una
+      <strong>conversación</strong> al pie: comentarios visibles, notas internas, menciones con
+      <code>@</code>, seguidores que reciben avisos, actividades planificadas (llamada, reunión,
+      correo, tarea) y un historial automático de cambios de campos importantes. Junto a ella, un
+      panel de <strong>adjuntos</strong> para subir archivos. Las menciones, las actividades y los
+      mensajes a seguidores generan <strong>notificaciones</strong> que llegan en tiempo real a la
+      campana de la interfaz. Todo esto lo provee el kernel: el módulo solo declara
+      <code>chatter = True</code> y <code>attachments = True</code> en el meta del modelo.</p>
+
+      <h2>Dos CLI que se llaman igual</h2>
+      <div class="warn">
+        <b>Ojo con el nombre <code>novvus</code>.</b> Hay dos herramientas de línea de comandos con el
+        mismo nombre y no se parecen en nada:
+        <ul>
+          <li>El <strong>CLI administrativo</strong> (Rust, carpeta <code>cli/</code>): vive en el servidor
+              del cliente. Comandos: <code>sudo novvus install</code>, <code>sudo novvus update</code>,
+              <code>novvus status</code>, <code>novvus version</code>.</li>
+          <li>El <strong>CLI del SDK</strong> (Python, viene con <code>novvus-sdk</code>): vive en tu
+              máquina de desarrollo y dentro de los contenedores de los módulos. Comandos:
+              <code>novvus new-module</code>, <code>novvus makemigration</code>, <code>novvus deploy</code>,
+              <code>novvus run</code>, <code>novvus seed</code>.</li>
+        </ul>
+        En un servidor de producción no se instala el SDK, así que nunca coexisten. Cuando esta
+        documentación diga «CLI» sin más, mira en qué contexto está: servidor o desarrollo.
+      </div>
+
+      <h2>Cómo viaja una petición</h2>
+      <p>Cuando un usuario abre la lista de contactos, esto es lo que pasa, de izquierda a derecha:</p>
+<pre class="diagram">
+ Navegador            Web (Next.js)          Kernel (gateway)            Módulo CRM            PostgreSQL
+ ─────────            ─────────────          ────────────────            ──────────            ──────────
+ GET /api/crm/contacts ──► proxy same-origin ──► 1. valida el JWT
+ (con tu token JWT)        /api/* → kernel       2. resuelve permisos
+                                                 3. ¿crm habilitado en
+                                                    tu organización?
+                                                 4. firma headers
+                                                    X-Novvus-* (HMAC) ──► 5. verifica la firma
+                                                                          6. SET LOCAL app.org_id
+                                                                          7. SELECT … ──────────► RLS filtra:
+                                                                                                  solo filas de
+                                                                          ◄─── filas ─────────── tu organización
+ ◄──────────────────────── JSON ◄──────────────── respuesta ◄────────────  8. responde JSON
+</pre>
+      <p>Tres cosas para recordar: el navegador solo habla con la web (en producción el kernel ni
+      siquiera tiene puerto público); el módulo nunca ve tu contraseña ni tu JWT, solo headers
+      firmados por el kernel; y la base de datos filtra por organización aunque el módulo lo
+      olvidara.</p>
+
+      <h2>Cómo viaja un evento</h2>
+<pre class="diagram">
+ CRM: «oportunidad ganada»                Kernel (bus)                         Proyectos
+ ───────────────────────────              ────────────                         ─────────
+ POST /api/core/events ───────────────►  guarda en core.events
+   crm.opportunity.won                    crea una entrega por suscriptor
+   payload {opportunity_id, …}            NOTIFY + barrido cada 5 s ─────────► POST /_novvus/events
+                                                                               ¿ya lo procesé? no →
+                                                                               crea proyecto + 3 tareas
+                                          marca entrega OK ◄────────────────── 200 OK
+</pre>
+
+      <h2>Glosario mini</h2>
+      <table>
+        <tr><th>Término</th><th>En una frase</th><th>Profundiza en</th></tr>
+        <tr><td>Organización / tenant</td><td>Empresa cliente; frontera de todos los datos.</td><td><a href="base-de-datos.html">Base de datos</a>, <a href="guia-usuario.html">Guía de usuario</a></td></tr>
+        <tr><td>Permiso</td><td>Llave <code>{modulo}.{recurso}.{accion}</code> otorgada a un rol.</td><td><a href="seguridad.html">Seguridad</a>, <a href="referencia.html">Referencia</a></td></tr>
+        <tr><td>Módulo / app</td><td>Aplicación de negocio en Python con manifiesto, modelos y API.</td><td><a href="tutorial-modulo.html">Tutorial: tu primer módulo</a></td></tr>
+        <tr><td>Manifiesto</td><td><code>novvus.toml</code>: ficha declarativa del módulo.</td><td><a href="tutorial-modulo.html">Tutorial</a>, <a href="extensibilidad.html">Extensibilidad</a></td></tr>
+        <tr><td>Kernel</td><td>Portero, registro y bus; escrito en Rust.</td><td><a href="kernel.html">El kernel por dentro</a></td></tr>
+        <tr><td>Gateway</td><td>La parte del kernel que recibe HTTP y reenvía a los módulos.</td><td><a href="arquitectura.html">Arquitectura</a>, <a href="api.html">La API</a></td></tr>
+        <tr><td>SDK</td><td><code>novvus-sdk</code>: genera API, aísla tenant, habla con el kernel.</td><td><a href="sdk.html">El SDK por dentro</a></td></tr>
+        <tr><td>Esquema <code>mod_{id}</code></td><td>Carpeta privada de tablas de cada módulo en Postgres.</td><td><a href="base-de-datos.html">Base de datos</a></td></tr>
+        <tr><td>RLS</td><td>Filtro por organización que aplica la propia base de datos.</td><td><a href="base-de-datos.html">Base de datos</a></td></tr>
+        <tr><td>Handshake</td><td>Presentación del módulo ante el kernel al arrancar; envía su meta.</td><td><a href="sdk.html">El SDK por dentro</a></td></tr>
+        <tr><td>Token de servicio</td><td>Credencial <code>nvk_…</code> del módulo; se muestra una sola vez.</td><td><a href="seguridad.html">Seguridad</a>, <a href="mantenimiento.html">Mantenimiento</a></td></tr>
+        <tr><td>Token de bootstrap</td><td>Secreto del instalador para registrar módulos sin usuarios.</td><td><a href="seguridad.html">Seguridad</a></td></tr>
+        <tr><td>Meta / <code>__novvus_views__</code></td><td>Descripción de modelos y vistas que produce UI automática.</td><td><a href="vistas-genericas.html">Vistas genéricas</a></td></tr>
+        <tr><td>Vista genérica</td><td>Pantalla <code>/m/{modulo}/{modelo}</code> generada desde el meta.</td><td><a href="vistas-genericas.html">Vistas genéricas</a>, <a href="guia-usuario.html">Guía de usuario</a></td></tr>
+        <tr><td>Evento</td><td>Aviso <code>{modulo}.{entidad}.{accion}</code> entregado por el bus.</td><td><a href="tutorial-modulo.html">Tutorial</a>, <a href="arquitectura.html">Arquitectura</a></td></tr>
+        <tr><td>Extensión</td><td>Campos/UI que un módulo aporta a los modelos de otro.</td><td><a href="extensibilidad.html">Extensibilidad</a></td></tr>
+        <tr><td>Campo personalizado</td><td>Campo creado por el admin desde la UI, por organización.</td><td><a href="extensibilidad.html">Extensibilidad</a>, <a href="guia-usuario.html">Guía de usuario</a></td></tr>
+        <tr><td>Chatter</td><td>Conversación, seguidores y actividades sobre un registro.</td><td><a href="colaboracion.html">Colaboración</a></td></tr>
+        <tr><td>Adjunto</td><td>Archivo ligado a un registro; lo guarda el kernel.</td><td><a href="colaboracion.html">Colaboración</a></td></tr>
+        <tr><td>SSE</td><td>Canal en tiempo real del kernel al navegador para notificaciones.</td><td><a href="colaboracion.html">Colaboración</a></td></tr>
+        <tr><td>Launcher / tienda</td><td>Inicio con tus apps y catálogo <code>/apps</code> para habilitarlas.</td><td><a href="guia-usuario.html">Guía de usuario</a></td></tr>
+        <tr><td>ModuleShell</td><td>Marco a pantalla completa con el que abre cada app.</td><td><a href="guia-usuario.html">Guía de usuario</a></td></tr>
+        <tr><td>First-run</td><td>Estado inicial de una instalación real: sin usuarios ni organizaciones.</td><td><a href="instalacion.html">Instalación</a></td></tr>
+        <tr><td>CLI administrativo</td><td><code>novvus install/update/status/version</code> en el servidor.</td><td><a href="instalacion.html">Instalación</a>, <a href="actualizacion.html">Actualización</a></td></tr>
+        <tr><td>CLI del SDK</td><td><code>novvus new-module/deploy/run/seed</code> en desarrollo.</td><td><a href="tutorial-modulo.html">Tutorial</a></td></tr>
+      </table>
+
+      <div class="tip">
+        <b>Siguiente paso.</b> Ya tienes el vocabulario. Ahora levanta la plataforma en tu
+        computadora con la <a href="instalacion.html">Instalación</a> (camino A, unos 20 minutos) y
+        recorre la interfaz con la <a href="guia-usuario.html">Guía de usuario</a>.
+      </div>
+
+      <nav class="page-nav">
+        <a href="index.html"><span class="dir">← Anterior</span>Inicio</a>
+        <a class="next" href="instalacion.html"><span class="dir">Siguiente →</span>Instalación</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

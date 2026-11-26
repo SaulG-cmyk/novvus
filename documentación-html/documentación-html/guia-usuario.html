@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía de usuario — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav active" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Empezar / Guía de usuario</div>
+    <article>
+      <h1>Guía de usuario</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">Cómo se usa la plataforma día a día desde el navegador: entrar, el launcher,
+      la tienda de aplicaciones, las vistas genéricas, la colaboración sobre registros, los
+      ajustes, la administración y un recorrido por el CRM y Proyectos. Sirve tanto para quien
+      hará una demo como para quien capacitará usuarios.</p>
+
+      <h2>Entrar a la plataforma</h2>
+      <p>La dirección depende de cómo se instaló (ver <a href="instalacion.html">Instalación</a>):
+      <code>http://localhost:3000</code> en la demo local, o <code>https://novvus.tu-dominio.com</code>
+      (puerto 8077 detrás del proxy) en una instalación real. La pantalla de acceso tiene dos
+      pestañas: <strong>Iniciar sesión</strong> y <strong>Crear cuenta</strong>.</p>
+      <h3>Instalación real: first-run</h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div><strong>Crear cuenta</strong>: nombre, correo y contraseña (mínimo 8 caracteres). La primera cuenta será la administradora.</div></div>
+        <div class="step"><span class="num">2</span><div><strong>Crear organización</strong>: nombre e <em>identificador (URL)</em> en minúsculas, números y guiones (<code>mi-empresa</code>). Quien la crea recibe el rol <strong>Owner</strong>, que lo puede todo dentro de esa organización.</div></div>
+        <div class="step"><span class="num">3</span><div>Llegas al <strong>Inicio</strong> vacío: «Aún no tienes aplicaciones habilitadas». Pulsa <strong>Explorar aplicaciones</strong> y habilita CRM y Proyectos (ver <a href="#tienda">la tienda</a>).</div></div>
+      </div>
+      <h3>Demo local</h3>
+      <div class="note"><b>Entorno de demostración:</b> usuario <code>demo@novvus.dev</code>,
+      contraseña <code>demo-password-123</code>. La organización «Novvus Demo» ya tiene CRM y
+      Proyectos habilitados, los roles «Ventas» y «Gerente de ventas», y datos de ejemplo
+      (empresas, contactos, leads y un pipeline con oportunidades). El usuario demo es Owner.</div>
+
+      <h2>Organizaciones: tu espacio de trabajo</h2>
+      <p>Una <strong>organización</strong> es el «inquilino»: todos los datos (contactos, oportunidades,
+      proyectos, archivos, conversaciones) pertenecen a una organización y son invisibles para
+      las demás. Un mismo usuario puede pertenecer a varias. El <strong>menú de organización</strong>
+      (el avatar con el nombre de la organización, abajo en la barra lateral del Inicio o arriba
+      a la derecha dentro de una app) muestra tu cuenta, la lista <em>Cambiar de organización</em> y
+      el cierre de sesión. Al cambiar de organización la plataforma renueva tu sesión ligada a la
+      nueva y todo lo que ves cambia con ella.</p>
+
+      <h2>El Inicio (launcher)</h2>
+      <p>Novvus Core es un <em>administrador de aplicaciones</em>. La pantalla de Inicio no muestra
+      datos de negocio; muestra tus apps:</p>
+      <ul>
+        <li>Un saludo con la fecha y el nombre de tu organización, y el botón
+            <strong>Administrar aplicaciones</strong>.</li>
+        <li>La <strong>cuadrícula de apps habilitadas</strong>: una tarjeta por aplicación (icono, nombre,
+            categoría). Clic para abrirla. Si una app tiene versión nueva, la tarjeta lo indica
+            con la insignia «Actualizar».</li>
+        <li>Cuatro contadores del catálogo: <em>Apps instaladas</em>, <em>Habilitadas</em>,
+            <em>Disponibles</em>, <em>Actualizaciones</em>.</li>
+        <li><strong>Resumen de tus apps</strong>: widgets que cada módulo aporta (por ejemplo «Pipeline de
+            ventas» del CRM y «Proyectos»), visibles solo si tienes el permiso correspondiente.</li>
+      </ul>
+      <p>La barra lateral del Inicio es corta a propósito: <strong>Inicio</strong>,
+      <strong>Aplicaciones</strong>, <strong>Configuración</strong> y, si tienes permisos de
+      administración, <strong>Administración</strong>. Abajo: menú de organización, campana de
+      notificaciones y botón de tema claro/oscuro. En móvil, el menú se abre con el botón de
+      hamburguesa.</p>
+
+      <h2 id="tienda">La tienda de aplicaciones (<code>/apps</code>)</h2>
+      <p>Aquí se decide qué módulos usa <em>tu organización</em>. Pestañas <strong>Todas</strong> /
+      <strong>Instaladas</strong> / <strong>Disponibles</strong> y un buscador. Cada tarjeta muestra
+      nombre, categoría, versión, descripción y una insignia de estado. Los botones cambian según
+      el estado:</p>
+      <table>
+        <tr><th>Estado</th><th>Botón</th><th>Qué pasa</th></tr>
+        <tr><td>No instalada</td><td><strong>Instalar</strong></td><td>La organización instala el módulo (el módulo ya está publicado en la instancia por el instalador).</td></tr>
+        <tr><td>Instalada</td><td><strong>Habilitar</strong></td><td>La app aparece en el launcher y su API responde para tu organización. Si depende de otros módulos, primero se calcula el <em>plan de dependencias</em>.</td></tr>
+        <tr><td>Habilitada</td><td><strong>Abrir</strong> · menú <em>Más acciones</em>: <strong>Deshabilitar</strong>, <strong>Desinstalar</strong></td><td>Deshabilitar la oculta sin borrar nada. Desinstalar por organización tampoco es destructivo: «Podrás volver a instalarlo más adelante» y tus datos siguen ahí.</td></tr>
+        <tr><td>Actualización disponible</td><td><strong>Actualizar</strong></td><td>Aplica la versión nueva del módulo para la organización.</td></tr>
+      </table>
+      <div class="tip">
+        <b>Plan de dependencias.</b> Proyectos depende de CRM. Si habilitas Proyectos con CRM
+        apagado, aparece un diálogo con la cadena a habilitar en orden y el botón
+        <strong>Habilitar todo</strong>. Si hay un problema (módulo faltante, versión incompatible,
+        dependencia circular) el diálogo lo explica y no deja continuar. Al revés, no puedes
+        deshabilitar CRM mientras Proyectos lo necesite.
+      </div>
+      <p>La ruta <code>/apps/{id}</code> (por ejemplo <code>/apps/crm</code>) es la «puerta» de cada
+      módulo: si está habilitado te redirige a su pantalla; si no, explica por qué y te lleva a
+      la tienda. Un módulo que solo extiende a otros (como Ventas México) muestra
+      «no tiene interfaz propia»: funciona en segundo plano.</p>
+
+      <h2>Dentro de una app: el marco a pantalla completa</h2>
+      <p>Al abrir una app, la barra lateral del Inicio desaparece y la app ocupa toda la pantalla
+      con su propio encabezado (técnicamente, el <em>ModuleShell</em>):</p>
+      <ul>
+        <li><strong>Selector de aplicaciones</strong> (icono de cuadrícula, a la izquierda): vuelve a
+            <em>Inicio</em>, salta a otra de <em>Tus aplicaciones</em> o entra a la tienda
+            («Instalar aplicaciones» si administras módulos; «Ver aplicaciones» si no).</li>
+        <li><strong>Icono y nombre de la app</strong> con su color propio; clic para ir a su portada.</li>
+        <li><strong>Navegación del módulo</strong>: pestañas declaradas por el módulo (en el CRM:
+            Pipeline, Leads, Contactos, Empresas, Reportes, Configuración), filtradas por tus
+            permisos. Un módulo sin menú propio recibe una pestaña por cada modelo visible.</li>
+        <li>A la derecha: <strong>campana de notificaciones</strong>, <strong>tema claro/oscuro</strong> y
+            <strong>menú de organización</strong> compacto.</li>
+      </ul>
+
+      <h2>Vistas genéricas: la misma pantalla para todos los modelos</h2>
+      <p>Muchas pantallas no las programó nadie: se generan a partir de la descripción que cada
+      módulo hace de sus modelos. Viven en <code>/m/{modulo}/{modelo}</code> (por ejemplo
+      <code>/m/crm/companies</code>) y todas se usan igual, así que aprendes una vez.</p>
+      <h3>Lista</h3>
+      <ul>
+        <li><strong>Buscar…</strong>: búsqueda libre sobre los campos marcados como buscables.</li>
+        <li><strong>Filtros</strong>: constructor visual. <em>Agregar condición</em> (campo, operador, valor),
+            combinar varias y <em>Aplicar</em>. Los campos de extensiones y los personalizados también
+            se pueden filtrar.</li>
+        <li><strong>Ordenar</strong>: clic en el encabezado de una columna; segundo clic invierte el orden.</li>
+        <li><strong>Exportar</strong> → CSV o XLSX, respetando la búsqueda, los filtros y el orden actuales.</li>
+        <li><strong>Nuevo</strong> abre el formulario vacío; clic en una fila abre el registro.</li>
+        <li>Si el modelo lo declara, arriba aparece un selector <strong>Lista / Kanban / Calendario</strong>.</li>
+      </ul>
+      <h3>Formulario</h3>
+      <p>Ruta <code>/m/{modulo}/{modelo}/{id}</code> (<code>/new</code> para crear). Campos en la
+      distribución que definió el módulo; los obligatorios se validan («Este campo es
+      obligatorio»); <strong>Guardar</strong>, <strong>Cancelar</strong> y <strong>Eliminar</strong> (con
+      confirmación). Debajo pueden aparecer: secciones aportadas por otros módulos (por ejemplo
+      «Datos fiscales» de Ventas México en los contactos), la sección
+      <strong>Información adicional</strong> con los campos personalizados de tu organización, el
+      panel de <strong>Adjuntos</strong> y la <strong>Conversación</strong> (chatter).</p>
+      <h3>Kanban</h3>
+      <p>Columnas por el campo que agrupa el modelo (en Empresas del CRM, por industria).
+      <strong>Arrastra</strong> una tarjeta a otra columna para cambiar ese campo; si el servidor
+      rechaza el cambio, la tarjeta regresa.</p>
+      <h3>Calendario</h3>
+      <p>Vista mensual (lunes a domingo) sobre el campo de fecha que declare el modelo, con
+      navegación por meses y botón <strong>Hoy</strong>. Clic en un registro para abrirlo.</p>
+
+      <h2>Colaborar sobre un registro: chatter, adjuntos y notificaciones</h2>
+      <h3>Conversación (chatter)</h3>
+      <p>Al pie de un contacto, una empresa, una oportunidad o cualquier registro que lo tenga
+      habilitado:</p>
+      <ul>
+        <li>Pestañas <strong>Todo</strong> / <strong>Conversación</strong> / <strong>Cambios</strong>. La última muestra el
+            historial automático de campos importantes («sistema»: quién cambió qué, de qué valor a cuál).</li>
+        <li>Caja «Escribe un comentario… usa <code>@</code> para mencionar»: el botón <strong>Mencionar</strong>
+            inserta a un miembro de la organización, que recibirá una notificación.</li>
+        <li>Interruptor <strong>Nota interna</strong>: el mensaje se marca como nota (para el equipo) en
+            lugar de comentario. <strong>Publicar</strong> lo envía.</li>
+        <li><strong>Seguir</strong> / <strong>Dejar de seguir</strong> con el contador de seguidores: los seguidores
+            reciben aviso de cada mensaje nuevo. Quien comenta pasa a seguir el registro.</li>
+        <li>Puedes editar tus propios mensajes durante 15 minutos («editado» queda marcado) y borrarlos.</li>
+        <li><strong>Actividades</strong> → <strong>Planificar actividad</strong>: tipo (Tarea, Llamada, Reunión,
+            Correo), resumen, fecha y responsable. El responsable recibe una notificación; al
+            vencer, otra. Se cierran como hechas o canceladas.</li>
+      </ul>
+      <h3>Adjuntos</h3>
+      <p>Panel <strong>Adjuntos</strong> en el registro: «Arrastra un archivo o haz clic para subir»,
+      lista con <strong>Descargar</strong> y <strong>Eliminar</strong>. Límite de 50 MB por archivo y
+      cuota de 10 GB por organización (configurables por el operador). Por seguridad los
+      ejecutables se rechazan y los archivos se entregan como descarga, salvo imágenes. Para
+      ver o subir adjuntos necesitas el permiso de lectura o escritura del registro padre.</p>
+      <h3>Notificaciones</h3>
+      <p>La <strong>campana</strong> muestra el contador de no leídas y un buzón: «Te mencionaron»,
+      «Nuevo mensaje» (en un registro que sigues), «Actividad asignada», «Actividad vencida».
+      Clic en una notificación abre el registro; <strong>Marcar todo leído</strong> limpia el
+      contador. Llegan en tiempo real (conexión SSE con el servidor); si esa conexión cae, la
+      campana se actualiza sola cada minuto.</p>
+
+      <h2>Configuración (<code>/settings</code>)</h2>
+      <table>
+        <tr><th>Tarjeta</th><th>Qué contiene</th></tr>
+        <tr><td><strong>Organización</strong></td><td>Nombre e identificador de la organización activa.</td></tr>
+        <tr><td><strong>Apariencia</strong></td><td><em>Claro</em>, <em>Oscuro</em> o <em>Sistema</em>. Se recuerda en este dispositivo. El botón sol/luna de las barras hace lo mismo.</td></tr>
+        <tr><td><strong>Idioma</strong></td><td><em>Español (México)</em> o <em>English (US)</em>. Cambia los textos de la plataforma y las etiquetas de los módulos; los nombres que tú escribes (campos personalizados, registros) no se traducen.</td></tr>
+        <tr><td><strong>Cuenta</strong></td><td>Tu nombre, correo, roles en esta organización y <em>Cerrar sesión</em>.</td></tr>
+        <tr><td><strong>Campos personalizados</strong></td><td>Solo con <code>core.custom_fields.manage</code>. Enlace a <code>/settings/custom-fields</code> (ver abajo).</td></tr>
+        <tr><td><strong>Aplicaciones</strong></td><td>Accesos a las secciones de ajustes que aportan los módulos habilitados (por ejemplo «Pipelines y etapas» del CRM).</td></tr>
+        <tr><td><strong>Ajustes de {app}</strong></td><td>Formulario de configuración por organización que declara cada módulo. En el CRM: <em>Moneda predeterminada</em> (MXN/USD/EUR), <em>Días para marcar oportunidad estancada</em>, <em>Asignar leads automáticamente</em>. Cada campo exige su permiso.</td></tr>
+        <tr><td><strong>Administración</strong></td><td>Acceso directo a <code>/admin</code> si tienes permisos.</td></tr>
+      </table>
+      <h3>Campos personalizados (<code>/settings/custom-fields</code>)</h3>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>Elige la <strong>Aplicación</strong> y el <strong>Modelo</strong> (por ejemplo <code>crm</code> → Oportunidades).</div></div>
+        <div class="step"><span class="num">2</span><div><strong>Nuevo campo</strong>: <em>Etiqueta</em> (lo que verán los usuarios), <em>Nombre interno</em> (inmutable, p. ej. <code>numero_contrato</code>), <em>Tipo</em> (inmutable), <em>Obligatorio</em> y, para texto, una lista de opciones (<code>valor=etiqueta</code>, una por línea; vacío = texto libre). Verás una vista previa del control antes de crearlo.</div></div>
+        <div class="step"><span class="num">3</span><div>Reordena con las flechas, <strong>Desactivar</strong>/<strong>Activar</strong> sin perder valores, o <strong>Eliminar</strong> (los valores dejan de mostrarse y la definición se purga a los 30 días).</div></div>
+      </div>
+      <p>El campo aparece de inmediato en el formulario (sección «Información adicional») y en
+      los filtros de la lista de ese modelo. No se modifica la base de datos: por eso es seguro y
+      cada organización tiene los suyos.</p>
+
+      <h2>Administración (<code>/admin</code>)</h2>
+      <ul>
+        <li><strong>Miembros</strong> (<code>core.members.manage</code>): agrega usuarios que <em>ya se registraron</em>
+            escribiendo su correo, y asígnales roles con el selector de cada fila.</li>
+        <li><strong>Roles</strong> (<code>core.roles.read</code> para ver, <code>core.roles.manage</code> para crear):
+            <em>Nuevo rol</em> con nombre y descripción; la tabla muestra los permisos de cada rol.
+            Los roles marcados «sistema» (Owner) no se editan.</li>
+        <li><strong>Módulos</strong>: estado de instancia de cada módulo (versión, estado, URL del runtime).
+            La habilitación por organización se hace en la tienda, no aquí.</li>
+      </ul>
+      <h3>Roles de ejemplo</h3>
+      <p>En una instalación real los roles los crea el Owner. En la demo existen estos dos,
+      creados por el bootstrap:</p>
+      <table>
+        <tr><th>Rol</th><th>Puede</th><th>No puede</th></tr>
+        <tr>
+          <td><strong>Ventas</strong></td>
+          <td>Ver y editar empresas, contactos, leads, oportunidades, actividades y etiquetas; ver pipelines y etapas (<code>crm.*.read/write</code> + <code>crm.pipelines.read</code>).</td>
+          <td>Ver <em>Reportes</em>, configurar pipelines, abrir Proyectos, administrar la plataforma.</td>
+        </tr>
+        <tr>
+          <td><strong>Gerente de ventas</strong></td>
+          <td>Todo lo de Ventas + <code>crm.pipelines.manage</code> + <code>crm.reports.read</code> + Proyectos y tareas (<code>projects.*</code>).</td>
+          <td>Administrar miembros, roles, módulos o campos personalizados (permisos <code>core.*</code>).</td>
+        </tr>
+        <tr>
+          <td><strong>Owner</strong></td>
+          <td>Absolutamente todo (<code>*</code>), incluidas Administración, la tienda y los campos personalizados.</td>
+          <td>—</td>
+        </tr>
+      </table>
+      <p>La interfaz oculta lo que no puedes hacer, pero si entras por URL directa a algo sin
+      permiso verás un mensaje claro y el servidor responderá <code>403</code>: la restricción es
+      real, no solo visual.</p>
+
+      <h2>Recorrido del CRM</h2>
+      <p>Pestañas del CRM: <strong>Pipeline</strong>, <strong>Leads</strong>, <strong>Contactos</strong>,
+      <strong>Empresas</strong>, <strong>Reportes</strong> (requiere <code>crm.reports.read</code>) y
+      <strong>Configuración</strong> (requiere <code>crm.pipelines.manage</code>).</p>
+      <h3>Pipeline (kanban de oportunidades)</h3>
+      <ul>
+        <li>Cada columna es una <strong>etapa</strong> con su probabilidad; el encabezado muestra cuántas
+            oportunidades hay y el monto acumulado. Arriba, tarjetas de resumen (abiertas, ganadas, valor abierto).</li>
+        <li><strong>Arrastra</strong> una tarjeta a otra columna para cambiar de etapa. Suéltala en la etapa
+            ganada o perdida para cerrarla; ambas registran la fecha de cierre.</li>
+        <li>Si el movimiento falla (sin red, sin permiso) la tarjeta <em>regresa sola</em>.</li>
+        <li>Clic en el nombre para abrir el detalle de la oportunidad.</li>
+      </ul>
+      <h3>Leads: capturar y convertir</h3>
+      <ol>
+        <li><strong>Crear lead</strong>: origen (<em>Manual</em>, <em>Formulario</em>, <em>Referido</em>), contacto,
+            empresa y notas («Interesado en…»). Estados: <em>Nuevo</em>, <em>Calificado</em>, <em>Perdido</em>,
+            <em>Convertido</em>. Hay búsqueda en notas y paginación con «Cargar más».</li>
+        <li><strong>Convertir</strong>: indica monto estimado y fecha esperada de cierre. Se crea una
+            oportunidad en la primera etapa del pipeline, enlazada al contacto y la empresa.</li>
+        <li>El lead no se borra: queda «Convertido» con enlace a su oportunidad. Un lead perdido no se
+            puede convertir.</li>
+      </ol>
+      <h3>Detalle de una oportunidad</h3>
+      <ul>
+        <li>Ficha editable (nombre, monto, fecha esperada) y selector de <strong>Etapa</strong> con su
+            probabilidad; al cerrar se muestra «Cerrada el» con la fecha.</li>
+        <li><strong>Actividades</strong> propias del CRM: llamadas, reuniones, correos y tareas con fecha
+            límite, marcables como completadas.</li>
+        <li>Conversación (chatter) con historial de cambios de monto y etapa, y seguidores.</li>
+      </ul>
+      <div class="tip"><b>Al ganar una oportunidad</b> el CRM emite el evento
+      <code>crm.opportunity.won</code>. Si Proyectos está habilitado en tu organización, se crea
+      automáticamente un proyecto vinculado con tareas iniciales, sin que nadie haga nada. Así
+      colaboran los módulos entre sí.</div>
+      <h3>Contactos y Empresas</h3>
+      <p>Son <strong>vistas genéricas</strong> puras: lista con búsqueda, filtros, orden y exportación;
+      formulario con adjuntos y conversación; Empresas además tiene kanban por industria. En
+      Contactos se registra el historial de cambios de puesto y empresa.</p>
+      <h3>Reportes</h3>
+      <ul>
+        <li><strong>Resumen del pipeline</strong>: abiertas, ganadas, perdidas y monto por etapa.</li>
+        <li><strong>Conversión por periodo</strong>: leads que entraron en un rango de fechas, cuántos se
+            convirtieron o perdieron y la tasa.</li>
+      </ul>
+      <h3>Configuración de pipelines</h3>
+      <p>Cada organización define sus etapas: nombre, orden, probabilidad (%) y si la etapa
+      significa «ganado» o «perdido». Se llega desde la pestaña Configuración del CRM o desde
+      <em>Configuración → Aplicaciones → Pipelines y etapas</em>.</p>
+
+      <h2>Proyectos</h2>
+      <ul>
+        <li><strong>Proyectos</strong>: tabla con Proyecto, Contacto, Origen, Estado y fecha de creación, y el
+            botón <strong>Nuevo proyecto</strong>. Los proyectos con origen «oportunidad ganada» se crearon
+            solos desde el CRM y traen tres tareas iniciales (reunión de arranque, definir alcance,
+            asignar equipo).</li>
+        <li><strong>Tareas</strong> (requiere <code>projects.tasks.read</code>): las tareas de todos los proyectos,
+            con las mismas herramientas de lista genérica.</li>
+      </ul>
+
+      <h2>Ventas México (SalesMX)</h2>
+      <p>Es un módulo sin pantallas: cuando está habilitado en tu organización, el formulario de
+      <strong>Contactos</strong> del CRM muestra una sección <strong>Datos fiscales</strong> con
+      <strong>RFC</strong> (12-13 caracteres, mayúsculas) y <strong>Régimen fiscal</strong> (601 General de
+      Ley, 612 Personas Físicas con Actividades Empresariales, 626 RESICO). Ambos campos se pueden
+      filtrar en la lista. En la demo local no viene incluido; se despliega en modo desarrollador
+      (ver <a href="instalacion.html">Instalación</a>, camino C).</p>
+
+      <h2>Preguntas frecuentes</h2>
+      <h3>«Inicié sesión y el Inicio dice que no tengo aplicaciones»</h3>
+      <p>O tu organización no ha habilitado ninguna app (ve a <em>Aplicaciones</em>), o eres miembro
+      sin roles y no tienes permiso para ver ninguna. Pide a un Owner que te asigne un rol en
+      <em>Administración → Miembros</em>.</p>
+      <h3>«No veo la pestaña Reportes / Configuración en el CRM»</h3>
+      <p>Faltan <code>crm.reports.read</code> o <code>crm.pipelines.manage</code> en tus roles.</p>
+      <h3>«Me pide iniciar sesión otra vez»</h3>
+      <p>Las sesiones se renuevan solas en silencio. Si vuelves al login es porque la sesión fue
+      revocada (cierre de sesión en otro lugar o medida de seguridad). Entra de nuevo.</p>
+      <h3>«Muevo una tarjeta y regresa»</h3>
+      <p>El servidor rechazó el movimiento (verás un aviso). Causas típicas: perdiste el permiso
+      de escritura, la etapa no existe ya, o la plataforma está reiniciándose.</p>
+      <h3>«No puedo deshabilitar el CRM»</h3>
+      <p>Otro módulo habilitado (Proyectos, Ventas México) lo necesita. Deshabilita primero los
+      que dependen de él.</p>
+      <h3>«Subí un archivo y no aparece / me lo rechazó»</h3>
+      <p>Revisa el tamaño (50 MB), la cuota de la organización (10 GB) y el tipo: los
+      ejecutables se rechazan por seguridad. Necesitas permiso de escritura sobre el registro.</p>
+
+      <nav class="page-nav">
+        <a href="instalacion.html"><span class="dir">← Anterior</span>Instalación</a>
+        <a class="next" href="actualizacion.html"><span class="dir">Siguiente →</span>Actualización y releases</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

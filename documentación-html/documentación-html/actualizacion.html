@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualización y releases — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav active" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Operar / Actualización y releases</div>
+    <article>
+      <h1>Actualización y releases</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">Cómo subir de versión sin perder nada: la demo local con <code>install.py</code>,
+      una instalación de cliente con <code>sudo novvus update</code>, un despliegue manual con
+      <code>docker-compose.prod.yml</code>, y —para quien construye módulos— cómo publica un release
+      el equipo y cómo se actualiza un módulo propio.</p>
+
+      <h2>Primero: ¿qué tipo de instalación tienes?</h2>
+      <p>En <a href="instalacion.html">Instalación</a> viste que hay tres formas de tener NOVVUS CORE
+      corriendo. Cada una se actualiza distinto, y confundirlas es el error más común. Identifica la
+      tuya antes de seguir:</p>
+      <table>
+        <tr><th>Instalación</th><th>Cómo la reconoces</th><th>Comando de actualización</th></tr>
+        <tr>
+          <td>Demo local</td>
+          <td>Clonaste el repo y corriste <code>python install.py</code>. La web abre en <code>localhost:3000</code> y entras con <code>demo@novvus.dev</code>.</td>
+          <td><code>python install.py update</code></td>
+        </tr>
+        <tr>
+          <td>Cliente (CLI)</td>
+          <td>Un servidor Linux con <code>/opt/novvus/novvus.json</code>, instalado con <code>sudo novvus install</code>. La web escucha en <code>:8077</code>.</td>
+          <td><code>sudo novvus update</code></td>
+        </tr>
+        <tr>
+          <td>Manual (compose)</td>
+          <td>Copiaste <code>docker-compose.prod.yml</code> y un <code>.env</code> a mano a <code>/opt/novvus</code>, sin CLI.</td>
+          <td>Editar <code>NOVVUS_VERSION</code> + <code>docker compose pull</code> + <code>up -d</code></td>
+        </tr>
+      </table>
+      <div class="note">
+        <b>Dos comandos llamados <code>novvus</code>.</b> El CLI administrativo (Rust, en el servidor del
+        cliente) tiene <code>install</code>, <code>update</code>, <code>status</code> y <code>version</code>.
+        El CLI del SDK (Python, en tu máquina de desarrollo) tiene <code>new-module</code>, <code>deploy</code>,
+        <code>run</code>, <code>makemigration</code> y <code>seed</code>. Nunca conviven en un servidor.
+        En esta página, cuando digamos <code>sudo novvus update</code> hablamos del primero.
+      </div>
+
+      <h2 id="demo">1. Actualizar la demo local</h2>
+      <p>La demo se construye desde el código fuente del repositorio, así que actualizar significa
+      traer el código nuevo y reconstruir las imágenes:</p>
+<pre><code>cd Novvus-Core
+python install.py update</code></pre>
+      <p>Por dentro hace exactamente dos cosas: <code>git pull --ff-only</code> (solo si el directorio es
+      un repo Git) y <code>docker compose -f docker-compose.full.yml up -d --build --wait</code>. Eso
+      reconstruye las imágenes que cambiaron, reinicia los servicios y espera a que reporten salud.</p>
+      <ul>
+        <li><strong>Tus datos se conservan.</strong> Los volúmenes <code>novvus_full_pgdata</code> (base de
+        datos) y <code>novvus_tokens</code> (tokens de servicio de los módulos) no se tocan.</li>
+        <li>El servicio <code>bootstrap</code> vuelve a correr al arrancar: es idempotente, re-registra los
+        módulos y aplica las migraciones pendientes que traiga la versión nueva.</li>
+        <li>El kernel aplica sus propias migraciones al arrancar (van embebidas en el binario).</li>
+        <li>No hay backup automático ni rollback. Si es una demo de verdad, no importa; si alguien la usa
+        como QA compartido, respalda antes (ver <a href="mantenimiento.html#respaldos">Mantenimiento</a>).</li>
+      </ul>
+      <div class="warn">
+        <b>No confundas <code>update</code> con <code>reset</code>.</b> <code>python install.py reset</code>
+        borra contenedores, imágenes locales <em>y volúmenes</em>; pide que escribas <code>BORRAR</code>
+        para confirmar. Es la única operación de <code>install.py</code> que destruye datos.
+      </div>
+
+      <h2 id="cliente">2. Actualizar una instalación de cliente: <code>sudo novvus update</code></h2>
+      <p>Aquí está el trabajo serio. Una instalación hecha con el CLI se actualiza con un solo comando
+      que hace backup, aplica, verifica y —si algo falla— vuelve solo al estado anterior. Lo único que
+      necesitas es ser root y tener red hacia <code>downloads.novvus.dev</code> y <code>ghcr.io</code>.</p>
+<pre><code><span class="c"># A la última versión publicada</span>
+sudo novvus update
+
+<span class="c"># A una versión concreta (SemVer numérico; los downgrades se rechazan)</span>
+sudo novvus update 0.1.6
+
+<span class="c"># Sin pregunta de confirmación (automatización)</span>
+sudo novvus update --yes</code></pre>
+      <p>Si ya estás en la última versión responde <code>Novvus Core is already up to date.</code> y
+      termina. Si no, esto es lo que pasa, paso a paso:</p>
+
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>El CLI viejo delega en el CLI nuevo.</strong> El binario instalado solo resuelve la versión
+          objetivo (<code>downloads.novvus.dev/latest</code> o la que pediste), descarga el CLI de <em>esa</em>
+          versión, verifica su SHA-256 contra el <code>manifest.json</code> del release y lo re-ejecuta.
+          La regla es: <em>la versión X es la única que sabe desplegar la versión X</em>; un CLI viejo
+          nunca aplica una plantilla vieja a un despliegue que no conoce. Desde aquí toma un
+          lock en <code>/opt/novvus/.update/lock</code>: dos <code>update</code> simultáneos son imposibles.
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Preflight.</strong> El CLI nuevo comprueba que la instalación actual está sana (los 6
+          servicios healthy, con hasta 60 s de espera), que existen <code>docker-compose.yml</code> y
+          <code>.env</code>, que el release existe para tu arquitectura y que hay espacio en disco.
+          Si la instalación no está sana se detiene: <em>arregla primero, actualiza después</em>.
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Descarga de imágenes sin tocar lo vivo.</strong> Escribe el compose y el <code>.env</code>
+          nuevos en <code>/opt/novvus/.update/</code> (<code>docker-compose.next.yml</code>, <code>.env.next</code>)
+          y hace <code>docker compose pull</code> contra esos archivos de staging mientras la versión
+          actual sigue sirviendo. Si un pull falla: <code>Update aborted. Current installation was not
+          modified.</code> y no hay nada que revertir.
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Backup obligatorio.</strong> Se crea <code>/opt/novvus/backups/&lt;fecha&gt;-&lt;desde&gt;-to-&lt;hasta&gt;/</code>
+          (directorio 0700, archivos 0600) con: <code>postgres.dump</code> (<code>pg_dump -Fc</code>, tomado
+          con la versión actual aún sirviendo y verificado con <code>pg_restore --list</code>),
+          <code>roles.sql</code> (<code>pg_dumpall --roles-only</code>), <code>files.tar.gz</code> (volumen de
+          adjuntos), <code>tokens.tar.gz</code> (tokens de servicio), <code>.env</code>, el compose en uso,
+          <code>novvus.json</code> y un <code>backup.json</code> con el SHA-256 de cada pieza. <strong>Nunca se
+          borran solos</strong>: tú decides cuándo limpiarlos.
+        </div></div>
+        <div class="step"><span class="num">5</span><div>
+          <strong>Migración del <code>.env</code>, línea a línea.</strong> No se regenera: se preserva cada
+          línea existente (comentarios incluidos), solo se reescribe <code>NOVVUS_VERSION</code> y se
+          <em>añaden</em> las claves que falten con su default (<code>NOVVUS_BOOTSTRAP_TOKEN</code> se
+          genera si no existe —llegó en 0.1.3—, <code>NOVVUS_WEB_PORT=8077</code>, <code>NOVVUS_LOG_LEVEL=info</code>,
+          <code>POSTGRES_USER</code>/<code>POSTGRES_DB</code>). <strong>Un secreto que ya existe jamás se regenera</strong>:
+          tus sesiones, tus firmas internas y tu base siguen siendo válidas.
+        </div></div>
+        <div class="step"><span class="num">6</span><div>
+          <strong>Swap atómico y arranque.</strong> Los archivos de staging reemplazan a los reales por
+          <code>rename</code> (si había un <code>docker-compose.prod.yml</code> manual se conserva como
+          <code>.pre-update</code>) y se hace <code>docker compose up -d --remove-orphans</code>. El kernel
+          aplica sus migraciones al arrancar; <code>bootstrap</code> re-registra los módulos y aplica sus
+          migraciones pendientes vía <code>POST /api/core/modules/{id}/migrate</code>, y <em>falla
+          ruidosamente</em> si alguna no pasa.
+        </div></div>
+        <div class="step"><span class="num">7</span><div>
+          <strong>Verificación.</strong> Espera hasta 420 s a que los 6 servicios estén healthy
+          (<code>bootstrap</code> cuenta como listo cuando termina con exit 0) y comprueba que
+          <code>/health</code> del kernel reporta <code>"version": "&lt;objetivo&gt;"</code>. Solo entonces
+          <code>novvus.json</code> avanza a la versión nueva y el binario <code>/usr/local/bin/novvus</code>
+          se reemplaza por rename atómico. Si Core falla, el CLI no cambia.
+        </div></div>
+        <div class="step"><span class="num">8</span><div>
+          <strong>Rollback automático</strong> si algo falla después del backup: baja el stack, restaura
+          compose y <code>.env</code>, restaura la base completa desde el dump (DROP + CREATE +
+          <code>pg_restore</code>), restaura volúmenes si cambiaron y levanta la versión anterior
+          verificando su salud. Verás <code>Update failed. Novvus Core was restored to 0.1.5.</code> con
+          la ruta del backup y del log.
+        </div></div>
+      </div>
+
+      <h3>Códigos de salida y qué hacer con cada uno</h3>
+      <table>
+        <tr><th>Exit code</th><th>Significado</th><th>Qué haces</th></tr>
+        <tr><td><span class="badge ok">0</span></td><td>Actualización correcta (o ya estabas al día).</td><td>Nada. Abre la web y verifica con <code>novvus status</code>.</td></tr>
+        <tr><td><span class="badge warn">1</span></td><td>Falló, pero el rollback dejó la versión anterior sana. También es 1 si el preflight rechazó (instalación no sana, downgrade, sin root).</td><td>Lee <code>/opt/novvus/logs/update-*.log</code>, corrige la causa y vuelve a correr <code>sudo novvus update</code>.</td></tr>
+        <tr><td><span class="badge warn">2</span></td><td><code>CRITICAL: automatic rollback failed</code>. La instalación puede estar en estado intermedio.</td><td>Ver abajo: no reintentes a ciegas.</td></tr>
+      </table>
+
+      <h3>Si sale 2 (rollback fallido)</h3>
+      <ol>
+        <li>No repitas <code>update</code> todavía. Corre <code>novvus status</code>: mostrará un aviso
+        <code>WARNING: an update 0.1.5 → 0.1.6 was interrupted during '&lt;fase&gt;'</code> con la ruta
+        del backup, y la tabla de servicios te dirá cuál no levanta.</li>
+        <li>Abre el log <code>/opt/novvus/logs/update-*.log</code> (no contiene secretos): registra cada
+        fase, la salida de los servicios que no estuvieron healthy y el error del rollback.</li>
+        <li>Con el backup en <code>/opt/novvus/backups/…</code> tienes todo para restaurar a mano:
+        <code>.env</code> y compose de la versión anterior, <code>postgres.dump</code> para
+        <code>pg_restore</code>, y los volúmenes en <code>.tar.gz</code>. El procedimiento manual está en
+        <a href="mantenimiento.html#restaurar">Mantenimiento → Restaurar</a>.</li>
+        <li>Cuando la instalación vuelva a estar sana, borra el marcador de actualización interrumpida
+        (el propio mensaje de <code>update</code> te dice qué archivo bajo <code>/opt/novvus/.update/</code>
+        quitar) y podrás actualizar de nuevo.</li>
+      </ol>
+      <div class="tip">
+        Un <kbd>Ctrl</kbd> + <kbd>C</kbd> o un reinicio a mitad del proceso dejan ese mismo marcador.
+        <code>novvus status</code> y el siguiente <code>update</code> lo muestran con la ruta del backup
+        para que nunca te quedes sin saber en qué fase se cortó.
+      </div>
+
+      <h3>Transición única desde 0.1.4</h3>
+      <p>El CLI 0.1.4 no tenía <code>update</code>. Si tu servidor está en esa versión, una sola vez
+      reinstala el CLI y luego actualiza; a partir de ahí el ciclo es solo <code>novvus update</code>:</p>
+<pre><code>curl -fsSL https://install.novvus.dev/install.sh | bash
+sudo novvus update</code></pre>
+
+      <h2 id="manual">3. Actualizar un despliegue manual (compose)</h2>
+      <p>Si instalaste sin CLI copiando <code>docker-compose.prod.yml</code>, no tienes backup ni rollback
+      automáticos: eres tú quien los hace. La secuencia recomendada es:</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Respalda</strong> base de datos y volumen <code>files</code> (ver
+          <a href="mantenimiento.html#respaldos">Mantenimiento</a>). Como mínimo:
+<pre><code>cd /opt/novvus
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" &gt; backup-$(date +%F).dump</code></pre>
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Cambia la versión</strong> en <code>.env</code>. Producción siempre fija <code>X.Y.Z</code>,
+          nunca <code>latest</code>; las imágenes <code>X.Y.Z</code> son inmutables (nunca se re-publica una
+          versión existente):
+<pre><code>NOVVUS_VERSION=0.1.6</code></pre>
+          Revisa también <code>.env.prod.example</code> de la versión nueva por si añadió variables
+          obligatorias: el compose se niega a arrancar si falta alguna.
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Descarga y levanta.</strong> Primero el pull (si falla, no has tocado nada) y después el
+          arranque con espera de salud:
+<pre><code>docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d --wait
+docker compose -f docker-compose.prod.yml ps</code></pre>
+          Todos los servicios deben quedar <code>healthy</code> y <code>bootstrap</code> en <code>Exited (0)</code>.
+          Confirma qué imágenes corren con <code>docker compose -f docker-compose.prod.yml images</code>
+          (la columna de tag debe ser la versión nueva). El kernel no está expuesto en el host: su
+          <code>/health</code> solo lo ven los healthchecks de Docker y la web.
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Si algo falla, vuelve atrás tú.</strong> Restaura <code>NOVVUS_VERSION</code> al valor
+          anterior, <code>up -d --wait</code> de nuevo y, si la versión nueva alcanzó a aplicar migraciones,
+          restaura la base desde el dump. Por eso el backup va antes, no después.
+        </div></div>
+      </div>
+      <div class="note">
+        Si un servidor manual ya está en <code>/opt/novvus</code>, el CLI lo detecta: <code>novvus status</code>
+        y <code>novvus version</code> funcionan sobre él (leen la versión del <code>.env</code>) y
+        <code>novvus install</code> se niega a pisarlo. Para migrar de manual a CLI, respalda, baja el stack
+        y reinstala con el CLI reutilizando tus secretos en el <code>.env</code> generado.
+      </div>
+
+      <h2 id="release">4. Cómo se publica un release</h2>
+      <p>Si mantienes el producto (no solo lo operas) te conviene saber de dónde salen las imágenes que
+      descargan los pasos anteriores. Todo gira alrededor de un archivo:</p>
+      <ul>
+        <li><strong><code>VERSION</code> en la raíz del repo es la única fuente de la versión.</strong>
+        <code>cli/build.rs</code> y el <code>build.rs</code> del kernel lo embeben en compile-time; el
+        kernel lo reporta en <code>/health</code>; el CLI lo muestra en <code>novvus version</code>.</li>
+        <li>Un push normal a <code>main</code> solo corre <code>ci.yml</code> (8 jobs de pruebas). Nada se
+        publica sin un tag.</li>
+        <li>Un tag <code>vX.Y.Z</code> dispara <code>.github/workflows/release.yml</code>, y su primer job
+        falla si el tag no coincide con <code>VERSION</code>.</li>
+      </ul>
+      <p>La secuencia para publicar, en orden:</p>
+<pre><code><span class="c"># 1. Todo lo que va en el release ya está en main</span>
+git push origin main
+
+<span class="c"># 2. Sube la versión (única fuente) y confírmala</span>
+echo 0.1.7 &gt; VERSION
+git commit -am "Bump version to 0.1.7"
+git push origin main
+
+<span class="c"># 3. Etiqueta y publica el tag: esto dispara release.yml</span>
+git tag -a v0.1.7 -m "Novvus Core v0.1.7"
+git push origin v0.1.7</code></pre>
+      <p>Jobs de <code>release.yml</code> y sus dependencias:</p>
+<pre class="diagram">
+version ── ¿tag == VERSION? ──► tests (ci.yml completo)
+                                   │
+                    ┌──────────────┴───────────────┐
+                    ▼                              ▼
+              cli-build                        build-push
+     (linux-x64 musl, linux-arm64 QEMU)   (5 imágenes → GHCR, tags X.Y.Z y latest)
+                    │                              │
+                    ▼                              │
+               cli-dist                            │
+   (dist/: install.sh, latest, &lt;v&gt;/manifest.json,  │
+    &lt;v&gt;/linux-x64/novvus, &lt;v&gt;/linux-arm64/novvus)  │
+                    │                              │
+                    └──────────────┬───────────────┘
+                                   ▼
+                          publish-downloads (R2)
+</pre>
+      <table>
+        <tr><th>Job</th><th>Qué produce</th></tr>
+        <tr><td><code>version</code></td><td>Verifica que el tag y <code>VERSION</code> coinciden; exporta la versión al resto.</td></tr>
+        <tr><td><code>tests</code></td><td>Reutiliza <code>ci.yml</code> completo: kernel, CLI, instalador, Python, cobertura, mutation testing, web y E2E.</td></tr>
+        <tr><td><code>cli-build</code></td><td>Binarios estáticos del CLI (musl + rust-lld) para <code>linux-x64</code> y <code>linux-arm64</code>, verificados con <code>file</code> y ejecutando <code>novvus version</code> (ARM64 bajo QEMU).</td></tr>
+        <tr><td><code>cli-dist</code></td><td>El árbol <code>dist/</code> con <code>manifest.json</code> (SHA-256 por plataforma), <code>latest</code> e <code>install.sh</code>.</td></tr>
+        <tr><td><code>build-push</code></td><td>Imágenes <code>ghcr.io/novvus/{core, web, bootstrap, crm, projects}</code> con tags <code>X.Y.Z</code> y <code>latest</code>.</td></tr>
+        <tr><td><code>publish-downloads</code></td><td>Sube <code>dist/</code> al bucket R2 <code>novvus-downloads</code>, servido por <code>downloads.novvus.dev</code> e <code>install.novvus.dev</code>. Solo corre si las imágenes GHCR ya existen.</td></tr>
+      </table>
+      <p>Reglas del job de publicación que conviene conocer porque explican el comportamiento de
+      <code>novvus update</code>:</p>
+      <ul>
+        <li><code>put-object</code> archivo por archivo, nunca <code>sync --delete</code>: las versiones ya
+        publicadas no se tocan (histórico inmutable).</li>
+        <li>Orden seguro: binarios → manifest → verificación pública de los checksums → <code>install.sh</code>
+        → <strong><code>latest</code> al final</strong>. Si algo falla antes, <code>latest</code> sigue apuntando a
+        la versión anterior y ningún cliente ve una versión a medias.</li>
+        <li>Cache: carpetas versionadas <code>max-age=31536000, immutable</code>; <code>latest</code>
+        <code>no-cache</code>; <code>install.sh</code> <code>max-age=300</code>.</li>
+        <li>Verificación final: el job descarga <code>install.sh</code> desde <code>install.novvus.dev</code> y lo
+        ejecuta de verdad en el runner; debe reportar la versión recién publicada.</li>
+      </ul>
+
+      <h3>La cadena de confianza de <code>install.sh</code></h3>
+<pre class="diagram">
+install.novvus.dev/install.sh            bootstrap bash público y auditable
+        ↓
+downloads.novvus.dev/latest              solo el número de versión (p. ej. 0.1.6)
+        ↓
+downloads.novvus.dev/&lt;v&gt;/manifest.json   SHA-256 de cada binario por plataforma
+        ↓
+downloads.novvus.dev/&lt;v&gt;/linux-x64/novvus   (o linux-arm64)
+        ↓  SHA-256 obligatorio: si no coincide, se borra y aborta
+/usr/local/bin/novvus
+        ↓
+sudo novvus install  →  ghcr.io/novvus/*  →  Novvus Core
+</pre>
+      <p><code>novvus update</code> reproduce exactamente este protocolo desde Rust
+      (<code>cli/src/release.rs</code>), sin <code>curl</code> ni <code>sha256sum</code> en el servidor: nunca se
+      ejecuta un binario sin verificar. Los binarios son públicos y no contienen Novvus Core ni
+      credenciales. Lo que hoy <em>no</em> existe es firma criptográfica del release (solo SHA-256
+      contra un manifest del mismo origen); está en el BACKLOG.</p>
+
+      <h2 id="modulo">5. Actualizar un módulo propio</h2>
+      <p>Esto ya es terreno de desarrollador (si no has construido un módulo, empieza por el
+      <a href="tutorial-modulo.html">tutorial</a>). Un módulo se actualiza con tres piezas: una versión
+      nueva en el manifiesto, una migración nueva si cambió el modelo, y un re-registro para que el
+      kernel aplique lo pendiente.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><div>
+          <strong>Sube la versión SemVer</strong> en <code>novvus.toml</code>: <code>version = "0.2.0"</code>.
+          El registro con versión mayor re-valida dependencias, y la versión viaja en el meta que ven las
+          vistas genéricas.
+        </div></div>
+        <div class="step"><span class="num">2</span><div>
+          <strong>Genera la migración incremental.</strong> Cambia tus modelos y pide al SDK el diff contra
+          tu base de desarrollo, donde ya está aplicado el esquema actual del módulo:
+<pre><code>cd modules/inventario
+NOVVUS_DATABASE_URL=postgres://novvus:novvus_dev_password@localhost:5432/novvus \
+  novvus makemigration -m add_min_stock
+<span class="c"># Migración generada: migrations/0002_add_min_stock.sql</span></code></pre>
+          El SDK numera automáticamente (<code>0002</code>, <code>0003</code>…), añade el bloque RLS a toda
+          tabla nueva y responde <code>Sin cambios: no se generó migración.</code> si no hay diff. Revisa el SQL
+          antes de confirmarlo: es el artefacto canónico.
+        </div></div>
+        <div class="step"><span class="num">3</span><div>
+          <strong>Nunca edites una migración aplicada.</strong> El kernel guarda el checksum en
+          <code>core.module_migrations</code> y rechaza el registro si cambia. Si <code>0001</code> tiene un
+          error, lo corriges en <code>0002</code>.
+        </div></div>
+        <div class="step"><span class="num">4</span><div>
+          <strong>Re-registra y migra.</strong> En el stack Docker (demo o producción) basta con volver a
+          construir la imagen del módulo y arrancar: <code>bootstrap</code> hace <code>POST /api/core/modules</code>
+          con el manifiesto y todas las migraciones, y como el módulo ya existe, llama a
+          <code>POST /api/core/modules/inventario/migrate</code>, que aplica solo las pendientes en orden,
+          cada una en su transacción. Si una falla el módulo no se habilita y —en un cliente— el
+          <code>update</code> hace rollback.
+<pre><code><span class="c"># Demo local</span>
+python install.py update
+
+<span class="c"># A mano, con un JWT de administrador (core.modules.manage), es lo mismo que hace bootstrap:</span>
+curl -s -X POST http://localhost:8000/api/core/modules \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d @registro.json           <span class="c"># {"manifest_toml": "...", "migrations": [{"version": "0001_init", "sql": "..."}, ...]}</span>
+curl -s -X POST http://localhost:8000/api/core/modules/inventario/migrate \
+  -H "Authorization: Bearer $JWT"
+<span class="c"># → {"applied_migrations": ["0002_add_min_stock"]}</span></code></pre>
+        </div></div>
+        <div class="step"><span class="num">5</span><div>
+          <strong>Reinicia el runtime.</strong> El proceso del módulo hace handshake al arrancar y envía su
+          meta nuevo; si añadiste campos a <code>__novvus_views__</code>, las vistas genéricas los verán en
+          menos de 60 s (la shell revalida por ETag).
+        </div></div>
+      </div>
+      <div class="warn">
+        <b>Ojo con el token de servicio.</b> Actualizar un módulo <em>no</em> cambia su
+        <code>NOVVUS_SERVICE_TOKEN</code>. Solo <code>install</code> emite uno (y se muestra una única vez).
+        Si desinstalas para "empezar limpio", el esquema <code>mod_inventario</code> se borra con todo lo que
+        contiene: eso es una reinstalación, no una actualización.
+      </div>
+
+      <h2>Los tres mecanismos, lado a lado</h2>
+      <table>
+        <tr><th></th><th>Demo (<code>install.py update</code>)</th><th>Cliente (<code>novvus update</code>)</th><th>Manual (compose)</th></tr>
+        <tr><td>Origen de la versión nueva</td><td>Código fuente (<code>git pull</code>) + build local</td><td><code>downloads.novvus.dev</code> + imágenes GHCR</td><td>Imágenes GHCR (<code>NOVVUS_VERSION</code>)</td></tr>
+        <tr><td>Tiempo</td><td>Minutos (reconstruye imágenes)</td><td>Segundos de pull + arranque</td><td>Segundos de pull + arranque</td></tr>
+        <tr><td>Backup previo</td><td>No (hazlo tú)</td><td>Obligatorio y verificado</td><td>No (hazlo tú)</td></tr>
+        <tr><td>Rollback</td><td>Manual (<code>git checkout</code> + rebuild)</td><td>Automático, incluida la base</td><td>Manual (versión anterior + <code>pg_restore</code>)</td></tr>
+        <tr><td>Migraciones</td><td colspan="3">Iguales en los tres: kernel al arrancar; módulos vía <code>bootstrap</code> → <code>/migrate</code></td></tr>
+        <tr><td>Migra el <code>.env</code></td><td>No aplica (compose fijo)</td><td>Sí, línea a línea</td><td>Tú, comparando con <code>.env.prod.example</code></td></tr>
+        <tr><td>Verificación</td><td><code>--wait</code> de compose</td><td>6 healthchecks + versión en <code>/health</code></td><td><code>--wait</code> + <code>ps</code> a mano</td></tr>
+        <tr><td>Registro</td><td>Salida en consola</td><td><code>/opt/novvus/logs/update-*.log</code></td><td>Lo que tú guardes</td></tr>
+        <tr><td>Downgrade</td><td>Posible (checkout de un commit)</td><td>Rechazado</td><td>Posible pero sin soporte de migraciones inversas</td></tr>
+      </table>
+
+      <h2>Antes de actualizar producción: lista corta</h2>
+      <ul>
+        <li>[ ] <code>novvus status</code> devuelve exit 0 (si no, el preflight te va a detener igual).</li>
+        <li>[ ] Hay disco para el backup: el dump de Postgres más el volumen <code>files</code> comprimido.</li>
+        <li>[ ] Avisaste una ventana: el arranque de la versión nueva implica unos segundos sin servicio.</li>
+        <li>[ ] Leíste las notas del release: si añade variables al <code>.env</code>, el CLI las agrega solo, pero un despliegue manual no.</li>
+        <li>[ ] Sabes dónde quedarán el backup (<code>/opt/novvus/backups/</code>) y el log (<code>/opt/novvus/logs/</code>).</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="guia-usuario.html"><span class="dir">← Anterior</span>Guía de usuario</a>
+        <a class="next" href="mantenimiento.html"><span class="dir">Siguiente →</span>Mantenimiento</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

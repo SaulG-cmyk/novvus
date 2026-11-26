@@ -1,0 +1,169 @@
+[module]
+id = "crm"
+name = "CRM"
+version = "0.2.4"
+description = "Gestión de relaciones con clientes: empresas, contactos, prospectos, pipeline de oportunidades, actividades, productos, cotizaciones y reportes."
+
+[manifest]
+api_version = "novvus.dev/v1"
+kind = "module"
+
+[publisher]
+id = "novvus"
+name = "Novvus"
+
+[distribution]
+visibility = "standard"
+image = "ghcr.io/novvus/crm"
+platforms = ["linux/amd64", "linux/arm64"]
+
+[compatibility]
+core = ">=0.2.0,<0.4.0"
+sdk = ">=0.2.0,<0.3.0"
+platform_api = 1
+
+[entitlement]
+required = false
+
+[presentation]
+display_name = "CRM"
+summary = "Gestiona tu pipeline de ventas, leads, contactos y empresas. Da seguimiento a oportunidades y mide tu conversión."
+category = "Ventas"
+icon = "contact"
+accent = "bg-blue-500/15 text-blue-600 dark:text-blue-300"
+publisher = "Novvus"
+license = "MIT"
+
+[dependencies]
+modules = []
+# Integración con Proyectos por su API pública (sin dependencia dura: el CRM funciona sin Proyectos y las
+# acciones «Crear proyecto»/«Ver proyectos» explican la ausencia).
+service_permissions = ["projects.projects.read", "projects.projects.write", "projects.templates.read"]
+
+[[permissions]]
+key = "crm.companies.read"
+description = "Ver empresas"
+
+[[permissions]]
+key = "crm.companies.write"
+description = "Crear y editar empresas"
+
+[[permissions]]
+key = "crm.contacts.read"
+description = "Ver contactos"
+
+[[permissions]]
+key = "crm.contacts.write"
+description = "Crear y editar contactos"
+
+[[permissions]]
+key = "crm.leads.read"
+description = "Ver leads"
+
+[[permissions]]
+key = "crm.leads.write"
+description = "Crear, editar y convertir leads"
+
+[[permissions]]
+key = "crm.opportunities.read"
+description = "Ver oportunidades"
+
+[[permissions]]
+key = "crm.opportunities.write"
+description = "Crear, editar y mover oportunidades"
+
+[[permissions]]
+key = "crm.activities.read"
+description = "Ver actividades"
+
+[[permissions]]
+key = "crm.activities.write"
+description = "Crear, editar y completar actividades"
+
+[[permissions]]
+key = "crm.tags.read"
+description = "Ver etiquetas"
+
+[[permissions]]
+key = "crm.tags.write"
+description = "Crear y asignar etiquetas"
+
+[[permissions]]
+key = "crm.pipelines.read"
+description = "Ver pipelines y etapas"
+
+[[permissions]]
+key = "crm.pipelines.manage"
+description = "Configurar pipelines y etapas"
+
+[[permissions]]
+key = "crm.reports.read"
+description = "Ver reportes del CRM"
+
+[[permissions]]
+key = "crm.products.read"
+description = "Ver productos, servicios e impuestos"
+
+[[permissions]]
+key = "crm.products.write"
+description = "Administrar el catálogo de productos, servicios e impuestos"
+
+[[permissions]]
+key = "crm.quotes.read"
+description = "Ver cotizaciones"
+
+[[permissions]]
+key = "crm.quotes.write"
+description = "Crear, editar, enviar y decidir cotizaciones"
+
+[events]
+emits = [
+    "crm.lead.created",
+    "crm.lead.converted",
+    "crm.opportunity.stage_changed",
+    "crm.opportunity.won",
+    "crm.opportunity.lost",
+    "crm.activity.completed",
+    "crm.quote.sent",
+    "crm.quote.accepted",
+    "crm.quote.rejected",
+]
+listens = []
+
+# Cotizaciones: las enviadas con vigencia vencida pasan a «vencida» una vez al día (quotes.py).
+[[cron]]
+name = "crm.quotes_expire"
+interval_seconds = 86400
+description = "Marca como vencidas las cotizaciones enviadas cuya vigencia ya pasó"
+
+[runtime]
+port = 8110
+healthcheck = "/health"
+
+# Sin [ui]: la shell navega por las vistas genéricas declaradas en los modelos (docs/VIEWS.md §8e),
+# como cualquier módulo de la plataforma.
+
+[[config]]
+key = "crm.default_currency"
+type = "select"
+label = "Moneda predeterminada"
+description = "Moneda usada para nuevas oportunidades."
+options = ["MXN", "USD", "EUR"]
+default = "MXN"
+permission = "crm.pipelines.manage"
+
+[[config]]
+key = "crm.rotting_days"
+type = "number"
+label = "Días para marcar oportunidad estancada"
+description = "Una oportunidad sin actividad por más de estos días se marca como estancada."
+default = 14
+permission = "crm.pipelines.manage"
+
+[[config]]
+key = "crm.auto_assign_leads"
+type = "boolean"
+label = "Asignar leads automáticamente"
+description = "Reparte los leads entrantes entre el equipo de ventas."
+default = false
+permission = "crm.pipelines.manage"

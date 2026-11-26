@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial: tu primer módulo — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav active" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Construir módulos / Tutorial: tu primer módulo</div>
+    <article>
+      <h1>Tutorial: tu primer módulo</h1>
+      <span class="level medio">Nivel medio</span>
+      <p class="lead">De cero a un módulo <strong>Inventario</strong> funcionando dentro de NOVVUS CORE: dos
+      modelos con relación, interfaz completa sin escribir React, API automática, un endpoint de
+      negocio que emite eventos, un consumidor de eventos del CRM, cron, seed, tests e i18n. Todo el
+      código es real y coherente con el SDK 0.1.6; puedes copiarlo tal cual.</p>
+
+      <h2>Qué vas a construir</h2>
+      <p>Un módulo <code>inventario</code> con un almacén (<code>Warehouse</code>) y productos
+      (<code>Product</code>) que apuntan a un almacén. Cuando el CRM gane una oportunidad, Inventario
+      creará un producto "kit" para ese cliente. Un endpoint <code>POST /products/{id}/restock</code>
+      aumentará existencias y emitirá <code>inventario.product.restocked</code>. Un cron horario avisará de
+      productos agotados. Al terminar tendrás:</p>
+<pre class="diagram">
+modules/inventario/
+├── novvus.toml            contrato: permisos, eventos, puerto, config, cron
+├── module.py              entrypoint: NovvusModule + registro de modelos + app
+├── models.py              Warehouse, Product, ALL_MODELS
+├── business.py            endpoints custom (restock, reporte de bajo stock)
+├── seed.py                datos demo por organización
+├── i18n/en-US.json        traducciones (es-MX es el idioma fuente)
+├── migrations/0001_init.sql
+└── tests/
+    ├── conftest.py        arnés: BD efímera + módulo en modo offline
+    └── test_products.py
+</pre>
+      <div class="note">
+        <b>Un módulo no es una app pegada al sistema.</b> El kernel es dueño de identidad, permisos,
+        ciclo de vida, eventos y ruteo; el módulo declara y el SDK genera. Si sientes que necesitas tocar
+        tablas ajenas, login o la shell de Next.js, falta un evento, una API pública o una extensión
+        (ver <a href="extensibilidad.html">Extensibilidad</a>). Si aún no leíste
+        <a href="conceptos.html">Conceptos</a>, hazlo antes: aquí los damos por sabidos.
+      </div>
+
+      <div class="steps">
+
+        <div class="step"><span class="num">1</span><div>
+          <h2>Requisitos y entorno de desarrollo</h2>
+          <p>Usa el <strong>modo desarrollador</strong> de <a href="instalacion.html">Instalación</a>: Postgres
+          en Docker con puerto expuesto, kernel corriendo en tu máquina y el SDK instalado en un venv.
+          Lo necesitas así porque <code>makemigration</code> incremental y <code>seed</code> se conectan a
+          Postgres por <code>localhost:5432</code>, y porque el kernel debe poder alcanzar tu módulo en
+          <code>127.0.0.1:8130</code>.</p>
+<pre><code><span class="c"># Desde la raíz del repo, una sola vez</span>
+cp .env.example .env
+make up                                   <span class="c"># Postgres en :5432 (docker-compose.yml raíz)</span>
+pip install -e sdk                        <span class="c"># Python &gt;= 3.12; instala el comando `novvus` del SDK</span>
+
+<span class="c"># En una terminal aparte, el kernel en :8000</span>
+cd kernel &amp;&amp; cargo run -p novvus-gateway
+
+<span class="c"># En otra, la web en :3000 (para ver la UI generada al final)</span>
+cd apps/web &amp;&amp; npm install &amp;&amp; npm run dev</code></pre>
+          <p>En Windows, <code>start.bat</code> levanta todo eso en ventanas separadas. Verifica que el kernel
+          responde: <code>curl localhost:8000/health</code> debe devolver <code>"version": "0.1.6"</code>.</p>
+          <div class="tip">
+            ¿Prefieres la demo Docker (<code>python install.py</code>)? Funciona para <code>deploy</code> y para
+            la UI, pero el kernel vive dentro de Docker: al correr tu módulo exporta
+            <code>NOVVUS_MODULE_BASE_URL=http://host.docker.internal:8130</code> para que el kernel lo
+            encuentre, y ten en cuenta que ese compose no expone Postgres al host (sin
+            <code>makemigration</code> incremental ni <code>seed</code> desde tu máquina).
+          </div>
+        </div></div>
+
+        <div class="step"><span class="num">2</span><div>
+          <h2>Scaffolding: <code>novvus new-module</code></h2>
+<pre><code>cd modules
+novvus new-module inventario
+<span class="c"># Módulo 'inventario' creado en .../modules/inventario</span>
+<span class="c"># Migración inicial: .../modules/inventario/migrations/0001_init.sql</span>
+cd inventario</code></pre>
+          <p>El id debe cumplir <code>[a-z][a-z0-9_]*</code> y no ser <code>core</code>, <code>api</code>,
+          <code>internal</code> ni <code>novvus</code>. El comando genera cuatro archivos: un
+          <code>novvus.toml</code> mínimo, un <code>module.py</code> con un modelo de ejemplo <code>Item</code>,
+          <code>tests/test_smoke.py</code> y <code>migrations/0001_init.sql</code> generado a partir de ese
+          <code>Item</code>.</p>
+          <p>Como vamos a reemplazar el modelo de ejemplo por los nuestros, <strong>borra ahora
+          <code>migrations/0001_init.sql</code></strong>: lo regeneraremos en el paso 6 con los modelos
+          reales. Es seguro porque aún no se ha aplicado en ningún kernel (una migración aplicada nunca se
+          edita ni se borra).</p>
+        </div></div>
+
+        <div class="step"><span class="num">3</span><div>
+          <h2>Diseña el manifiesto <code>novvus.toml</code></h2>
+          <p>Es la única fuente de verdad sobre lo que tu módulo hace; el kernel lo valida al registrarlo y
+          rechaza cualquier cosa fuera de tu namespace. Sustituye el generado por este:</p>
+<pre><code><span class="k">[module]</span>
+id = <span class="s">"inventario"</span>
+name = <span class="s">"Inventario"</span>
+version = <span class="s">"0.1.0"</span>
+description = <span class="s">"Productos, almacenes y existencias por organización."</span>
+
+<span class="c"># Tarjeta en la tienda de apps (/apps) y en el launcher. Puramente descriptivo.</span>
+<span class="k">[presentation]</span>
+display_name = <span class="s">"Inventario"</span>
+summary = <span class="s">"Controla productos, almacenes y niveles de existencia."</span>
+category = <span class="s">"Operaciones"</span>
+icon = <span class="s">"package"</span>
+accent = <span class="s">"bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"</span>
+publisher = <span class="s">"Tu empresa"</span>
+license = <span class="s">"MIT"</span>
+
+<span class="c"># Dependemos del CRM: escuchamos su evento y leemos contactos por su API pública.</span>
+<span class="k">[dependencies]</span>
+modules = [<span class="s">"crm&gt;=0.1"</span>]
+service_permissions = [<span class="s">"crm.contacts.read"</span>]
+
+<span class="c"># Permisos: SIEMPRE bajo tu id. Los CRUD generados usan {id}.{recurso}.read|write.</span>
+<span class="k">[[permissions]]</span>
+key = <span class="s">"inventario.products.read"</span>
+description = <span class="s">"Ver productos"</span>
+
+<span class="k">[[permissions]]</span>
+key = <span class="s">"inventario.products.write"</span>
+description = <span class="s">"Crear, editar y reabastecer productos"</span>
+
+<span class="k">[[permissions]]</span>
+key = <span class="s">"inventario.warehouses.read"</span>
+description = <span class="s">"Ver almacenes"</span>
+
+<span class="k">[[permissions]]</span>
+key = <span class="s">"inventario.warehouses.write"</span>
+description = <span class="s">"Crear y editar almacenes"</span>
+
+<span class="k">[[permissions]]</span>
+key = <span class="s">"inventario.reports.read"</span>
+description = <span class="s">"Ver reportes de inventario"</span>
+
+<span class="c"># Eventos: emites solo bajo tu namespace; escuchas de cualquier módulo.</span>
+<span class="k">[events]</span>
+emits = [<span class="s">"inventario.product.restocked"</span>, <span class="s">"inventario.product.out_of_stock"</span>]
+listens = [<span class="s">"crm.opportunity.won"</span>]
+
+<span class="k">[runtime]</span>
+port = <span class="n">8130</span>
+healthcheck = <span class="s">"/health"</span>
+
+<span class="c"># Configuración por organización: la shell la renderiza en /settings; el SDK la lee tipada.</span>
+<span class="k">[[config]]</span>
+key = <span class="s">"inventario.low_stock_threshold"</span>
+type = <span class="s">"number"</span>
+label = <span class="s">"Umbral de bajo stock"</span>
+description = <span class="s">"Un producto por debajo de este valor se considera crítico."</span>
+default = <span class="n">5</span>
+permission = <span class="s">"inventario.products.write"</span>
+
+<span class="c"># Job programado: el kernel lo dispara cada hora por cada organización que tenga el módulo habilitado.</span>
+<span class="k">[[cron]]</span>
+name = <span class="s">"inventario.check_out_of_stock"</span>
+interval_seconds = <span class="n">3600</span>
+description = <span class="s">"Emite inventario.product.out_of_stock por cada producto en cero"</span></code></pre>
+          <p>Fíjate en lo que <strong>no</strong> declaramos: <code>[ui]</code>. Un módulo sin páginas propias
+          simplemente no declara <code>nav</code> ni <code>entry</code>; la shell deriva su navegación de los
+          modelos del meta y lo abre en <code>/m/inventario/products</code>. Si más adelante construyes páginas
+          dedicadas en <code>apps/web</code>, entonces sí:</p>
+          <details class="fold"><summary>Ver ejemplo de <code>[ui]</code> para cuando tengas páginas propias</summary>
+<pre><code><span class="k">[ui]</span>
+entry = <span class="s">"/inventario"</span>            <span class="c"># destino del botón "Abrir"</span>
+
+<span class="k">[[ui.nav]]</span>                       <span class="c"># chrome del propio módulo (ModuleShell); toda path bajo /inventario, jamás /m/...</span>
+path = <span class="s">"/inventario/reports"</span>
+label = <span class="s">"Reportes"</span>
+icon = <span class="s">"bar-chart"</span>
+permission = <span class="s">"inventario.reports.read"</span>
+
+<span class="k">[[ui.dashboard]]</span>                 <span class="c"># widget en el launcher de la plataforma</span>
+title = <span class="s">"Inventario"</span>
+path = <span class="s">"/inventario"</span>
+permission = <span class="s">"inventario.products.read"</span></code></pre>
+          </details>
+        </div></div>
+
+        <div class="step"><span class="num">4</span><div>
+          <h2>Los modelos: <code>models.py</code></h2>
+          <p>Todo modelo hereda de <code>NovvusModel</code>, que aporta las columnas de sistema
+          (<code>id</code> UUIDv7, <code>org_id</code>, <code>ext</code>, <code>custom</code>, <code>created_at</code>,
+          <code>updated_at</code>, <code>deleted_at</code>). Tú solo escribes las de negocio. El atributo
+          <code>__novvus_views__</code> es lo que convierte el modelo en pantallas: etiquetas es-MX, columnas de
+          la lista, layout del formulario, kanban, calendario, y los flags de adjuntos, chatter y tracking.</p>
+<pre><code><span class="s">"""Modelos de Inventario. Las columnas de sistema vienen del SDK."""</span>
+
+<span class="k">from</span> datetime <span class="k">import</span> datetime
+<span class="k">from</span> decimal <span class="k">import</span> Decimal
+<span class="k">from</span> enum <span class="k">import</span> StrEnum
+<span class="k">from</span> uuid <span class="k">import</span> UUID
+
+<span class="k">from</span> sqlalchemy <span class="k">import</span> Enum <span class="k">as</span> SAEnum
+<span class="k">from</span> sqlalchemy <span class="k">import</span> ForeignKey, Numeric, String, UniqueConstraint
+<span class="k">from</span> sqlalchemy.dialects.postgresql <span class="k">import</span> UUID <span class="k">as</span> PgUUID
+<span class="k">from</span> sqlalchemy.orm <span class="k">import</span> Mapped, mapped_column
+
+<span class="k">from</span> novvus_sdk <span class="k">import</span> NovvusModel
+
+
+<span class="c"># Miembros en minúsculas: SQLAlchemy persiste el NOMBRE del miembro y así coincide con la API.</span>
+<span class="k">class</span> ProductCategory(StrEnum):
+    general = <span class="s">"general"</span>
+    raw_material = <span class="s">"raw_material"</span>
+    finished = <span class="s">"finished"</span>
+
+
+<span class="k">def</span> <span class="f">_enum</span>(enum_cls: type[StrEnum]) -&gt; SAEnum:
+    <span class="c"># native_enum=False: VARCHAR con CHECK, sin tipos ENUM de Postgres que complican migraciones.</span>
+    <span class="k">return</span> SAEnum(enum_cls, native_enum=False, length=20)
+
+
+<span class="k">class</span> Warehouse(NovvusModel):
+    __resource__ = <span class="s">"warehouses"</span>            <span class="c"># segmento de URL y nombre del modelo en el meta</span>
+
+    name: Mapped[str] = mapped_column(String(120))
+    city: Mapped[str] = mapped_column(String(120), default=<span class="s">""</span>)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+    __novvus_views__ = {
+        <span class="s">"label"</span>: <span class="s">"Almacenes"</span>,
+        <span class="s">"display"</span>: <span class="s">"name"</span>,
+        <span class="s">"labels"</span>: {<span class="s">"name"</span>: <span class="s">"Nombre"</span>, <span class="s">"city"</span>: <span class="s">"Ciudad"</span>, <span class="s">"is_active"</span>: <span class="s">"Activo"</span>},
+        <span class="s">"list"</span>: {<span class="s">"columns"</span>: [<span class="s">"name"</span>, <span class="s">"city"</span>, <span class="s">"is_active"</span>], <span class="s">"default_order"</span>: <span class="s">"name"</span>},
+        <span class="s">"form"</span>: {<span class="s">"layout"</span>: [[<span class="s">"name"</span>, <span class="s">"city"</span>], [<span class="s">"is_active"</span>]]},
+    }
+
+
+<span class="k">class</span> Product(NovvusModel):
+    __resource__ = <span class="s">"products"</span>
+    __table_args__ = (UniqueConstraint(<span class="s">"org_id"</span>, <span class="s">"sku"</span>),)   <span class="c"># un SKU por organización</span>
+
+    name: Mapped[str] = mapped_column(String(200))
+    sku: Mapped[str] = mapped_column(String(40))
+    category: Mapped[ProductCategory] = mapped_column(
+        _enum(ProductCategory), default=ProductCategory.general
+    )
+    stock: Mapped[int] = mapped_column(default=0)
+    min_stock: Mapped[int] = mapped_column(default=5)
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal(<span class="s">"0"</span>))
+    <span class="c"># FK dentro del propio esquema: el nombre de tabla es el snake_case de la clase.</span>
+    warehouse_id: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey(<span class="s">"warehouse.id"</span>, ondelete=<span class="s">"SET NULL"</span>), nullable=True
+    )
+    restocked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    __novvus_api__ = {<span class="s">"search"</span>: [<span class="s">"name"</span>, <span class="s">"sku"</span>]}   <span class="c"># columnas que responden a ?q=</span>
+
+    __novvus_views__ = {
+        <span class="s">"label"</span>: <span class="s">"Productos"</span>,
+        <span class="s">"display"</span>: <span class="s">"name"</span>,               <span class="c"># campo representativo en títulos y relaciones</span>
+        <span class="s">"attachments"</span>: True,             <span class="c"># panel de adjuntos en el formulario</span>
+        <span class="s">"chatter"</span>: True,                 <span class="c"># hilo de comentarios, notas y seguidores</span>
+        <span class="s">"track"</span>: [<span class="s">"stock"</span>, <span class="s">"price"</span>, <span class="s">"warehouse_id"</span>],   <span class="c"># cambios → mensaje system en el chatter</span>
+        <span class="s">"labels"</span>: {
+            <span class="s">"name"</span>: <span class="s">"Nombre"</span>, <span class="s">"sku"</span>: <span class="s">"SKU"</span>, <span class="s">"category"</span>: <span class="s">"Categoría"</span>,
+            <span class="s">"stock"</span>: <span class="s">"Existencias"</span>, <span class="s">"min_stock"</span>: <span class="s">"Mínimo"</span>, <span class="s">"price"</span>: <span class="s">"Precio"</span>,
+            <span class="s">"warehouse_id"</span>: <span class="s">"Almacén"</span>, <span class="s">"restocked_at"</span>: <span class="s">"Último reabasto"</span>,
+        },
+        <span class="s">"list"</span>: {
+            <span class="s">"columns"</span>: [<span class="s">"name"</span>, <span class="s">"sku"</span>, <span class="s">"category"</span>, <span class="s">"stock"</span>, <span class="s">"price"</span>, <span class="s">"warehouse_id"</span>],
+            <span class="s">"default_order"</span>: <span class="s">"name"</span>,
+        },
+        <span class="s">"form"</span>: {
+            <span class="s">"layout"</span>: [[<span class="s">"name"</span>, <span class="s">"sku"</span>], [<span class="s">"category"</span>, <span class="s">"warehouse_id"</span>],
+                       [<span class="s">"stock"</span>, <span class="s">"min_stock"</span>, <span class="s">"price"</span>], [<span class="s">"restocked_at"</span>]],
+        },
+        <span class="s">"kanban"</span>: {<span class="s">"group_by"</span>: <span class="s">"category"</span>, <span class="s">"card"</span>: [<span class="s">"name"</span>, <span class="s">"stock"</span>]},
+        <span class="s">"calendar"</span>: {<span class="s">"date_field"</span>: <span class="s">"restocked_at"</span>, <span class="s">"title"</span>: <span class="s">"name"</span>},
+    }
+
+
+<span class="c"># El orden importa: las tablas referenciadas van primero (la migración 0001 crea en este orden).</span>
+ALL_MODELS: list[type[NovvusModel]] = [Warehouse, Product]</code></pre>
+          <table>
+            <tr><th>Clave de <code>__novvus_views__</code></th><th>Para qué</th></tr>
+            <tr><td><code>label</code>, <code>labels</code></td><td>Nombre del modelo y de cada campo, en es-MX (la cadena es la clave de traducción).</td></tr>
+            <tr><td><code>display</code></td><td>Campo representativo: título del registro y texto en relaciones/autocomplete.</td></tr>
+            <tr><td><code>list</code>, <code>form</code></td><td>Columnas de la lista y filas del formulario (1-3 campos por fila). Si los omites, el SDK deriva una lista y un form básicos: todo modelo es navegable.</td></tr>
+            <tr><td><code>kanban</code></td><td><code>group_by</code> debe ser un campo agrupable (string, boolean, date o relación). Arrastrar una tarjeta hace <code>PATCH</code> de ese campo.</td></tr>
+            <tr><td><code>calendar</code></td><td><code>date_field</code> debe ser date/datetime.</td></tr>
+            <tr><td><code>attachments</code>, <code>chatter</code>, <code>track</code></td><td>Activan el panel de adjuntos, el hilo de colaboración y los mensajes automáticos de cambio (ver <a href="colaboracion.html">Colaboración</a>).</td></tr>
+          </table>
+          <p>La validación es <em>fail-fast</em>: un campo que no existe en <code>labels</code>, un
+          <code>group_by</code> no agrupable o una clave desconocida hacen que el módulo no arranque, con
+          el mensaje exacto del error. Los detalles del meta están en
+          <a href="vistas-genericas.html">Vistas genéricas y metadatos</a>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">5</span><div>
+          <h2>El entrypoint: <code>module.py</code></h2>
+          <p>El CLI del SDK exige que <code>module.py</code> viva junto a <code>novvus.toml</code> y defina
+          <code>module = NovvusModule()</code>. Aquí registramos modelos, colgamos los endpoints de negocio, el
+          consumidor de eventos, el cron y el seed, y creamos la app FastAPI:</p>
+<pre><code><span class="s">"""Inventario — módulo NOVVUS. Construido exclusivamente con novvus-sdk."""</span>
+
+<span class="k">import</span> logging
+<span class="k">from</span> pathlib <span class="k">import</span> Path
+<span class="k">from</span> uuid <span class="k">import</span> UUID
+
+<span class="k">import</span> business
+<span class="k">import</span> seed <span class="k">as</span> seed_module
+<span class="k">from</span> models <span class="k">import</span> ALL_MODELS, Product
+<span class="k">from</span> sqlalchemy <span class="k">import</span> select
+<span class="k">from</span> sqlalchemy.ext.asyncio <span class="k">import</span> AsyncSession
+
+<span class="k">from</span> novvus_sdk <span class="k">import</span> NovvusModule
+<span class="k">from</span> novvus_sdk.events <span class="k">import</span> Event
+
+logger = logging.getLogger(<span class="s">"novvus.inventario"</span>)
+
+module = NovvusModule(Path(__file__).with_name(<span class="s">"novvus.toml"</span>))
+
+<span class="k">for</span> model <span class="k">in</span> ALL_MODELS:
+    module.model(model)          <span class="c"># tabla + RLS en migraciones, CRUD en la API, entrada en el meta</span>
+
+business.register(module)        <span class="c"># endpoints custom (paso 12)</span>
+module.seed(seed_module.seed)    <span class="c"># datos demo (paso 15)</span>
+
+
+<span class="c"># --- Consumidor de eventos (paso 13): el CRM ganó una oportunidad → producto "kit" -----------</span>
+<span class="f">@module.on(<span class="s">"crm.opportunity.won"</span>)</span>
+<span class="k">async def</span> <span class="f">create_kit_for_won_opportunity</span>(event: Event, session: AsyncSession) -&gt; None:
+    opportunity_id = event.payload.get(<span class="s">"opportunity_id"</span>)
+    <span class="k">if</span> <span class="k">not</span> opportunity_id:
+        <span class="k">return</span>
+    sku = f<span class="s">"KIT-{opportunity_id[:8].upper()}"</span>
+
+    <span class="c"># El SDK ya descartó duplicados por event.id; esto es cinturón y tirantes de negocio.</span>
+    existing = <span class="k">await</span> session.scalar(select(Product).where(Product.sku == sku))
+    <span class="k">if</span> existing <span class="k">is not</span> None:
+        <span class="k">return</span>
+
+    <span class="c"># Dato de otro módulo: SOLO por su API pública, vía gateway (paso 14). Degradar, nunca romper.</span>
+    contact_name = <span class="s">""</span>
+    contact_id = event.payload.get(<span class="s">"contact_id"</span>)
+    <span class="k">if</span> contact_id <span class="k">and</span> module.kernel <span class="k">is not</span> None:
+        <span class="k">try</span>:
+            contact = <span class="k">await</span> module.call(<span class="s">"GET"</span>, f<span class="s">"/api/crm/contacts/{contact_id}"</span>, org_id=event.org_id)
+            contact_name = str(contact.get(<span class="s">"name"</span>, <span class="s">""</span>))
+        <span class="k">except</span> Exception <span class="k">as</span> error:
+            logger.warning(<span class="s">"CRM no disponible al resolver el contacto %s: %s"</span>, contact_id, error)
+
+    session.add(
+        Product(
+            org_id=event.org_id,
+            name=(f<span class="s">"Kit de bienvenida — {contact_name}"</span> <span class="k">if</span> contact_name <span class="k">else</span> <span class="s">"Kit de bienvenida"</span>),
+            sku=sku,
+            stock=1,
+        )
+    )
+    <span class="k">await</span> session.flush()
+
+
+<span class="c"># --- Cron (declarado en [[cron]]): corre dentro del tenant de cada organización habilitada ---</span>
+<span class="f">@module.cron(<span class="s">"inventario.check_out_of_stock"</span>)</span>
+<span class="k">async def</span> <span class="f">check_out_of_stock</span>(session: AsyncSession) -&gt; None:
+    rows = (
+        <span class="k">await</span> session.scalars(
+            select(Product).where(Product.stock &lt;= 0, Product.deleted_at.is_(None))
+        )
+    ).all()
+    <span class="k">for</span> product <span class="k">in</span> rows:
+        <span class="k">await</span> module.emit(
+            <span class="s">"inventario.product.out_of_stock"</span>,
+            {<span class="s">"product_id"</span>: str(product.id), <span class="s">"sku"</span>: product.sku},
+        )
+
+
+<span class="c"># --- Hook por organización (best-effort): un almacén inicial al instalar ---------------------</span>
+<span class="f">@module.on_install</span>
+<span class="k">async def</span> <span class="f">create_default_warehouse</span>(session: AsyncSession) -&gt; None:
+    <span class="k">from</span> models <span class="k">import</span> Warehouse
+    <span class="k">from</span> novvus_sdk <span class="k">import</span> current_context
+
+    session.add(Warehouse(org_id=current_context().org_id, name=<span class="s">"Almacén principal"</span>))
+    <span class="k">await</span> session.flush()
+
+
+app = module.create_app()</code></pre>
+          <p>Firmas que conviene memorizar (todas de <code>sdk/src/novvus_sdk/app.py</code>):</p>
+          <table>
+            <tr><th>Primitiva</th><th>Firma</th><th>Nota</th></tr>
+            <tr><td><code>module.model(cls)</code></td><td>Registra un <code>NovvusModel</code>; también sirve como decorador <code>@module.model</code>.</td><td>Valida <code>__novvus_views__</code> al instante.</td></tr>
+            <tr><td><code>@module.on(tipo)</code></td><td><code>async def h(event: Event, session: AsyncSession)</code></td><td>El tipo debe estar en <code>listens</code>; idempotencia por <code>event.id</code> incluida.</td></tr>
+            <tr><td><code>await module.emit(tipo, payload, org_id=None)</code></td><td>Publica en el bus.</td><td>Debe estar en <code>emits</code>. En modo offline (tests) no falla: registra un warning.</td></tr>
+            <tr><td><code>await module.call(método, ruta, org_id=None, json=None)</code></td><td>API pública de otro módulo vía gateway.</td><td>Requiere <code>service_permissions</code>; <code>RuntimeError</code> en offline.</td></tr>
+            <tr><td><code>@module.cron(nombre)</code></td><td><code>async def h(session)</code></td><td>Nombre declarado en <code>[[cron]]</code>.</td></tr>
+            <tr><td><code>@module.on_install/on_enable/on_disable/on_uninstall</code></td><td><code>async def h(session)</code></td><td>Por organización; best-effort.</td></tr>
+            <tr><td><code>@module.seed</code></td><td><code>async def seed(session, org_id: UUID)</code></td><td>Lo ejecuta <code>novvus seed --org</code>.</td></tr>
+            <tr><td><code>await module.config(org_id=None)</code></td><td>Valores efectivos de <code>[[config]]</code>.</td><td>Offline: solo defaults.</td></tr>
+            <tr><td><code>module.session_dependency()</code></td><td>Dependencia FastAPI que entrega una sesión con tenant.</td><td>Úsala en todo endpoint custom.</td></tr>
+            <tr><td><code>module._("texto")</code></td><td>Traduce según el locale del request.</td><td>es-MX devuelve la cadena tal cual.</td></tr>
+          </table>
+        </div></div>
+
+        <div class="step"><span class="num">6</span><div>
+          <h2>Genera la migración: <code>novvus makemigration -m init</code></h2>
+          <p>Antes de esto, crea <code>business.py</code> y <code>seed.py</code> aunque sea vacíos (con
+          <code>def register(module): pass</code> y <code>async def seed(session, org_id): pass</code>), porque
+          <code>module.py</code> los importa y el CLI carga <code>module.py</code> para leer los modelos.</p>
+<pre><code>novvus makemigration -m init
+<span class="c"># Migración generada: .../modules/inventario/migrations/0001_init.sql</span></code></pre>
+          <p>La primera migración no necesita base de datos: se genera del metadata de tus modelos. Ábrela.
+          Verás, por cada tabla, el <code>CREATE TABLE</code> con tus columnas <strong>más</strong> las de
+          sistema, el índice por <code>org_id</code> y el bloque de aislamiento por tenant:</p>
+<pre><code><span class="k">CREATE TABLE</span> product (
+    name VARCHAR(200) <span class="k">NOT NULL</span>,
+    sku VARCHAR(40) <span class="k">NOT NULL</span>,
+    category VARCHAR(20) <span class="k">NOT NULL</span>,
+    stock INTEGER <span class="k">NOT NULL</span>,
+    min_stock INTEGER <span class="k">NOT NULL</span>,
+    price NUMERIC(12, 2) <span class="k">NOT NULL</span>,
+    warehouse_id UUID,
+    restocked_at TIMESTAMP WITHOUT TIME ZONE,
+    id UUID <span class="k">NOT NULL</span>,
+    org_id UUID <span class="k">NOT NULL</span>,
+    ext JSONB <span class="k">DEFAULT</span> <span class="s">'{}'</span>::jsonb <span class="k">NOT NULL</span>,       <span class="c">-- datos que otros módulos te extienden</span>
+    custom JSONB <span class="k">DEFAULT</span> <span class="s">'{}'</span>::jsonb <span class="k">NOT NULL</span>,    <span class="c">-- campos personalizados por organización</span>
+    created_at TIMESTAMP WITH TIME ZONE <span class="k">DEFAULT</span> now() <span class="k">NOT NULL</span>,
+    updated_at TIMESTAMP WITH TIME ZONE <span class="k">DEFAULT</span> now() <span class="k">NOT NULL</span>,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    <span class="k">PRIMARY KEY</span> (id),
+    <span class="k">UNIQUE</span> (org_id, sku),
+    <span class="k">FOREIGN KEY</span>(warehouse_id) <span class="k">REFERENCES</span> warehouse (id) <span class="k">ON DELETE SET NULL</span>
+);
+
+<span class="k">CREATE INDEX</span> ix_product_org_id <span class="k">ON</span> product (org_id);
+
+<span class="k">ALTER TABLE</span> product <span class="k">ENABLE ROW LEVEL SECURITY</span>;
+<span class="k">ALTER TABLE</span> product <span class="k">FORCE ROW LEVEL SECURITY</span>;
+<span class="k">CREATE POLICY</span> tenant_isolation <span class="k">ON</span> product
+    <span class="k">USING</span> (org_id = current_setting(<span class="s">'app.org_id'</span>)::uuid)
+    <span class="k">WITH CHECK</span> (org_id = current_setting(<span class="s">'app.org_id'</span>)::uuid);
+
+<span class="c">-- idempotent event consumption (documents/docs/EVENTS.md §4)</span>
+<span class="k">CREATE TABLE IF NOT EXISTS</span> _processed_events (
+    event_id uuid <span class="k">PRIMARY KEY</span>,
+    processed_at timestamptz <span class="k">NOT NULL DEFAULT</span> now()
+);</code></pre>
+          <details class="fold"><summary>¿Qué pasó por dentro? RLS y el rol del módulo</summary>
+            <p>El SQL no lleva nombre de esquema: el kernel lo ejecuta con <code>search_path = mod_inventario</code>
+            y con el rol <code>novvus_module</code>, que solo tiene privilegios sobre esquemas <code>mod_*</code> y
+            <em>no</em> tiene <code>BYPASSRLS</code>. Cada tabla queda con <code>FORCE ROW LEVEL SECURITY</code> y una
+            política que compara <code>org_id</code> con <code>current_setting('app.org_id')</code>. El SDK abre cada
+            sesión con <code>SET LOCAL app.org_id = '&lt;org del request&gt;'</code>, así que una consulta sin tenant
+            no devuelve "todo": falla (<em>fail-closed</em>). Por eso no escribes <code>WHERE org_id = …</code> en
+            ninguna parte. La tabla <code>_processed_events</code> es la memoria de idempotencia del paso 13.</p>
+          </details>
+          <p>Las migraciones posteriores se generan por diff contra tu base de desarrollo
+          (<code>NOVVUS_DATABASE_URL=… novvus makemigration -m add_campo</code>) y se numeran solas; lo verás
+          en <a href="actualizacion.html#modulo">Actualización → actualizar un módulo</a>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">7</span><div>
+          <h2>Obtén un JWT de administrador</h2>
+          <p>Registrar e instalar módulos exige el permiso <code>core.modules.manage</code> en la organización
+          activa (el Owner de una organización tiene <code>*</code>). En el entorno de desarrollo no hay usuario
+          demo: créalo, crea una organización y pide un token <em>con</em> esa organización activa. Necesitas
+          <code>jq</code>:</p>
+<pre><code>K=http://localhost:8000
+
+<span class="c"># 1) Cuenta (una vez). Si ya existe, el kernel responde error de duplicado y sigues al login.</span>
+curl -s -X POST $K/api/core/auth/register -H "Content-Type: application/json" \
+  -d '{"email":"dev@ejemplo.test","password":"una-clave-larga-de-dev","display_name":"Dev"}'
+
+<span class="c"># 2) Login → access + refresh</span>
+TOKENS=$(curl -s -X POST $K/api/core/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"dev@ejemplo.test","password":"una-clave-larga-de-dev"}' | jq -c .tokens)
+ACCESS=$(echo $TOKENS | jq -r .access_token)
+
+<span class="c"># 3) Organización (una vez); el creador queda como Owner</span>
+curl -s -X POST $K/api/core/orgs -H "Authorization: Bearer $ACCESS" -H "Content-Type: application/json" \
+  -d '{"name":"Taller Dev","slug":"taller-dev"}'
+ORG=$(curl -s $K/api/core/orgs -H "Authorization: Bearer $ACCESS" | jq -r '.[0].id')
+
+<span class="c"># 4) Refresh con org_id: el JWT resultante lleva la organización activa</span>
+JWT=$(curl -s -X POST $K/api/core/auth/refresh -H "Content-Type: application/json" \
+  -d "{\"refresh_token\":$(echo $TOKENS | jq .refresh_token),\"org_id\":\"$ORG\"}" | jq -r .tokens.access_token)
+echo $JWT | cut -c1-20</code></pre>
+          <p>Es exactamente la secuencia que ejecuta <code>scripts/bootstrap.py</code> en modo demo. En la demo
+          Docker puedes saltarte 1 y 3 usando <code>demo@novvus.dev</code> / <code>demo-password-123</code>. El access
+          token dura 15 minutos: si más adelante recibes 401, repite el login.</p>
+        </div></div>
+
+        <div class="step"><span class="num">8</span><div>
+          <h2>Despliega: <code>novvus deploy</code></h2>
+<pre><code>cd modules/inventario
+novvus deploy --kernel http://127.0.0.1:8000 --token $JWT
+<span class="c"># Registrado: inventario</span>
+<span class="c"># Instalado. Migraciones aplicadas: ['0001_init']</span>
+<span class="c"># Habilitado.</span>
+<span class="c">#</span>
+<span class="c"># Token de servicio del módulo (guárdalo, se muestra UNA sola vez):</span>
+<span class="c">#   NOVVUS_SERVICE_TOKEN=nvk_...</span></code></pre>
+          <p>Tres transiciones en un comando: <strong>register</strong> (valida el manifiesto y guarda el SQL de
+          las migraciones), <strong>install</strong> (crea <code>mod_inventario</code>, aplica <code>0001_init</code> en
+          su propia transacción, registra tus cinco permisos en <code>core.permissions</code>, siembra el cron en
+          <code>core.cron_jobs</code> y emite el token de servicio) y <strong>enable</strong> (verifica que
+          <code>crm</code> está <code>ENABLED</code>; si no, falla aquí).</p>
+          <div class="warn">
+            <b>Guarda el token ahora.</b> El kernel almacena solo su hash; no se puede volver a mostrar. Si lo
+            pierdes tendrás que deshabilitar, desinstalar (destruye <code>mod_inventario</code>) y desplegar de
+            nuevo. Lo cómodo en dev es un <code>modules/inventario/.env</code> (ignorado por Git) con
+            <code>NOVVUS_SERVICE_TOKEN=nvk_...</code>, que <code>start.bat</code> ya sabe leer.
+          </div>
+          <p>Errores típicos de <code>register</code>: permiso o evento fuera de <code>inventario.*</code>, id
+          reservado, <code>service_permissions</code> con <code>core.*</code>, o una <code>path</code> de
+          <code>[ui]</code> fuera de <code>/inventario</code>. El mensaje del kernel dice cuál.</p>
+        </div></div>
+
+        <div class="step"><span class="num">9</span><div>
+          <h2>Arranca el runtime: <code>novvus run --port 8130</code></h2>
+<pre><code>NOVVUS_SERVICE_TOKEN=nvk_... novvus run --port 8130
+<span class="c"># INFO: Uvicorn running on http://127.0.0.1:8130</span></code></pre>
+          <p>El puerto sale de <code>--port</code>, o de <code>NOVVUS_MODULE_PORT</code>, o de
+          <code>[runtime] port</code>, o 8100. En Windows el CLI fuerza el <code>SelectorEventLoop</code> (psycopg
+          async no funciona con el Proactor). Comprueba el módulo directamente: <code>curl localhost:8130/health</code>
+          → <code>{"status": "ok", "module": "inventario", "version": "0.1.0", "degraded_dependencies": {}}</code>.
+          Si el CRM estuviera deshabilitado verías <code>"status": "degraded"</code>.</p>
+          <details class="fold"><summary>¿Qué pasó por dentro? Handshake, meta y HMAC</summary>
+            <p>Al arrancar, <code>module.startup()</code> ve <code>NOVVUS_SERVICE_TOKEN</code> y llama a
+            <code>POST /api/core/modules/handshake</code> con <code>{module_id, version, base_url, meta}</code>. El
+            <code>meta</code> es el documento JSON que <code>build_module_meta()</code> construye desde tus modelos y
+            sus <code>__novvus_views__</code>. El kernel valida ese documento con tipos estrictos (tamaño ≤ 512 KB,
+            nombres <code>^[a-z][a-z0-9_]{0,63}$</code>, permisos dentro del namespace del módulo) y lo persiste en
+            <code>core.modules.meta</code>; <strong>un meta inválido rechaza el handshake</strong>, así que el módulo
+            no arranca "a medias". En la respuesta recibe dos cosas que guarda en memoria: el
+            <strong>secreto HMAC</strong> con el que el gateway firma los headers internos, y el
+            <strong>DSN</strong> del rol <code>novvus_module</code>. Desde ese momento, todo request que no sea
+            <code>/health</code> pasa por un middleware que exige <code>x-novvus-user</code>, <code>x-novvus-org</code>,
+            <code>x-novvus-perms</code>, <code>x-novvus-timestamp</code> y <code>x-novvus-signature</code> (HMAC-SHA256 sobre
+            usuario, org, permisos, timestamp, método y ruta; ventana de 60 s). Sin firma válida: 401. Por eso
+            <code>curl localhost:8130/api/inventario/products</code> directo <em>falla</em>, y por eso solo el
+            gateway puede originar tráfico. El endpoint <code>/_novvus/meta</code> te deja inspeccionar el meta en
+            dev, pero la copia autoritativa es la que viajó en el handshake.</p>
+          </details>
+        </div></div>
+
+        <div class="step"><span class="num">10</span><div>
+          <h2>Habilítalo para la organización desde la tienda</h2>
+          <p><code>deploy</code> habilitó el módulo a nivel <em>instancia</em>. Cada organización decide además si
+          lo usa. Abre <code>http://localhost:3000</code>, entra con tu usuario dev, ve a
+          <strong>Aplicaciones</strong> (<code>/apps</code>) y pulsa <strong>Habilitar</strong> en Inventario. La tienda
+          calcula el plan de dependencias (<code>GET /api/core/orgs/{org}/modules/inventario/plan</code>) y, si el
+          CRM no estaba habilitado para tu organización, lo habilita primero. Al habilitar, el kernel llama a tu
+          hook <code>on_install</code> y aparece "Almacén principal".</p>
+          <p>Por API es lo mismo:</p>
+<pre><code>curl -s -X POST $K/api/core/orgs/$ORG/modules/inventario/enable -H "Authorization: Bearer $JWT"</code></pre>
+          <p>Tu usuario es Owner (<code>*</code>), así que ya tiene todos los permisos <code>inventario.*</code>. Para
+          otros usuarios crearás roles en Administración con, por ejemplo,
+          <code>inventario.products.read</code> e <code>inventario.warehouses.read</code>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">11</span><div>
+          <h2>Mira la interfaz que no escribiste</h2>
+          <p>En el launcher aparece la tarjeta de Inventario (los datos de <code>[presentation]</code>). Ábrela:
+          aterrizas en <code>/m/inventario/products</code>, dentro del chrome del módulo, con navegación derivada
+          de tus dos modelos. Sin una línea de React tienes:</p>
+          <ul>
+            <li><strong>Lista</strong> con las columnas de <code>list.columns</code>, búsqueda (<code>?q=</code> sobre
+            <code>name</code> y <code>sku</code>), constructor visual de filtros, orden por columna, agrupación,
+            paginación por cursor, selección múltiple y exportación CSV/XLSX.</li>
+            <li><strong>Formulario</strong> en <code>/m/inventario/products/new</code> y <code>/m/inventario/products/{id}</code>
+            con el layout que declaraste, validación (required y tipo), un selector con autocomplete para
+            <code>warehouse_id</code> (usa el <code>display</code> de <code>Warehouse</code>), el panel de adjuntos y el
+            chatter con seguidores, notas y actividades.</li>
+            <li><strong>Kanban</strong> por categoría (arrastrar cambia <code>category</code>) y
+            <strong>calendario</strong> por <code>restocked_at</code>.</li>
+            <li>En <code>/settings</code>, el formulario de "Umbral de bajo stock", y en
+            <code>/settings/custom-fields</code> el administrador puede añadir campos a Productos sin tocar tu
+            código (van a la columna <code>custom</code>).</li>
+          </ul>
+          <p>Todo esto sale de <code>GET /api/core/meta</code>, que el kernel filtra por permisos: un usuario sin
+          <code>inventario.warehouses.read</code> ni siquiera ve que existe el modelo. Cómo personalizarlo, y cómo
+          sustituir una vista genérica por una propia, está en
+          <a href="vistas-genericas.html">Vistas genéricas y metadatos</a>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">12</span><div>
+          <h2>Prueba la API automática con curl</h2>
+          <p>Todo pasa por el gateway (<code>:8000</code>) con tu JWT; el gateway valida el token, resuelve tus
+          permisos vivos y firma los headers hacia <code>:8130</code>.</p>
+<pre><code>A="Authorization: Bearer $JWT"; J="Content-Type: application/json"
+B=$K/api/inventario
+
+<span class="c"># Crear un almacén y un producto (201). Campos desconocidos u org_id en el body → 422.</span>
+WH=$(curl -s -X POST $B/warehouses -H "$A" -H "$J" -d '{"name":"Bodega Norte","city":"Monterrey"}' | jq -r .id)
+curl -s -X POST $B/products -H "$A" -H "$J" \
+  -d "{\"name\":\"Café de Chiapas 1 kg\",\"sku\":\"CAF-001\",\"category\":\"finished\",\"stock\":12,\"price\":\"189.00\",\"warehouse_id\":\"$WH\"}"
+
+<span class="c"># Listar: paginación keyset, orden y búsqueda</span>
+curl -s "$B/products?limit=20&amp;order_by=-created_at&amp;q=caf" -H "$A"
+<span class="c"># → {"items": [...], "next_cursor": null}</span>
+
+<span class="c"># Filtro plano por igualdad (cualquier columna) y DSL JSON (?filter=)</span>
+curl -s "$B/products?category=finished" -H "$A"
+curl -s -G $B/products -H "$A" --data-urlencode \
+  'filter={"and":[{"field":"stock","op":"lt","value":20},{"field":"name","op":"contains","value":"café"}]}'
+
+<span class="c"># Actualizar (PATCH parcial). "stock" está en track: el chatter recibe un mensaje system {field, old, new}.</span>
+P=$(curl -s "$B/products?sku=CAF-001" -H "$A" | jq -r '.items[0].id')
+curl -s -X PATCH $B/products/$P -H "$A" -H "$J" -d '{"stock": 9}'
+
+<span class="c"># Agrupar (alimenta el kanban) y exportar</span>
+curl -s "$B/products/group?by=category" -H "$A"
+<span class="c"># → {"groups": [{"value": "finished", "label": "finished", "count": 1}]}</span>
+curl -s "$B/products/export?format=csv&amp;order_by=name" -H "$A" -o productos.csv
+
+<span class="c"># Borrado suave (204): la fila conserva deleted_at y desaparece de la lista</span>
+curl -s -X DELETE $B/products/$P -H "$A" -o /dev/null -w "%{http_code}\n"</code></pre>
+          <table>
+            <tr><th>Ruta</th><th>Permiso</th><th>Detalle</th></tr>
+            <tr><td><code>GET /api/inventario/products</code></td><td><code>inventario.products.read</code></td><td><code>limit</code> 1-200 (50), <code>cursor</code>, <code>order_by=[-]campo</code>, <code>q</code>, <code>filter</code>, <code>columna=valor</code>.</td></tr>
+            <tr><td><code>GET …/products/group?by=</code></td><td>read</td><td>Solo campos agrupables; admite <code>q</code> y <code>filter</code>.</td></tr>
+            <tr><td><code>GET …/products/export?format=csv|xlsx</code></td><td>read</td><td>Mismo filtrado que la lista; labels traducidos; tope de 100 000 filas (422 si lo excedes).</td></tr>
+            <tr><td><code>POST …/products</code></td><td><code>inventario.products.write</code></td><td><code>extra="forbid"</code>: un <code>org_id</code> del cliente nunca entra.</td></tr>
+            <tr><td><code>GET/PATCH/DELETE …/products/{id}</code></td><td>read / write / write</td><td>DELETE es borrado suave.</td></tr>
+          </table>
+          <p>Operadores del DSL: <code>eq ne gt gte lt lte in contains ilike is_null between</code>; anidamiento
+          <code>and</code>/<code>or</code> hasta profundidad 5 y 50 condiciones. Un filtro inválido responde 422 con
+          la ruta del nodo que falló. Referencia completa en <a href="api.html">La API</a>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">13</span><div>
+          <h2>Un endpoint de negocio: <code>business.py</code></h2>
+          <p>El CRUD no cubre "reabastecer": es una operación con regla (cantidad positiva), efecto
+          (actualiza <code>restocked_at</code>) y consecuencia (un evento). Va en el router del módulo, bajo
+          el mismo namespace <code>/api/inventario</code>, con <code>@requires</code> y la sesión con tenant del SDK:</p>
+<pre><code><span class="s">"""Reglas de negocio de Inventario: endpoints más allá del CRUD generado."""</span>
+
+<span class="k">from</span> datetime <span class="k">import</span> UTC, datetime
+<span class="k">from</span> typing <span class="k">import</span> Annotated, Any
+<span class="k">from</span> uuid <span class="k">import</span> UUID
+
+<span class="k">from</span> fastapi <span class="k">import</span> Depends, HTTPException
+<span class="k">from</span> models <span class="k">import</span> Product
+<span class="k">from</span> pydantic <span class="k">import</span> BaseModel, ConfigDict, Field
+<span class="k">from</span> sqlalchemy <span class="k">import</span> select
+<span class="k">from</span> sqlalchemy.ext.asyncio <span class="k">import</span> AsyncSession
+
+<span class="k">from</span> novvus_sdk <span class="k">import</span> NovvusModule, requires
+
+
+<span class="k">class</span> Restock(BaseModel):
+    model_config = ConfigDict(extra=<span class="s">"forbid"</span>)
+
+    quantity: int = Field(gt=0)
+    note: str = <span class="s">""</span>
+
+
+<span class="k">def</span> <span class="f">_serialize</span>(product: Product) -&gt; dict[str, Any]:
+    <span class="k">return</span> {
+        <span class="s">"id"</span>: str(product.id), <span class="s">"sku"</span>: product.sku, <span class="s">"name"</span>: product.name,
+        <span class="s">"stock"</span>: product.stock, <span class="s">"min_stock"</span>: product.min_stock,
+        <span class="s">"restocked_at"</span>: product.restocked_at.isoformat() <span class="k">if</span> product.restocked_at <span class="k">else</span> None,
+    }
+
+
+<span class="k">def</span> <span class="f">register</span>(module: NovvusModule) -&gt; None:
+    router = module.router                                   <span class="c"># se monta con prefijo /api/inventario</span>
+    SessionDep = Annotated[AsyncSession, Depends(module.session_dependency())]
+
+    <span class="f">@router.post(<span class="s">"/products/{product_id}/restock"</span>)</span>
+    <span class="f">@requires(<span class="s">"inventario.products.write"</span>)</span>              <span class="c"># después del decorador de ruta, siempre</span>
+    <span class="k">async def</span> <span class="f">restock</span>(product_id: UUID, payload: Restock, session: SessionDep) -&gt; dict[str, Any]:
+        product = <span class="k">await</span> session.scalar(
+            select(Product).where(Product.id == product_id, Product.deleted_at.is_(None))
+        )
+        <span class="k">if</span> product <span class="k">is</span> None:
+            <span class="k">raise</span> HTTPException(status_code=404, detail=<span class="s">"product not found"</span>)
+
+        product.stock += payload.quantity
+        product.restocked_at = datetime.now(tz=UTC)
+        <span class="k">await</span> session.flush()
+        <span class="k">await</span> session.refresh(product)
+
+        <span class="c"># Hecho ya ocurrido, payload mínimo: quien lo necesite consulta nuestra API.</span>
+        <span class="k">await</span> module.emit(
+            <span class="s">"inventario.product.restocked"</span>,
+            {<span class="s">"product_id"</span>: str(product.id), <span class="s">"sku"</span>: product.sku,
+             <span class="s">"quantity"</span>: payload.quantity, <span class="s">"stock"</span>: product.stock},
+        )
+        <span class="k">return</span> _serialize(product)
+
+    <span class="f">@router.get(<span class="s">"/reports/low-stock"</span>)</span>
+    <span class="f">@requires(<span class="s">"inventario.reports.read"</span>)</span>
+    <span class="k">async def</span> <span class="f">low_stock</span>(session: SessionDep) -&gt; dict[str, Any]:
+        config = <span class="k">await</span> module.config()                       <span class="c"># [[config]] de la org activa</span>
+        threshold = int(config[<span class="s">"inventario.low_stock_threshold"</span>])
+        rows = (
+            <span class="k">await</span> session.scalars(
+                select(Product)
+                .where(Product.stock &lt; threshold, Product.deleted_at.is_(None))
+                .order_by(Product.stock)
+            )
+        ).all()
+        <span class="k">return</span> {<span class="s">"threshold"</span>: threshold, <span class="s">"items"</span>: [_serialize(p) <span class="k">for</span> p <span class="k">in</span> rows]}</code></pre>
+<pre><code>curl -s -X POST $B/products/$P/restock -H "$A" -H "$J" -d '{"quantity": 24}'
+curl -s $B/reports/low-stock -H "$A"</code></pre>
+          <p>Reglas que no se negocian: todo endpoint custom lleva <code>@requires</code> con una clave concreta
+          (los grants pueden ser comodines, los requisitos no); la sesión viene del SDK (ya trae tenant y
+          transacción; no hagas <code>commit</code>, el SDK confirma al terminar el request); nunca aceptes
+          <code>org_id</code> en el body. Reinicia <code>novvus run</code> para cargar el archivo nuevo.</p>
+        </div></div>
+
+        <div class="step"><span class="num">14</span><div>
+          <h2>Escucha un evento del CRM y llama a su API</h2>
+          <p>Ya lo escribiste en <code>module.py</code> (paso 5). Pruébalo de verdad: en el CRM (habilitado en tu
+          organización) mueve una oportunidad a la etapa "Ganado". El CRM emite
+          <code>crm.opportunity.won</code>; el despachador del kernel crea una fila en
+          <code>core.event_deliveries</code> por cada módulo habilitado que lo escucha y hace
+          <code>POST /_novvus/events</code> firmado a tu runtime. Segundos después aparece "Kit de bienvenida —
+          &lt;contacto&gt;" en tu lista de productos.</p>
+<pre><code><span class="c"># Con la API: crea un lead, conviértelo y mueve la oportunidad a la etapa ganada (ver api.html)</span>
+curl -s -X POST $K/api/crm/opportunities/$OPP/move -H "$A" -H "$J" -d "{\"stage_id\":\"$WON_STAGE\"}"</code></pre>
+          <details class="fold"><summary>¿Qué pasó por dentro? At-least-once e idempotencia</summary>
+            <p>El bus garantiza <em>at-least-once</em>: si tu módulo estaba caído, la entrega queda
+            <code>pending</code> y se reintenta con backoff (1 s, 4 s, 16 s… tope 5 min, 25 intentos). Si respondiste
+            2xx pero el kernel no lo vio (timeout), lo volverás a recibir. Por eso <code>/_novvus/events</code> abre
+            una sesión con el tenant del evento y hace <code>INSERT INTO _processed_events (event_id) … ON CONFLICT
+            DO NOTHING</code> <strong>en la misma transacción que tu handler</strong>: si la fila ya existía responde
+            <code>duplicate</code> sin ejecutarte; si tu handler lanza, la marca tampoco se guarda y el kernel
+            reintentará. Tu <code>UNIQUE (org_id, sku)</code> es la segunda línea de defensa. Y
+            <code>module.call("GET", "/api/crm/contacts/…")</code> sale por el gateway autenticado con tu token de
+            servicio, con exactamente los permisos de <code>service_permissions</code> y el <code>org_id</code> del
+            evento: nunca lees <code>mod_crm.contact</code>.</p>
+          </details>
+        </div></div>
+
+        <div class="step"><span class="num">15</span><div>
+          <h2>Datos demo: <code>seed.py</code> y <code>novvus seed</code></h2>
+<pre><code><span class="s">"""Seed determinista de Inventario: 2 almacenes y 6 productos."""</span>
+
+<span class="k">from</span> decimal <span class="k">import</span> Decimal
+<span class="k">from</span> uuid <span class="k">import</span> UUID
+
+<span class="k">from</span> models <span class="k">import</span> Product, ProductCategory, Warehouse
+<span class="k">from</span> sqlalchemy.ext.asyncio <span class="k">import</span> AsyncSession
+
+PRODUCTS = [
+    (<span class="s">"Café de Chiapas 1 kg"</span>, <span class="s">"CAF-001"</span>, ProductCategory.finished, 40, Decimal(<span class="s">"189.00"</span>)),
+    (<span class="s">"Café verde 60 kg"</span>, <span class="s">"CAF-RAW-060"</span>, ProductCategory.raw_material, 3, Decimal(<span class="s">"4200.00"</span>)),
+    (<span class="s">"Bolsa kraft 1 kg"</span>, <span class="s">"EMP-001"</span>, ProductCategory.general, 0, Decimal(<span class="s">"3.50"</span>)),
+    (<span class="s">"Taza cerámica"</span>, <span class="s">"MER-010"</span>, ProductCategory.finished, 120, Decimal(<span class="s">"95.00"</span>)),
+    (<span class="s">"Filtro #4 (100 pzas)"</span>, <span class="s">"ACC-004"</span>, ProductCategory.general, 18, Decimal(<span class="s">"48.00"</span>)),
+    (<span class="s">"Molino manual"</span>, <span class="s">"MER-020"</span>, ProductCategory.finished, 7, Decimal(<span class="s">"650.00"</span>)),
+]
+
+
+<span class="k">async def</span> <span class="f">seed</span>(session: AsyncSession, org_id: UUID) -&gt; None:
+    north = Warehouse(org_id=org_id, name=<span class="s">"Bodega Norte"</span>, city=<span class="s">"Monterrey"</span>)
+    south = Warehouse(org_id=org_id, name=<span class="s">"Bodega Sur"</span>, city=<span class="s">"Oaxaca"</span>)
+    session.add_all([north, south])
+    <span class="k">await</span> session.flush()                       <span class="c"># necesitamos los ids para la FK</span>
+
+    session.add_all(
+        Product(
+            org_id=org_id, name=name, sku=sku, category=category, stock=stock, price=price,
+            warehouse_id=(north.id <span class="k">if</span> index % 2 == 0 <span class="k">else</span> south.id),
+        )
+        <span class="k">for</span> index, (name, sku, category, stock, price) <span class="k">in</span> enumerate(PRODUCTS)
+    )
+    <span class="k">await</span> session.flush()</code></pre>
+<pre><code><span class="c"># Corre con el rol del módulo, dentro del tenant que indiques</span>
+NOVVUS_DATABASE_URL=postgres://novvus_module:novvus_module_dev_password@localhost:5432/novvus \
+  novvus seed --org $ORG
+<span class="c"># Seed ejecutado para la organización ...</span></code></pre>
+          <p>Migración cambia estructura; seed crea datos. No metas datos demo en el SQL. Un seed repetido
+          fallará por el <code>UNIQUE (org_id, sku)</code>: es intencional.</p>
+        </div></div>
+
+        <div class="step"><span class="num">16</span><div>
+          <h2>Tests con el arnés del SDK</h2>
+          <p>Copia <code>modules/crm/tests/conftest.py</code> a <code>modules/inventario/tests/</code> y cambia cuatro
+          cosas: la raíz (<code>CRM_ROOT</code> → tu carpeta), el esquema (<code>mod_crm</code> → <code>mod_inventario</code>
+          en las tres sentencias SQL), el secreto (<code>HMAC_SECRET = "inventario-test-secret"</code>) y las
+          constantes de permisos. Quita <code>build_sales_pipeline</code>. El arnés crea una base efímera, aplica
+          tus migraciones como lo haría el kernel (rol <code>novvus_module</code>, <code>search_path</code>), arranca el
+          módulo en <strong>modo offline</strong> (sin kernel: <code>NOVVUS_DATABASE_URL</code> +
+          <code>NOVVUS_INTERNAL_HMAC_SECRET</code>) y firma cada request como lo haría el gateway.</p>
+<pre><code><span class="c"># tests/conftest.py — solo lo que cambia respecto al del CRM</span>
+MODULE_ROOT = Path(__file__).resolve().parents[1]
+HMAC_SECRET = <span class="s">"inventario-test-secret"</span>
+ALMACEN_PERMS = <span class="s">"inventario.products.read,inventario.warehouses.read"</span>
+GERENTE_PERMS = <span class="s">"inventario.products.*,inventario.warehouses.*,inventario.reports.read"</span>
+<span class="c"># ... y mod_crm → mod_inventario en CREATE SCHEMA, GRANT y search_path; la fixture `crm` → `inventario`</span></code></pre>
+<pre><code><span class="c"># tests/test_products.py</span>
+<span class="k">from</span> uuid <span class="k">import</span> uuid4
+
+<span class="k">from</span> conftest <span class="k">import</span> ALMACEN_PERMS, GERENTE_PERMS, OrgClient
+
+
+<span class="k">async def</span> <span class="f">test_restock_requires_write_and_updates_stock</span>(inventario) -&gt; None:
+    client, _module = inventario
+    org = uuid4()
+    gerente = OrgClient(client, org, GERENTE_PERMS)
+    lector = OrgClient(client, org, ALMACEN_PERMS)
+
+    created = <span class="k">await</span> gerente.post(<span class="s">"/api/inventario/products"</span>, {<span class="s">"name"</span>: <span class="s">"Taza"</span>, <span class="s">"sku"</span>: <span class="s">"MER-010"</span>, <span class="s">"stock"</span>: 2})
+    <span class="k">assert</span> created.status_code == 201, created.text
+    product_id = created.json()[<span class="s">"id"</span>]
+
+    <span class="k">assert</span> (<span class="k">await</span> lector.post(f<span class="s">"/api/inventario/products/{product_id}/restock"</span>, {<span class="s">"quantity"</span>: 5})).status_code == 403
+
+    restocked = <span class="k">await</span> gerente.post(f<span class="s">"/api/inventario/products/{product_id}/restock"</span>, {<span class="s">"quantity"</span>: 5})
+    <span class="k">assert</span> restocked.status_code == 200
+    <span class="k">assert</span> restocked.json()[<span class="s">"stock"</span>] == 7
+    <span class="k">assert</span> (<span class="k">await</span> gerente.post(f<span class="s">"/api/inventario/products/{product_id}/restock"</span>, {<span class="s">"quantity"</span>: 0})).status_code == 422
+
+
+<span class="k">async def</span> <span class="f">test_rls_isolates_organizations</span>(inventario) -&gt; None:
+    client, _module = inventario
+    org_a, org_b = OrgClient(client, uuid4(), GERENTE_PERMS), OrgClient(client, uuid4(), GERENTE_PERMS)
+
+    product = (<span class="k">await</span> org_a.post(<span class="s">"/api/inventario/products"</span>, {<span class="s">"name"</span>: <span class="s">"Solo A"</span>, <span class="s">"sku"</span>: <span class="s">"A-1"</span>})).json()
+    <span class="k">assert</span> (<span class="k">await</span> org_b.get(<span class="s">"/api/inventario/products"</span>)).json()[<span class="s">"items"</span>] == []
+    <span class="k">assert</span> (<span class="k">await</span> org_b.get(f<span class="s">"/api/inventario/products/{product['id']}"</span>)).status_code == 404</code></pre>
+<pre><code>make up                                              <span class="c"># Postgres debe estar arriba (si no, los tests se saltan)</span>
+cd modules/inventario
+../../sdk/.venv/Scripts/python -m pytest             <span class="c"># Linux/macOS: ../../sdk/.venv/bin/python</span></code></pre>
+          <p>En offline, <code>module.emit</code> no falla: registra un warning y devuelve <code>{"skipped": true}</code>,
+          así que puedes probar <code>restock</code> sin kernel. <code>module.call</code> sí lanza
+          <code>RuntimeError</code>: por eso el handler del paso 5 comprueba <code>module.kernel is not None</code>.
+          Umbrales de cobertura y mutation testing en <a href="contribuir.html">Contribuir y calidad</a>.</p>
+        </div></div>
+
+        <div class="step"><span class="num">17</span><div>
+          <h2>i18n: <code>i18n/en-US.json</code></h2>
+          <p>El idioma fuente es es-MX: las cadenas de <code>labels</code>, <code>label</code> y los textos que pasas
+          por <code>module._()</code> son a la vez el texto y la clave. Un catálogo por locale, sin build:</p>
+<pre><code>{
+  <span class="s">"Productos"</span>: <span class="s">"Products"</span>,
+  <span class="s">"Almacenes"</span>: <span class="s">"Warehouses"</span>,
+  <span class="s">"Nombre"</span>: <span class="s">"Name"</span>,
+  <span class="s">"Ciudad"</span>: <span class="s">"City"</span>,
+  <span class="s">"Activo"</span>: <span class="s">"Active"</span>,
+  <span class="s">"Categoría"</span>: <span class="s">"Category"</span>,
+  <span class="s">"Existencias"</span>: <span class="s">"Stock"</span>,
+  <span class="s">"Mínimo"</span>: <span class="s">"Minimum"</span>,
+  <span class="s">"Precio"</span>: <span class="s">"Price"</span>,
+  <span class="s">"Almacén"</span>: <span class="s">"Warehouse"</span>,
+  <span class="s">"Último reabasto"</span>: <span class="s">"Last restock"</span>,
+  <span class="s">"Kit de bienvenida"</span>: <span class="s">"Welcome kit"</span>
+}</code></pre>
+          <p>La shell traduce los labels del meta con este catálogo; el export CSV/XLSX usa el locale del
+          request (<code>x-novvus-locale</code>, header informativo que nunca autoriza nada). Fallback:
+          <code>en-US</code> → <code>en</code> → cadena fuente; una cadena sin traducir jamás es un error.</p>
+        </div></div>
+
+      </div>
+
+      <h2>Checklist de conformidad</h2>
+      <ul>
+        <li>[ ] <code>novvus.toml</code> válido: permisos, eventos emitidos, config y cron bajo <code>inventario.*</code>; nada de <code>core.*</code> en <code>service_permissions</code>.</li>
+        <li>[ ] <code>register → install → enable</code> sin pasos manuales (<code>novvus deploy</code> de una sola pasada).</li>
+        <li>[ ] Todas las tablas en <code>mod_inventario</code> con <code>org_id</code>, <code>ext</code>, <code>custom</code> y RLS (el generador lo hace; si escribes SQL a mano, no lo olvides).</li>
+        <li>[ ] Ningún SQL hacia <code>core</code> ni hacia otro <code>mod_*</code>; los datos ajenos llegan por <code>module.call</code> o por eventos.</li>
+        <li>[ ] Todo endpoint custom con <code>@requires</code> y sesión del SDK; <code>org_id</code> nunca viene del cliente.</li>
+        <li>[ ] Eventos emitidos son hechos (<code>restocked</code>), no comandos; consumidores idempotentes con constraint de respaldo.</li>
+        <li>[ ] Dependencias declaradas; el módulo degrada (no rompe) si el CRM no está.</li>
+        <li>[ ] Migraciones nuevas para cada cambio; jamás editas una aplicada.</li>
+        <li>[ ] Tests de permisos, RLS y reglas de negocio pasan contra Postgres real.</li>
+        <li>[ ] <code>uninstall</code> no deja tablas huérfanas (el kernel lo garantiza con <code>DROP SCHEMA … CASCADE</code>).</li>
+      </ul>
+
+      <h2>Para seguir</h2>
+      <div class="cards">
+        <a class="card" href="vistas-genericas.html"><span class="kicker">Siguiente</span><h3>Vistas genéricas y metadatos</h3><p>Todo lo que admite <code>__novvus_views__</code>, el meta que viaja en el handshake y cómo sustituir una vista por una tuya.</p></a>
+        <a class="card" href="colaboracion.html"><span class="kicker">Profundizar</span><h3>Adjuntos, chatter y notificaciones</h3><p>Qué activaste con <code>attachments</code>, <code>chatter</code> y <code>track</code>, y cómo publicar mensajes desde el módulo.</p></a>
+        <a class="card" href="extensibilidad.html"><span class="kicker">Profundizar</span><h3>Extensiones, campos, config y cron</h3><p>Aportar campos a modelos de otro módulo, campos personalizados por organización, <code>[[config]]</code> y <code>[[cron]]</code> a fondo.</p></a>
+        <a class="card" href="sdk.html"><span class="kicker">Por dentro</span><h3>El SDK por dentro</h3><p>Cómo el SDK construye la auto-API, verifica la firma HMAC y abre sesiones con tenant.</p></a>
+      </div>
+      <p>Para estudiar código real: <code>modules/crm</code> (10 modelos, endpoints custom, reportes, seed, tests
+      de RLS), <code>modules/projects</code> (dependencia del CRM, <code>@module.on</code>, <code>module.call</code>,
+      degradación) y <code>modules/salesmx</code> (un módulo sin modelos ni migraciones: solo extensiones).</p>
+
+      <nav class="page-nav">
+        <a href="mantenimiento.html"><span class="dir">← Anterior</span>Mantenimiento</a>
+        <a class="next" href="vistas-genericas.html"><span class="dir">Siguiente →</span>Vistas genéricas y metadatos</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>

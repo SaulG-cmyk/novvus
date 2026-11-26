@@ -1,0 +1,65 @@
+[module]
+id = "auditorias"
+name = "Auditorías"
+version = "0.1.0"
+description = "Gestión de auditorías internas y externas: auditorías, hallazgos, listas de verificación e informes."
+
+[presentation]
+display_name = "Auditorías"
+summary = "Ejecuta auditorías internas y externas, registra hallazgos con severidad y cierra planes de acción."
+category = "Calidad"
+icon = "shield"
+accent = "bg-purple-500/15 text-purple-600 dark:text-purple-300"
+publisher = "Tu empresa"
+license = "MIT"
+
+[dependencies]
+modules = ["crm>=0.1"]
+service_permissions = ["crm.activities.write", "crm.activities.read"]
+
+[[permissions]]
+key = "auditorias.audits.read"
+description = "Ver auditorías"
+
+[[permissions]]
+key = "auditorias.audits.write"
+description = "Crear y editar auditorías"
+
+[[permissions]]
+key = "auditorias.audit_findings.read"
+description = "Ver hallazgos"
+
+[[permissions]]
+key = "auditorias.audit_findings.write"
+description = "Crear y editar hallazgos"
+
+[[permissions]]
+key = "auditorias.audit_checklists.read"
+description = "Ver listas de verificación"
+
+[[permissions]]
+key = "auditorias.audit_checklists.write"
+description = "Crear y editar listas de verificación"
+
+[[permissions]]
+key = "auditorias.audit_reports.read"
+description = "Ver informes"
+
+[[permissions]]
+key = "auditorias.audit_reports.write"
+description = "Crear y editar informes"
+
+[events]
+emits = ["auditorias.audit.completed", "auditorias.finding.created"]
+listens = []
+
+[runtime]
+port = 8160
+
+[[config]]
+key = "auditorias.default_audit_type"
+type = "string"
+label = "Tipo de auditoría por defecto"
+description = "Tipo preseleccionado al crear una auditoría."
+default = "internal"
+permission = "auditorias.audits.write"

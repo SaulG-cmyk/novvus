@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mantenimiento — NOVVUS CORE</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <a class="logo" href="index.html"><strong>NOVVUS</strong><span>CORE · Documentación · v0.1.6</span></a>
+    <h4>Empezar</h4>
+    <a class="nav" href="index.html">Inicio</a>
+    <a class="nav" href="conceptos.html">Conceptos en 10 minutos</a>
+    <a class="nav" href="instalacion.html">Instalación</a>
+    <a class="nav" href="guia-usuario.html">Guía de usuario</a>
+    <h4>Operar</h4>
+    <a class="nav" href="actualizacion.html">Actualización y releases</a>
+    <a class="nav active" href="mantenimiento.html">Mantenimiento</a>
+    <h4>Construir módulos</h4>
+    <a class="nav" href="tutorial-modulo.html">Tutorial: tu primer módulo</a>
+    <a class="nav" href="vistas-genericas.html">Vistas genéricas y metadatos</a>
+    <a class="nav" href="colaboracion.html">Adjuntos, chatter y notificaciones</a>
+    <a class="nav" href="extensibilidad.html">Extensiones, campos, config y cron</a>
+    <h4>Profundizar</h4>
+    <a class="nav" href="arquitectura.html">Arquitectura</a>
+    <a class="nav" href="kernel.html">El kernel por dentro</a>
+    <a class="nav" href="sdk.html">El SDK por dentro</a>
+    <a class="nav" href="base-de-datos.html">Base de datos</a>
+    <a class="nav" href="api.html">La API</a>
+    <a class="nav" href="seguridad.html">Seguridad</a>
+    <h4>Equipo</h4>
+    <a class="nav" href="contribuir.html">Contribuir y calidad</a>
+    <a class="nav" href="referencia.html">Referencia técnica</a>
+  </nav>
+
+  <main>
+    <div class="crumbs"><a href="index.html">Documentación</a> / Operar / Mantenimiento</div>
+    <article>
+      <h1>Mantenimiento</h1>
+      <span class="level basico">Nivel básico</span>
+      <p class="lead">Lo que haces después de instalar: revisar salud, leer logs, respaldar y restaurar,
+      rotar secretos, entender qué limpia el kernel por su cuenta, manejar el ciclo de vida de los
+      módulos y resolver los problemas que sí aparecen en la práctica.</p>
+
+      <h2>Regla de oro</h2>
+      <p>Antes de tocar un servidor compartido identifica tres cosas: <strong>qué tipo de instalación
+      es</strong> (demo, cliente con CLI o manual), <strong>cuándo fue el último backup</strong> y
+      <strong>quién está usando la plataforma ahora</strong>. En producción nunca hagas
+      <code>reset</code>, nunca borres volúmenes y nunca cambies secretos sin avisar.</p>
+
+      <h2 id="diarios">Comandos diarios según tu instalación</h2>
+      <table>
+        <tr><th>Quiero…</th><th>Demo local (<code>install.py</code>)</th><th>Cliente (CLI en <code>/opt/novvus</code>)</th><th>Manual (<code>docker-compose.prod.yml</code>)</th></tr>
+        <tr>
+          <td>Ver estado</td>
+          <td><code>python install.py status</code></td>
+          <td><code>novvus status</code> (versión, tabla de 6 servicios, URL; exit 0 solo si todo sano)</td>
+          <td><code>docker compose -f docker-compose.prod.yml ps</code></td>
+        </tr>
+        <tr>
+          <td>Saber la versión</td>
+          <td><code>curl localhost:8000/health</code></td>
+          <td><code>novvus version</code> (CLI y Core por separado)</td>
+          <td><code>grep NOVVUS_VERSION .env</code></td>
+        </tr>
+        <tr>
+          <td>Ver logs en vivo</td>
+          <td><code>python install.py logs</code></td>
+          <td><code>docker compose -f /opt/novvus/docker-compose.yml logs -f --tail=100</code></td>
+          <td><code>docker compose -f docker-compose.prod.yml logs -f --tail=100</code></td>
+        </tr>
+        <tr>
+          <td>Logs de un servicio</td>
+          <td><code>docker compose -f docker-compose.full.yml logs --tail=200 kernel</code></td>
+          <td><code>docker compose -f /opt/novvus/docker-compose.yml logs --tail=200 kernel</code></td>
+          <td>Igual, con <code>docker-compose.prod.yml</code></td>
+        </tr>
+        <tr>
+          <td>Apagar (conservando datos)</td>
+          <td><code>python install.py stop</code></td>
+          <td><code>docker compose -f /opt/novvus/docker-compose.yml down</code></td>
+          <td><code>docker compose -f docker-compose.prod.yml down</code></td>
+        </tr>
+        <tr>
+          <td>Encender</td>
+          <td><code>python install.py start</code></td>
+          <td><code>docker compose -f /opt/novvus/docker-compose.yml up -d --wait</code></td>
+          <td><code>docker compose -f docker-compose.prod.yml up -d --wait</code></td>
+        </tr>
+        <tr>
+          <td>Actualizar</td>
+          <td><code>python install.py update</code></td>
+          <td><code>sudo novvus update</code></td>
+          <td>Ver <a href="actualizacion.html#manual">Actualización</a></td>
+        </tr>
+      </table>
+      <div class="note">
+        Los contenedores de producción corren con <code>restart: unless-stopped</code>: tras un reinicio
+        del servidor vuelven solos. Un <code>docker compose down</code> los detiene de forma limpia (el
+        kernel drena las conexiones en vuelo al recibir SIGTERM). Los servicios se llaman igual en los
+        tres compose: <code>postgres</code>, <code>kernel</code>, <code>bootstrap</code>, <code>crm</code>,
+        <code>projects</code>, <code>web</code>.
+      </div>
+
+      <h3>Qué debe verse cuando todo está bien</h3>
+      <table>
+        <tr><th>Servicio</th><th>Estado esperado</th><th>Si no</th></tr>
+        <tr><td><code>postgres</code></td><td><code>healthy</code></td><td>Disco lleno, volumen dañado o contraseña del <code>.env</code> distinta de la que inicializó el volumen.</td></tr>
+        <tr><td><code>kernel</code></td><td><code>healthy</code>; <code>/health</code> reporta la versión</td><td>Falta una variable obligatoria, <code>DATABASE_URL</code> incorrecta o una migración core falló al arrancar.</td></tr>
+        <tr><td><code>bootstrap</code></td><td><code>Exited (0)</code> (<code>novvus status</code> lo muestra como <code>completed</code>)</td><td>Si termina con código distinto de 0, una migración de módulo falló o falta el token de servicio en el volumen <code>tokens</code>. Lee sus logs: el mensaje es explícito.</td></tr>
+        <tr><td><code>crm</code>, <code>projects</code></td><td><code>healthy</code> (hicieron handshake)</td><td>Sin token, kernel caído o dependencia deshabilitada (<code>projects</code> reporta <code>degraded</code> si el CRM no está habilitado).</td></tr>
+        <tr><td><code>web</code></td><td><code>healthy</code>, escuchando en <code>8077</code> (cliente/manual) o <code>3000</code> (demo)</td><td>Puerto ocupado o el kernel no responde detrás del proxy same-origin.</td></tr>
+      </table>
+
+      <h2 id="respaldos">Respaldos</h2>
+      <p>Hay <strong>tres volúmenes</strong> en una instalación de cliente o manual, y no todos valen lo mismo:</p>
+      <table>
+        <tr><th>Volumen</th><th>Contenido</th><th>¿Respaldar?</th></tr>
+        <tr><td><code>pgdata</code></td><td>Toda la base PostgreSQL: usuarios, organizaciones, datos de todos los módulos, chatter, definiciones de campos.</td><td><span class="badge ok">Sí</span> siempre, con <code>pg_dump</code> (no copiando el directorio en caliente).</td></tr>
+        <tr><td><code>files</code></td><td>Adjuntos (backend local del kernel). Si usas S3/R2/MinIO, los binarios viven allá y este volumen no importa.</td><td><span class="badge ok">Sí</span></td></tr>
+        <tr><td><code>tokens</code></td><td>Tokens de servicio de los módulos (<code>/run/novvus/&lt;modulo&gt;.env</code>), publicados por <code>bootstrap</code> al instalar.</td><td><span class="badge warn">No hace falta</span>, pero <strong>no lo borres</strong>: sin él los módulos no arrancan y solo se regenera reinstalándolos.</td></tr>
+      </table>
+      <p>Además del volumen, respalda el <code>.env</code> (contiene los secretos que hacen legibles esos
+      datos) y el compose en uso. Es exactamente lo que <code>novvus update</code> guarda en cada
+      <code>/opt/novvus/backups/&lt;fecha&gt;-&lt;de&gt;-to-&lt;a&gt;/</code>: <code>postgres.dump</code>,
+      <code>roles.sql</code>, <code>files.tar.gz</code>, <code>tokens.tar.gz</code>, <code>.env</code>, el compose,
+      <code>novvus.json</code> y un <code>backup.json</code> con SHA-256 de cada pieza. Esos backups nunca se
+      borran solos: revísalos de vez en cuando y mueve los viejos fuera del servidor.</p>
+
+      <h3>Dump de la base</h3>
+<pre><code><span class="c"># Cliente (CLI). El .env tiene POSTGRES_USER y POSTGRES_DB; cárgalo sin imprimirlo.</span>
+cd /opt/novvus
+set -a; . ./.env; set +a
+mkdir -p backups/manual
+docker compose -f docker-compose.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" &gt; backups/manual/novvus-$(date +%F).dump
+
+<span class="c"># Manual: igual, con -f docker-compose.prod.yml</span>
+<span class="c"># Demo: usuario novvus, base novvus, archivo docker-compose.full.yml</span></code></pre>
+      <p>El formato <code>-Fc</code> (custom) se restaura con <code>pg_restore</code> y permite restaurar
+      tablas sueltas. Verifica que el dump es legible antes de confiar en él:</p>
+<pre><code>docker compose -f docker-compose.yml exec -T postgres pg_restore --list &lt; backups/manual/novvus-2026-09-04.dump | head</code></pre>
+
+      <h3>Volumen de adjuntos</h3>
+<pre><code><span class="c"># El nombre real del volumen lleva el prefijo del proyecto: míralo con `docker volume ls`</span>
+docker run --rm -v novvus_files:/data:ro -v "$PWD/backups/manual":/backup alpine \
+  tar czf /backup/files-$(date +%F).tar.gz -C /data .</code></pre>
+
+      <h3>Backup programado (cron)</h3>
+      <p>Para un servidor pequeño, un cron diario es un buen punto de partida. Guarda esto como
+      <code>/usr/local/bin/novvus-backup.sh</code> (perm 700) y prográmalo:</p>
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/novvus
+set -a; . ./.env; set +a
+DEST=/var/backups/novvus/$(date +%F)
+mkdir -p "$DEST"; chmod 700 "$DEST"
+docker compose -f docker-compose.yml exec -T postgres \
+  pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" &gt; "$DEST/postgres.dump"
+docker run --rm -v novvus_files:/data:ro -v "$DEST":/backup alpine \
+  tar czf /backup/files.tar.gz -C /data .
+cp .env "$DEST/.env"; chmod 600 "$DEST"/*
+<span class="c"># Conserva 14 días en el servidor; lo demás debe vivir fuera (S3, R2, el backup del proveedor)</span>
+find /var/backups/novvus -maxdepth 1 -mtime +14 -type d -exec rm -rf {} +</code></pre>
+<pre><code>sudo crontab -e
+<span class="c"># todos los días a las 02:15</span>
+15 2 * * * /usr/local/bin/novvus-backup.sh &gt;&gt; /var/log/novvus-backup.log 2&gt;&amp;1</code></pre>
+      <div class="warn">
+        <b>Un backup que solo vive en el mismo servidor no es un backup.</b> Copia el directorio del día a
+        almacenamiento externo. Y recuerda que el <code>.env</code> respaldado contiene secretos: trátalo con
+        los mismos permisos que el original.
+      </div>
+
+      <h3 id="restaurar">Restaurar</h3>
+      <p>Restaurar la base pisa lo que hay. Detén primero los consumidores (kernel y módulos) para que no
+      haya conexiones abiertas ni escrituras a medias:</p>
+<pre><code>cd /opt/novvus
+set -a; . ./.env; set +a
+docker compose -f docker-compose.yml stop kernel crm projects web bootstrap
+docker compose -f docker-compose.yml exec -T postgres \
+  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists &lt; backups/manual/novvus-2026-09-04.dump
+docker compose -f docker-compose.yml up -d --wait</code></pre>
+      <p>Para el volumen de adjuntos, con el stack detenido:</p>
+<pre><code>docker run --rm -v novvus_files:/data -v "$PWD/backups/manual":/backup alpine \
+  sh -c "rm -rf /data/* &amp;&amp; tar xzf /backup/files-2026-09-04.tar.gz -C /data"</code></pre>
+      <p>Si restauras un backup hecho por <code>novvus update</code>, usa también su <code>.env</code> y su
+      compose: la base tiene que ir con la versión de imágenes con la que se hizo el dump. La forma más
+      segura es dejar <code>.env</code> y <code>docker-compose.yml</code> del backup en <code>/opt/novvus</code>,
+      restaurar la base y levantar; después vuelves a actualizar.</p>
+
+      <h2 id="secretos">Secretos y rotación</h2>
+      <p>En una instalación de cliente los secretos los generó el CLI con entropía del sistema y viven en
+      <code>/opt/novvus/.env</code> (permisos 600). En un despliegue manual los generaste tú con
+      <code>openssl rand -hex 32</code>. En ambos casos <code>novvus update</code> los preserva: <strong>jamás
+      regenera un secreto que ya existe</strong>. Esta es la lista completa y qué pasa si rotas cada uno:</p>
+      <table>
+        <tr><th>Variable</th><th>Quién la usa</th><th>Consecuencia de rotarla</th></tr>
+        <tr><td><code>POSTGRES_PASSWORD</code></td><td>Postgres y el kernel (<code>DATABASE_URL</code>).</td><td>Postgres solo lee la variable al <em>inicializar</em> el volumen. Para rotarla: <code>ALTER USER novvus PASSWORD '…'</code> dentro del contenedor, luego cambia el <code>.env</code> y reinicia el stack.</td></tr>
+        <tr><td><code>NOVVUS_JWT_ACCESS_SECRET</code></td><td>Kernel: firma los access tokens (15 min).</td><td>Todas las sesiones activas expiran de inmediato; los usuarios vuelven a entrar. Rotación barata.</td></tr>
+        <tr><td><code>NOVVUS_JWT_REFRESH_SECRET</code></td><td>Kernel: firma los refresh tokens (14 días).</td><td>Igual que el anterior, pero nadie podrá renovar sesión sin volver a autenticarse.</td></tr>
+        <tr><td><code>NOVVUS_INTERNAL_HMAC_SECRET</code></td><td>Kernel y todos los módulos: firma de los headers internos gateway → módulo.</td><td>Los módulos reciben el secreto en el handshake, así que hay que reiniciar <strong>kernel y módulos juntos</strong>. Hasta entonces, cada petición a un módulo responde 401.</td></tr>
+        <tr><td><code>NOVVUS_MODULE_DB_PASSWORD</code></td><td>Rol <code>novvus_module</code> de Postgres; el kernel lo entrega en el DSN del handshake.</td><td>El kernel provisiona el rol con <code>CREATE/ALTER ROLE … PASSWORD</code> al instalar módulos. Tras rotar: reinicia el stack; si algún módulo no conecta, ejecuta <code>ALTER ROLE novvus_module PASSWORD '…'</code> a mano y reinicia de nuevo.</td></tr>
+        <tr><td><code>NOVVUS_BOOTSTRAP_TOKEN</code></td><td>Solo el servicio <code>bootstrap</code>, en los 6 endpoints de ciclo de vida de instancia (<code>x-novvus-bootstrap-token</code>).</td><td>Sin efecto sobre usuarios ni datos: no es una credencial de usuario. Rotarlo solo exige reiniciar (bootstrap vuelve a correr y es idempotente).</td></tr>
+        <tr><td><code>NOVVUS_FILES_S3_ACCESS_KEY</code> / <code>NOVVUS_FILES_S3_SECRET_KEY</code></td><td>Kernel, solo con <code>NOVVUS_FILES_BACKEND=s3</code>.</td><td>Rotas en el proveedor, actualizas el <code>.env</code>, reinicias el kernel. Los metadatos siguen en Postgres; los objetos no se mueven.</td></tr>
+        <tr><td><code>NOVVUS_TRUSTED_PUBLISHER_KEYS</code></td><td>Kernel: allowlist de claves públicas Ed25519 para publicar paquetes en el catálogo.</td><td>No es un secreto, pero es fail-closed: vacía = nadie puede publicar. Quitar una clave no desinstala nada ya registrado.</td></tr>
+        <tr><td><code>NOVVUS_SERVICE_TOKEN</code> (por módulo)</td><td>El runtime del módulo, en el handshake. Vive en el volumen <code>tokens</code> (Docker) o en tu shell (dev).</td><td>No se rota: el kernel guarda solo el hash. Perderlo o quererlo nuevo = reinstalar el módulo (ver problemas comunes).</td></tr>
+      </table>
+<pre><code><span class="c"># Generar un valor nuevo</span>
+openssl rand -hex 32</code></pre>
+      <div class="tip">
+        Otras variables que lee el kernel y que puedes ajustar sin rotar nada: <code>NOVVUS_AUTH_RATE_LIMIT_PER_MINUTE</code>
+        (30 por defecto), <code>NOVVUS_CORS_ORIGINS</code>, <code>NOVVUS_CHATTER_EDIT_WINDOW_MINUTES</code>,
+        <code>NOVVUS_CUSTOM_FIELDS_LIMIT</code>, <code>NOVVUS_FILES_MAX_SIZE_BYTES</code> (50 MB),
+        <code>NOVVUS_FILES_ORG_QUOTA_BYTES</code> (10 GB), <code>NOVVUS_FILES_GC_RETENTION_DAYS</code> (30) y
+        <code>NOVVUS_LOG_LEVEL</code>. La lista completa está en <a href="referencia.html">Referencia técnica</a>.
+      </div>
+
+      <h2 id="automaticos">Lo que el kernel hace solo</h2>
+      <p>Hay procesos que no tienes que programar: el kernel los corre en segundo plano desde que arranca.
+      Conviene conocerlos para no "descubrirlos" en un log a las tres de la mañana.</p>
+      <table>
+        <tr><th>Proceso</th><th>Frecuencia</th><th>Qué hace</th><th>Dónde se ve</th></tr>
+        <tr><td>Despachador de eventos</td><td>Continuo (LISTEN/NOTIFY + barrido cada 5 s)</td><td>Entrega <code>event_deliveries</code> pendientes a los módulos suscritos, at-least-once, con backoff exponencial (1 s, 4 s, 16 s… tope 5 min). Tras 25 intentos marca la entrega <code>failed</code>.</td><td>Tabla <code>core.event_deliveries</code>; logs del kernel.</td></tr>
+        <tr><td>Scheduler de cron</td><td>Continuo (barrido cada 5 s)</td><td>Reclama filas vencidas de <code>core.cron_runs</code> con <code>FOR UPDATE SKIP LOCKED</code> (dos kernels nunca duplican una ejecución) y hace <code>POST /_novvus/cron</code> al módulo, una vez por job × organización habilitada. Reprograma <code>next_run_at</code> al terminar.</td><td><code>core.cron_jobs</code>, <code>core.cron_runs</code>.</td></tr>
+        <tr><td>GC de adjuntos</td><td>Cada hora</td><td>Adjuntos borrados (lógicamente) hace más de <code>NOVVUS_FILES_GC_RETENTION_DAYS</code> (30 por defecto): decrementa el refcount del blob y, si llega a 0, borra el objeto físico.</td><td>Log <code>attachment GC pass</code>.</td></tr>
+        <tr><td>Purga de campos personalizados</td><td>Cada hora</td><td>Borra las <em>definiciones</em> de <code>core.custom_fields</code> con <code>deleted_at</code> mayor a 30 días. Los valores huérfanos en las tablas de los módulos los limpia el SDK al escribir cada registro; el kernel nunca ejecuta SQL sobre <code>mod_*</code>.</td><td>Log <code>custom-field purge pass</code>.</td></tr>
+        <tr><td>Actividades vencidas</td><td>Cada hora</td><td>Genera una notificación <code>activity_due</code> por actividad abierta con fecha pasada, una sola vez al día por actividad.</td><td>Log <code>overdue-activity pass</code>; buzón del usuario.</td></tr>
+        <tr><td>Purga de notificaciones</td><td>Cada hora</td><td>Borra notificaciones <strong>leídas</strong> hace más de 90 días. Las no leídas se conservan.</td><td>Log <code>notification purge pass</code>.</td></tr>
+        <tr><td>Listener SSE</td><td>Continuo</td><td>Una conexión <code>LISTEN novvus_notify</code> por proceso que reparte notificaciones y mensajes de chatter a las conexiones SSE abiertas; heartbeat cada 25 s.</td><td><code>GET /api/core/stream</code>.</td></tr>
+      </table>
+      <p>Consultas útiles para vigilar los dos primeros (con <code>psql</code> como usuario <code>novvus</code>):</p>
+<pre><code><span class="c">-- entregas fallidas o atascadas: si crece, hay un módulo que rechaza eventos</span>
+<span class="k">SELECT</span> module_id, status, count(*) <span class="k">FROM</span> core.event_deliveries
+ <span class="k">WHERE</span> status &lt;&gt; <span class="s">'delivered'</span> <span class="k">GROUP BY</span> 1, 2;
+
+<span class="c">-- jobs de cron atrasados más de una hora o que fallaron</span>
+<span class="k">SELECT</span> module_id, name, org_id, status, attempts, next_run_at, last_status
+  <span class="k">FROM</span> core.cron_runs
+ <span class="k">WHERE</span> status = <span class="s">'failed'</span> <span class="k">OR</span> next_run_at &lt; now() - interval <span class="s">'1 hour'</span>;</code></pre>
+      <div class="note">
+        Una entrega <code>failed</code> no se reintenta sola: es visible para operación y re-encolable a mano
+        (poniéndola de nuevo en <code>pending</code>). Antes de hacerlo, arregla la causa en el módulo: los
+        consumidores son idempotentes, así que reintentar es seguro.
+      </div>
+
+      <h2 id="modulos">Ciclo de vida de los módulos</h2>
+      <p>Hay <strong>dos niveles</strong> y confundirlos cuesta datos:</p>
+      <table>
+        <tr><th></th><th>Nivel instancia</th><th>Nivel organización</th></tr>
+        <tr><td>Quién lo maneja</td><td><code>bootstrap</code> (token de plataforma) o un admin con <code>core.modules.manage</code> vía API.</td><td>Cada organización desde la tienda <code>/apps</code> (o <code>/api/core/orgs/{org}/modules/{id}/…</code>).</td></tr>
+        <tr><td>Estados</td><td><code>REGISTERED → INSTALLED → ENABLED ⇄ DISABLED → (uninstall)</code></td><td>Instalado / habilitado / deshabilitado para esa org, en <code>core.org_modules</code>.</td></tr>
+        <tr><td><code>disable</code></td><td>El gateway responde <code>503 module_disabled</code> en <code>/api/{id}/*</code> para todos; los eventos se acumulan como pendientes, no se pierden.</td><td>Solo esa organización deja de ver el módulo; el runtime sigue corriendo.</td></tr>
+        <tr><td><code>uninstall</code></td><td><strong>Destructivo e irreversible</strong>: <code>DROP SCHEMA mod_{id} CASCADE</code>, borra migraciones, permisos y suscripciones. Solo desde <code>DISABLED</code> (o <code>REGISTERED</code>) y con el cuerpo JSON <code>{"confirm": true}</code>.</td><td><strong>No destructivo</strong>: quita la fila de habilitación de la org. El esquema y las filas del tenant sobreviven; volver a habilitar las recupera.</td></tr>
+        <tr><td>Dependencias</td><td><code>enable</code> falla si una dependencia no está <code>ENABLED</code>. Deshabilitar una dependencia deja a los dependientes en estado <code>degraded</code> (lo reportan en su <code>/health</code>), no rotos.</td><td>La tienda calcula el plan transitivo (<code>/plan</code>) y habilita las dependencias en orden.</td></tr>
+        <tr><td>Hooks</td><td>—</td><td><code>on_install / on_enable / on_disable / on_uninstall</code> del módulo, best-effort (un fallo no revierte la transición).</td></tr>
+      </table>
+<pre><code><span class="c"># Deshabilitar y desinstalar a nivel instancia (destructivo), con JWT de administrador</span>
+curl -X POST http://localhost:8000/api/core/modules/inventario/disable -H "Authorization: Bearer $JWT"
+curl -X POST http://localhost:8000/api/core/modules/inventario/uninstall \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"confirm": true}'</code></pre>
+
+      <h2>Limpieza de Docker</h2>
+      <p>Las actualizaciones dejan imágenes antiguas. Revisa antes de borrar:</p>
+<pre><code>docker system df
+df -h
+docker image prune          <span class="c"># imágenes sin etiqueta</span>
+docker image prune -a       <span class="c"># también imágenes con etiqueta que ningún contenedor usa (versiones viejas)</span></code></pre>
+      <div class="warn">
+        <b>Nunca <code>docker volume prune</code> ni <code>docker system prune --volumes</code></b> en un servidor
+        con datos. Ahí viven <code>pgdata</code>, <code>files</code> y <code>tokens</code>. Conservar la imagen
+        de la versión anterior un tiempo tampoco es mala idea: un rollback manual la necesita.
+      </div>
+
+      <h2 id="problemas">Problemas comunes</h2>
+      <table>
+        <tr><th>Síntoma</th><th>Causa</th><th>Solución</th></tr>
+        <tr>
+          <td>El kernel no arranca; el compose dice <code>Define NOVVUS_VERSION en .env</code> o una variable <code>required variable … is missing</code></td>
+          <td>Falta una variable obligatoria en el <code>.env</code> (el compose de producción no tiene defaults para secretos).</td>
+          <td>Compara tu <code>.env</code> con <code>.env.prod.example</code>; en una instalación CLI, <code>novvus update</code> añade las que falten.</td>
+        </tr>
+        <tr>
+          <td>El kernel arranca y muere; los logs mencionan <code>DATABASE_URL</code> o <code>password authentication failed</code></td>
+          <td>La contraseña del <code>.env</code> no coincide con la del volumen <code>pgdata</code> (se cambió después de inicializarlo).</td>
+          <td>Vuelve al valor original o cambia la contraseña dentro de Postgres (<code>ALTER USER</code>) antes de tocar el <code>.env</code>.</td>
+        </tr>
+        <tr>
+          <td><code>503 module "crm" runtime is not connected</code></td>
+          <td>El módulo está habilitado pero su proceso no hizo handshake: sin token, kernel inaccesible o proceso caído.</td>
+          <td>Logs del módulo. En Docker verifica que existe <code>/run/novvus/crm.env</code> en el volumen <code>tokens</code>; en dev, que exportaste <code>NOVVUS_SERVICE_TOKEN</code> y que <code>NOVVUS_KERNEL_URL</code> apunta al kernel.</td>
+        </tr>
+        <tr>
+          <td><code>503 module "crm" is not enabled</code></td>
+          <td>Módulo deshabilitado a nivel instancia, o no habilitado para esa organización.</td>
+          <td>Instancia: <code>POST /api/core/modules/crm/enable</code>. Organización: tienda <code>/apps</code> → Habilitar.</td>
+        </tr>
+        <tr>
+          <td>Perdí el <code>NOVVUS_SERVICE_TOKEN</code> — en Docker</td>
+          <td><code>bootstrap</code> lo escribió en el volumen <code>tokens</code> y el kernel guarda solo el hash. Si el volumen se borró, bootstrap se detiene con <code>ya estaba instalado pero no hay token</code>.</td>
+          <td>Restaura <code>tokens.tar.gz</code> del último backup. Si no hay, reinstala el módulo: <code>disable</code> → <code>uninstall</code> (con <code>{"confirm": true}</code>) (borra sus datos: restaura su esquema desde un dump después) → <code>docker compose up -d</code> para que bootstrap lo instale y publique el token nuevo.</td>
+        </tr>
+        <tr>
+          <td>Perdí el <code>NOVVUS_SERVICE_TOKEN</code> — en desarrollo</td>
+          <td><code>novvus deploy</code> lo imprimió una sola vez y no lo guardaste.</td>
+          <td>Con un JWT admin: <code>disable</code>, <code>uninstall</code> (con <code>{"confirm": true}</code>) y <code>novvus deploy</code> de nuevo. Es tu base de desarrollo: perder el esquema del módulo no debería doler; si duele, <code>novvus seed</code>.</td>
+        </tr>
+        <tr>
+          <td><code>Port 8077 is already in use</code> al instalar, o la web no levanta</td>
+          <td>Otro proceso escucha en el puerto de la web. El CLI nunca elige otro por su cuenta.</td>
+          <td><code>NOVVUS_WEB_PORT=8088 novvus install</code> (o cambia <code>NOVVUS_WEB_PORT</code> en el <code>.env</code> y <code>up -d</code>). En la demo, los puertos son <code>3000</code> y <code>8000</code>; <code>install.py</code> avisa si están ocupados.</td>
+        </tr>
+        <tr>
+          <td><code>error during connect</code> / Docker Desktop no responde</td>
+          <td>El daemon de Docker no está corriendo.</td>
+          <td>Linux: <code>sudo systemctl start docker</code>. Windows/macOS: abre Docker Desktop; <code>install.py</code> intenta abrirlo solo y espera hasta ~4 minutos. Si sigue sin responder, reinicia Docker Desktop (en Windows, revisa que WSL2 esté sano con <code>wsl --status</code>).</td>
+        </tr>
+        <tr>
+          <td><code>novvus update</code> terminó con <code>Update failed. Novvus Core was restored to 0.1.5.</code></td>
+          <td>Algo falló tras el backup (casi siempre una migración de módulo, que hace que <code>bootstrap</code> termine con error) y el rollback funcionó.</td>
+          <td>Estás en la versión anterior y sana. Lee <code>/opt/novvus/logs/update-*.log</code>: incluye los últimos 80 renglones de los servicios que no levantaron. Corrige y reintenta.</td>
+        </tr>
+        <tr>
+          <td><code>CRITICAL: automatic rollback failed</code> (exit 2)</td>
+          <td>Falló la actualización <em>y</em> el rollback.</td>
+          <td>No reintentes. <code>novvus status</code> muestra la fase y el backup; restaura a mano con los pasos de <a href="#restaurar">Restaurar</a> y sigue <a href="actualizacion.html#cliente">Actualización → si sale 2</a>.</td>
+        </tr>
+        <tr>
+          <td>Un servicio queda <code>unhealthy</code> o <code>starting</code> eternamente</td>
+          <td>El healthcheck real falla: el proceso arrancó pero no responde (kernel sin base, módulo sin handshake, web sin kernel).</td>
+          <td><code>docker compose … logs --tail=200 &lt;servicio&gt;</code>. Los healthchecks tienen timeout de 300 s en <code>install</code> y 420 s en <code>update</code>; si se agotan, el CLI imprime un diagnóstico por servicio.</td>
+        </tr>
+        <tr>
+          <td>Abrí la web recién instalada y no hay usuario para entrar</td>
+          <td>Es el <strong>first-run</strong>: en producción <code>bootstrap</code> no crea usuarios ni organizaciones.</td>
+          <td>Normal. "Crear cuenta" (será Owner) → "Crear organización" → tienda <code>/apps</code> → habilitar CRM y Projects. Las credenciales <code>demo@novvus.dev</code> solo existen en la demo local.</td>
+        </tr>
+        <tr>
+          <td>Habilité un módulo en la tienda y no aparece en el launcher</td>
+          <td>La caché del meta dura 60 s (ETag + <code>max-age</code>), o el usuario no tiene el permiso <code>read</code> de ningún modelo del módulo.</td>
+          <td>Espera un minuto o recarga; revisa los roles del usuario en Administración.</td>
+        </tr>
+        <tr>
+          <td>Subir un adjunto responde 413</td>
+          <td>Archivo mayor a <code>NOVVUS_FILES_MAX_SIZE_BYTES</code> (50 MB) o cuota de la organización agotada (<code>NOVVUS_FILES_ORG_QUOTA_BYTES</code>, 10 GB).</td>
+          <td>Sube el límite en el <code>.env</code> y reinicia el kernel, o libera espacio borrando adjuntos (el GC recupera el disco tras la retención).</td>
+        </tr>
+        <tr>
+          <td>Disco lleno</td>
+          <td>Backups acumulados en <code>/opt/novvus/backups/</code>, imágenes viejas o logs.</td>
+          <td><code>docker system df</code>, mueve backups fuera, <code>docker image prune -a</code>. Los logs de contenedor ya rotan solos (10 MB × 3).</td>
+        </tr>
+        <tr>
+          <td>Windows dev: <code>error calling dlltool</code> al compilar el kernel</td>
+          <td>Falta binutils para la toolchain GNU de Rust.</td>
+          <td>Instala WinLibs y antepón su <code>mingw64\bin</code> al <code>PATH</code>.</td>
+        </tr>
+        <tr>
+          <td>Windows dev: <code>Psycopg cannot use the 'ProactorEventLoop'</code></td>
+          <td>Ejecutaste uvicorn directo en vez de <code>novvus run</code>.</td>
+          <td><code>novvus run</code> fuerza el <code>SelectorEventLoop</code>; en tests, <code>conftest.py</code> hace lo mismo.</td>
+        </tr>
+      </table>
+
+      <h2>Revisión mensual sugerida</h2>
+      <ul>
+        <li>[ ] <code>novvus status</code> (o <code>ps</code>) devuelve todo sano.</li>
+        <li>[ ] El cron de backup dejó archivos ayer y se copiaron fuera del servidor.</li>
+        <li>[ ] Probaste restaurar un dump en otra máquina al menos una vez este trimestre.</li>
+        <li>[ ] <code>event_deliveries</code> no acumula filas <code>failed</code>.</li>
+        <li>[ ] Hay una versión nueva publicada (<code>novvus update</code> te lo dice sin aplicar nada si lo cancelas en la confirmación).</li>
+        <li>[ ] <code>/opt/novvus/backups/</code> no está creciendo sin control.</li>
+      </ul>
+
+      <nav class="page-nav">
+        <a href="actualizacion.html"><span class="dir">← Anterior</span>Actualización y releases</a>
+        <a class="next" href="tutorial-modulo.html"><span class="dir">Siguiente →</span>Tutorial: tu primer módulo</a>
+      </nav>
+    </article>
+  </main>
+</div>
+</body>
+</html>
